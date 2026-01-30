@@ -1,0 +1,182 @@
+import { Pool } from 'pg';
+
+let pool: Pool;
+
+export async function setupDatabase(): Promise<void> {
+  const config = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME || 'system_design_simulator',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  };
+
+  pool = new Pool(config);
+
+  // Test connection
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT NOW()');
+    client.release();
+    
+    // Initialize database schema
+    await initializeSchema();
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    throw error;
+  }
+}
+
+export function getDatabase(): Pool {
+  if (!pool) {
+    throw new Error('Database not initialized. Call setupDatabase() first.');
+  }
+  return pool;
+}
+
+async function initializeSchema(): Promise<void> {
+  const client = await pool.connect();
+  
+  try {
+    // Create tables if they don't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workspaces (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        user_id VARCHAR(255) NOT NULL,
+        configuration JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS components (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        position JSONB NOT NULL,
+        configuration JSONB NOT NULL DEFAULT '{}',
+        metadata JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS connections (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        source_component_id UUID NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+        target_component_id UUID NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+        source_port VARCHAR(100) NOT NULL,
+        target_port VARCHAR(100) NOT NULL,
+        configuration JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS scenarios (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        objectives JSONB NOT NULL DEFAULT '[]',
+        initial_setup JSONB NOT NULL DEFAULT '{}',
+        evaluation_criteria JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_progress (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(255) NOT NULL,
+        scenario_id UUID NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        score INTEGER,
+        feedback JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(user_id, scenario_id)
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workspace_versions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        version_number INTEGER NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        snapshot JSONB NOT NULL,
+        performance_metrics JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_by VARCHAR(255) NOT NULL,
+        UNIQUE(workspace_id, version_number)
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ab_tests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        variants JSONB NOT NULL,
+        traffic_split JSONB NOT NULL,
+        duration INTEGER NOT NULL,
+        metrics JSONB NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'draft',
+        results JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        started_at TIMESTAMP WITH TIME ZONE,
+        completed_at TIMESTAMP WITH TIME ZONE
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS performance_reports (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        version_id UUID REFERENCES workspace_versions(id) ON DELETE CASCADE,
+        report_type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        summary TEXT,
+        content JSONB NOT NULL,
+        generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_by VARCHAR(255),
+        shared BOOLEAN DEFAULT FALSE,
+        share_token VARCHAR(255) UNIQUE
+      );
+    `);
+
+    // Create indexes for better performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_workspaces_user_id ON workspaces(user_id);
+      CREATE INDEX IF NOT EXISTS idx_components_workspace_id ON components(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_connections_workspace_id ON connections(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_user_progress_user_id ON user_progress(user_id);
+      CREATE INDEX IF NOT EXISTS idx_workspace_versions_workspace_id ON workspace_versions(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_workspace_versions_version_number ON workspace_versions(workspace_id, version_number);
+      CREATE INDEX IF NOT EXISTS idx_ab_tests_workspace_id ON ab_tests(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_ab_tests_status ON ab_tests(status);
+      CREATE INDEX IF NOT EXISTS idx_performance_reports_workspace_id ON performance_reports(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_performance_reports_version_id ON performance_reports(version_id);
+      CREATE INDEX IF NOT EXISTS idx_performance_reports_share_token ON performance_reports(share_token);
+    `);
+
+    console.log('✅ Database schema initialized');
+  } catch (error) {
+    console.error('Failed to initialize database schema:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
