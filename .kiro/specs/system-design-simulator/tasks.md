@@ -1,459 +1,440 @@
-# Implementation Plan: Enhanced System Design Simulator SaaS Platform
+# Implementation Plan: System Design Simulation & Learning Platform (SaaS)
 
 ## Overview
 
-This implementation plan breaks down the Enhanced System Design Simulator SaaS platform into discrete coding tasks that build incrementally toward a fully functional multi-tenant learning platform focused on teaching causality, tradeoffs, and engineering intuition. The approach prioritizes the four Core Backend Engines (System Graph Engine, Load Simulation Engine, Distributed Systems Behavior Library, Cost Modeling Engine) and enhanced frontend components while maintaining comprehensive SaaS foundation.
+This implementation plan breaks down the System Design Simulation & Learning Platform into discrete coding tasks that build incrementally toward a fully functional SaaS platform implementing all SRS functional requirements (FR-1 through FR-10). The approach prioritizes the core user journey: **"Build a system. Scale it. Watch it break. Fix it."** while ensuring compliance with all SRS non-functional requirements (NFR-1 through NFR-17).
 
-The implementation emphasizes the unique value proposition: teaching "why" behind architectural decisions through hands-on simulation with real-time feedback, 10 specific industry-standard components, and collaborative learning experiences similar to Figma.
+The implementation emphasizes the unique value proposition of experiential learning through realistic simulation, focusing on the **Build → Scale → Break → Observe → Fix → Repeat** learning loop that transforms system design education from static diagram memorization to hands-on experience.
 
 ## Tasks
 
-### Phase 1: Core Backend Engines Foundation
-
-- [x] 1. System Graph Engine (SGE) Development
-  - [x] 1.1 Create System Graph Engine core architecture
-    - Implement DAG representation with capacity limits, latency curves, and throughput limits per component
-    - Create component modeling for the 10 specific component types (Client, Load Balancer, API Gateway, Service, Cache, Queue, Database, CDN, Search Index, Object Storage)
-    - Implement end-to-end latency calculation by graph traversal
-    - Add circular dependency detection and prevention
-    - _Requirements: 6.1, 6.2, 6.4_
-
-  - [x]* 1.2 Write property test for System Graph Engine
-    - **Property 5: System Graph Engine Modeling**
-    - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5**
-
-  - [x] 1.3 Implement realistic degradation modeling
-    - Model degradation patterns when capacity is exceeded (increased latency, dropped requests, cascading failures)
-    - Add dynamic reconfiguration during simulation without restart
-    - Create performance curve modeling for each component type
-    - _Requirements: 6.3, 6.5_
-
-- [-] 2. Load Simulation Engine (LSE) Development
-  - [x] 2.1 Create Load Simulation Engine with queueing theory
-    - Implement Poisson arrival processes with configurable lambda values
-    - Add backpressure propagation through system graph
-    - Implement queueing theory calculations (M/M/1, M/M/c queues) for wait times and queue lengths
-    - Create realistic overflow behavior (request dropping, circuit breaker activation)
-    - _Requirements: 7.1, 7.2, 7.3, 7.4_
-
-  - [ ]* 2.2 Write property test for Load Simulation Engine
-    - **Property 6: Load Simulation Engine with Queueing Theory**
-    - **Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5**
-
-  - [x] 2.3 Implement traffic pattern generation
-    - Add burst traffic patterns and gradual ramp-up scenarios
-    - Create realistic user behavior modeling
-    - Implement geographic distribution simulation
-    - _Requirements: 7.5_
-
-- [x] 3. Distributed Systems Behavior Library (DSBL) Development
-  - [x] 3.1 Create distributed systems behavior models
-    - Model database consistency levels (strong, eventual, weak) with performance/availability tradeoffs
-    - Implement replication lag and split-brain scenario simulation
-    - Add sharding strategies (range-based, hash-based, directory-based) with hotspot detection
-    - Create network partition simulation and impact modeling
-    - _Requirements: 8.1, 8.2, 8.3, 8.4_
-
-  - [ ]* 3.2 Write property test for Distributed Systems Behavior Library
-    - **Property 7: Distributed Systems Behavior Library**
-    - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5**
-
-  - [x] 3.3 Implement consensus algorithms
-    - Model consensus algorithms (Raft, PBFT) for distributed coordination scenarios
-    - Add Byzantine fault tolerance modeling
-    - Create leader election and failover scenarios
-    - _Requirements: 8.5_
-
-- [ ] 4. Cost Modeling Engine (CME) Development
-  - [ ] 4.1 Create Cost Modeling Engine with live feedback
-    - Implement real-time cost calculation based on component types, instance sizes, data transfer, storage usage
-    - Create live cost meter with monthly projection and component-level breakdown
-    - Add configurable bankruptcy warnings and cost optimization suggestions
-    - Model realistic cloud pricing (compute, storage, network, managed services)
-    - _Requirements: 9.1, 9.2, 9.3, 9.4_
-
-  - [ ]* 4.2 Write property test for Cost Modeling Engine
-    - **Property 8: Cost Modeling Engine with Live Feedback**
-    - **Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5**
-
-  - [ ] 4.3 Implement cost comparison and optimization
-    - Create cost comparison views showing architectural change impacts
-    - Add cost optimization recommendation engine
-    - Implement cost vs performance tradeoff analysis
-    - _Requirements: 9.5_
-
-### Phase 2: SaaS Foundation and Multi-Tenant Architecture
-
-- [ ] 5. Authentication and User Management System
-  - [ ] 5.1 Create User Service with multi-provider authentication
-    - Implement JWT-based authentication with refresh tokens
-    - Integrate multiple OAuth providers (Google, GitHub)
-    - Create email verification and password reset flows
-    - Add user profile management with learning preferences
-    - _Requirements: 18.1, 18.2, 18.3, 18.5_
-
-  - [ ]* 5.2 Write property test for user authentication
-    - **Property 16: User Authentication and Account Management**
-    - **Validates: Requirements 18.1, 18.2, 18.3, 18.5, 18.6**
-
-  - [ ]* 5.3 Write property test for password reset
-    - **Property 17: Password Reset Round-Trip**
-    - **Validates: Requirements 18.4**
-
-  - [ ] 5.4 Implement account management features
-    - Add profile updates with validation
-    - Create account deletion with proper data cleanup
-    - Implement session management across devices
-    - _Requirements: 18.4, 18.6_
-
-- [ ] 6. Multi-Tenant Architecture Implementation
-  - [ ] 6.1 Create Tenant Service with data isolation
-    - Implement tenant-scoped database operations
-    - Create tenant management with organization support
-    - Add resource quotas and billing integration
-    - Implement tenant-scoped API middleware
-    - _Requirements: 19.1, 19.2, 19.3, 19.4_
-
-  - [ ]* 6.2 Write property test for multi-tenant isolation
-    - **Property 18: Multi-Tenant Data Isolation**
-    - **Validates: Requirements 19.1, 19.2**
-
-  - [ ]* 6.3 Write property test for organization tenancy
-    - **Property 19: Organization Tenancy and Resource Management**
-    - **Validates: Requirements 19.3, 19.4**
-
-  - [ ] 6.4 Implement tenant analytics and monitoring
-    - Create tenant-scoped analytics collection
-    - Add usage monitoring and reporting
-    - Implement resource utilization tracking
-    - _Requirements: 19.5_
-
-  - [ ]* 6.5 Write property test for tenant analytics
-    - **Property 20: Tenant Analytics Collection**
-    - **Validates: Requirements 19.5**
-
-### Phase 3: Enhanced Frontend Components
-
-- [ ] 7. Visual System Builder with Specific Components
-  - [ ] 7.1 Create Visual System Builder with 10 specific components
-    - Implement component library with exactly: Client, Load Balancer, API Gateway, Service, Cache, Queue, Database, CDN, Search Index, Object Storage
-    - Create component-specific icons, labels, and configuration panels
-    - Implement drag-and-drop with component positioning and selection
-    - Add support for multiple instances with unique identifiers
-    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
-
-  - [ ]* 7.2 Write property test for Visual System Builder
-    - **Property 1: Visual System Builder Component Management**
-    - **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5**
-
-  - [ ] 7.3 Implement enhanced wire system with network properties
-    - Create wire system requiring latency, bandwidth, and retry policy configuration
-    - Add visual representation of wire properties (thickness for bandwidth, color for latency, icons for retry policies)
-    - Implement connection compatibility validation
-    - Add real-time wire property modification
-    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-  - [ ]* 7.4 Write property test for enhanced wire management
-    - **Property 2: Enhanced Wire Management with Network Properties**
-    - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5**
-
-- [ ] 8. Traffic & Scale Simulator and Bottleneck Visualizer
-  - [ ] 8.1 Create Traffic & Scale Simulator with single slider
-    - Implement logarithmic scale slider (1, 1K, 1M, 1B users)
-    - Add automatic calculation of QPS, concurrent connections, data volume, cache hit ratios, queue depth, disk IOPS, network saturation
-    - Ensure real-time updates within 100ms of slider movement
-    - Integrate with Core Backend Engines for realistic simulation
-    - _Requirements: 3.1, 3.2_
-
-  - [ ] 8.2 Create Bottleneck Visualizer with color-coded feedback
-    - Implement real-time color-coded component states (green=healthy, yellow=stressed, red=bottleneck, black=failed)
-    - Add specific bottleneck indicators showing limiting resources (CPU %, memory %, network %, disk I/O %)
-    - Create real-time performance metric overlays on components
-    - Add bottleneck propagation visualization through system graph
-    - _Requirements: 3.3, 3.4_
-
-  - [ ]* 8.3 Write property test for Traffic Scale Simulation
-    - **Property 3: Traffic Scale Simulation with Real-Time Feedback**
-    - **Validates: Requirements 3.2, 3.3, 3.4**
-
-- [ ] 9. Constraint Injector and Learning Modes
-  - [ ] 9.1 Create Constraint Injector with specific failure types
-    - Implement 6 specific failure types: DB node down, network latency spikes, cache eviction storms, cost ceiling exceeded, GC pauses, cold starts
-    - Add configurable constraint severity (mild, moderate, severe) and duration (5s, 30s, 5min, permanent)
-    - Create chaos mode for random multiple constraint injection
-    - Add visual constraint indicators on affected components
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
-
-  - [ ]* 9.2 Write property test for Constraint Injection
-    - **Property 4: Constraint Injection and Chaos Engineering**
-    - **Validates: Requirements 4.2, 4.3, 4.4, 4.5**
-
-  - [ ] 9.3 Implement Learning Modes interface
-    - Create unified interface for Free Play Mode (unlimited access), Guided Scenarios (Twitter Feed, WhatsApp Messaging, Netflix Streaming, UPI Payments), Interview Mode (timer, hidden spikes, critique), Instructor Mode (control, attention guidance)
-    - Add mode-specific UI components and progress tracking
-    - Integrate with curriculum engine for mode orchestration
-    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
-
-### Phase 4: Learning System and Curriculum Engine
-
-- [ ] 10. Curriculum Engine and Learning Paths
-  - [ ] 10.1 Create curriculum engine with causality focus
-    - Implement learning path data models emphasizing engineering intuition
-    - Create curriculum progression logic focused on tradeoff understanding
-    - Set up skill assessment system for causality comprehension
-    - Add personalized recommendation engine for engineering decision-making
-    - _Requirements: 20.1, 20.2, 20.4_
-
-  - [ ]* 10.2 Write property test for learning progression
-    - **Property 21: Learning Path Progression**
-    - **Validates: Requirements 20.1, 20.2, 20.5**
-
-  - [ ]* 10.3 Write property test for curriculum adaptation
-    - **Property 22: Curriculum Adaptation and Personalization**
-    - **Validates: Requirements 20.4**
-
-  - [ ] 10.4 Implement specialized learning tracks
-    - Create domain-specific learning paths (web applications, mobile backends, data processing, real-time systems)
-    - Build scaling scenario library with progressive complexity
-    - Implement challenge mode with constraints and competitive features
-    - Add achievement and milestone tracking system
-    - _Requirements: 20.3_
-
-  - [ ]* 10.5 Write property test for learning tracks
-    - **Property 23: Learning Track Availability**
-    - **Validates: Requirements 20.3**
-
-- [ ] 11. Guided Scenarios Implementation
-  - [ ] 11.1 Create guided scenario system
-    - Implement exactly four scenarios: Twitter Feed, WhatsApp Messaging, Netflix Streaming, UPI Payments
-    - Create scenario loading with initial requirements, constraints, and success criteria
-    - Add progressive hints and guidance during scenario execution
-    - Implement scenario evaluation against real-world implementations
-    - _Requirements: 14.1, 14.2, 14.3, 14.4_
-
-  - [ ] 11.2 Implement scenario progression and tracking
-    - Add progress tracking across scenarios with unlock system
-    - Create advanced variations (e.g., Twitter at different scales, WhatsApp with end-to-end encryption)
-    - Implement detailed feedback and performance evaluation
-    - Add scenario completion analytics and insights
-    - _Requirements: 14.5_
-
-  - [ ]* 11.3 Write property test for scenario execution
-    - **Property 12: Enhanced Simulation Engine with Causality Focus**
-    - **Validates: Requirements 13.1, 13.2, 13.3, 13.5**
-
-### Phase 5: Multiplayer Canvas and Collaboration
-
-- [ ] 12. Multiplayer Canvas Implementation
-  - [ ] 12.1 Create Multiplayer Canvas with Figma-like collaboration
-    - Implement real-time collaborative editing with multiple users
-    - Add user cursors with names and colors, live component movements
-    - Implement operational transformation for concurrent edit handling
-    - Create voice/video integration for live teaching sessions
-    - _Requirements: 10.1, 10.2, 10.3, 10.5_
-
-  - [ ]* 12.2 Write property test for Multiplayer Canvas
-    - **Property 9: Multiplayer Canvas Collaboration**
-    - **Validates: Requirements 10.1, 10.2, 10.3, 10.4**
-
-  - [ ] 12.3 Implement Instructor Mode and attention guidance
-    - Add instructor control takeover and component highlighting
-    - Create student attention guidance system
-    - Implement screen sharing capabilities
-    - Add live teaching session management
-    - _Requirements: 10.4_
-
-- [ ] 13. Template Sharing and Public Gallery
-  - [ ] 13.1 Create template sharing system
-    - Implement scenario publishing as public templates with descriptions and learning objectives
-    - Create searchable template gallery organized by difficulty, use case, architectural patterns
-    - Add template import with full configuration preservation (round-trip property)
-    - Implement rating and review system for templates
-    - _Requirements: 11.1, 11.2, 11.3, 11.4_
-
-  - [ ]* 13.2 Write property test for Template Sharing
-    - **Property 10: Template Sharing and Versioning**
-    - **Validates: Requirements 11.1, 11.2, 11.3, 11.4, 11.5**
-
-  - [ ] 13.3 Implement template versioning and notifications
-    - Add template versioning with change tracking
-    - Create update notifications when authors publish improvements
-    - Implement template migration and compatibility handling
-    - _Requirements: 11.5_
-
-### Phase 6: Enhanced Workspace Management
-
-- [ ] 14. Workspace Management with Collaboration
-  - [ ] 14.1 Create enhanced workspace system with multiplayer support
-    - Implement tenant-scoped workspace operations with collaboration features
-    - Add workspace quotas and resource management
-    - Create workspace versioning and history with collaborative editing support
-    - Integrate with Multiplayer Canvas for real-time synchronization
-    - _Requirements: 15.1, 15.4, 19.1, 19.2_
-
-  - [ ]* 14.2 Write property test for workspace persistence
-    - **Property 11: Workspace Persistence Round-Trip**
-    - **Validates: Requirements 15.1, 15.4**
-
-  - [ ] 14.3 Enhance workspace export and import with template support
-    - Update export format with tenant, collaboration, and template data
-    - Add workspace sharing via export/import with full configuration preservation
-    - Implement workspace migration between tenants
-    - Create workspace backup and restore functionality
-    - _Requirements: 15.3, 15.5_
-
-### Phase 7: Analytics and Learning Insights
-
-- [ ] 15. Learning Analytics System
-  - [ ] 15.1 Implement learning analytics service with causality tracking
-    - Create analytics data collection system focusing on decision-making patterns
-    - Implement learning effectiveness measurement for causality and engineering intuition
-    - Add progress tracking and reporting with tradeoff analysis focus
-    - Set up ML pipeline for personalization based on engineering skill development
-    - _Requirements: 22.1, 22.2, 22.3, 22.4_
-
-  - [ ]* 15.2 Write property test for analytics accuracy
-    - **Property 29: Learning Analytics Accuracy**
-    - **Validates: Requirements 22.1, 22.3**
-
-  - [ ] 15.3 Create instructor and admin dashboards
-    - Build student progress dashboards for instructors
-    - Implement platform-wide analytics for administrators
-    - Add personalized learning recommendations
-    - Create learning effectiveness reporting
-    - _Requirements: 22.5_
-
-### Phase 8: Core Backend Engines Integration
-
-- [ ] 16. Core Backend Engines Integration with Enhanced Frontend
-  - [ ] 16.1 Integrate System Graph Engine with Visual System Builder
-    - Connect SGE with the 10 specific component types in Visual System Builder
-    - Implement real-time graph updates when components are added/modified
-    - Add component capacity and performance curve visualization
-    - Integrate with wire property system for latency/bandwidth modeling
-    - _Requirements: 1.1, 1.2, 1.3, 6.1, 6.2_
-
-  - [ ] 16.2 Integrate Load Simulation Engine with Traffic & Scale Simulator
-    - Connect LSE with Traffic & Scale Simulator slider (1, 1K, 1M, 1B users)
-    - Implement automatic QPS, connection, and resource calculation
-    - Add real-time load distribution through system graph
-    - Connect with Bottleneck Visualizer for performance feedback
-    - _Requirements: 3.2, 7.1, 7.2_
-
-  - [ ] 16.3 Integrate Constraint Injector with all engines
-    - Connect Constraint Injector with System Graph Engine for failure modeling
-    - Integrate with Load Simulation Engine for traffic impact simulation
-    - Add constraint effects to Distributed Systems Behavior Library
-    - Connect with Cost Modeling Engine for cost impact of failures
-    - _Requirements: 4.2, 6.3, 7.4, 8.4, 9.3_
-
-### Phase 9: Enhanced Component Behavior Modeling
-
-- [ ] 17. Component Behavior Implementation
-  - [ ] 17.1 Implement Database component behavior
-    - Model realistic query processing times, connection pooling, transaction isolation
-    - Add storage I/O patterns and scaling characteristics
-    - Implement consistency levels and replication behavior
-    - Create performance degradation under load
-    - _Requirements: 17.1_
-
-  - [ ] 17.2 Implement Load Balancer component behavior
-    - Model different algorithms (round-robin, least connections, weighted, consistent hashing)
-    - Add health checking with failure detection
-    - Implement session affinity and SSL termination
-    - Create scaling and failover behavior
-    - _Requirements: 17.2_
-
-  - [ ] 17.3 Implement Cache component behavior
-    - Model configurable hit/miss ratios and eviction policies (LRU, LFU, TTL)
-    - Add memory constraints and cache warming behavior
-    - Implement distributed caching with sharding
-    - Create performance characteristics under different loads
-    - _Requirements: 17.3_
-
-  - [ ] 17.4 Implement remaining component behaviors
-    - Model API Gateway with rate limiting, authentication overhead, request routing
-    - Implement CDN with geographic distribution, cache hierarchies, origin pull behavior
-    - Add Queue components with messaging patterns, backpressure handling, durability
-    - Create Search Index with indexing latency, query complexity scaling
-    - Model Object Storage with throughput limits, consistency models, multi-part uploads
-    - _Requirements: 17.4, 17.5, 17.6, 17.7, 17.8_
-
-  - [ ]* 17.5 Write property test for component behavior
-    - **Property 15: Component Behavioral Consistency**
-    - **Validates: Requirements 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8**
-
-### Phase 10: Microservices Architecture Setup
-
-- [ ] 18. SaaS Infrastructure and Microservices
-  - [ ] 18.1 Set up containerized microservices architecture
-    - Initialize Docker containers for each microservice
-    - Set up API Gateway with Kong or similar
-    - Configure service discovery and load balancing
-    - Set up monitoring with Prometheus and Grafana
-    - _Requirements: 21.1, 21.3_
-
-  - [ ] 18.2 Implement auto-scaling and reliability
-    - Configure auto-scaling capabilities for varying user loads
-    - Implement proper failover and disaster recovery mechanisms
-    - Add comprehensive monitoring, logging, and alerting
-    - Set up rate limiting and DDoS protection
-    - _Requirements: 21.2, 21.4, 21.5_
-
-### Phase 11: Integration and System Testing
-
-- [ ] 19. Checkpoint - Core System Integration
-  - [ ] 19.1 Integrate all microservices and test end-to-end workflows
-    - Connect all microservices through API Gateway
-    - Test complete user journeys from registration to advanced scenarios
-    - Verify multi-tenant isolation and security
-    - Test scale simulation workflows with all Core Backend Engines
-    - _Requirements: All requirements_
-
-  - [ ] 19.2 Write comprehensive integration tests
-    - Test multi-tenant user workflows across all user classes
-    - Verify collaboration and real-time features
-    - Test scale simulation accuracy and performance
-    - Validate learning progression and analytics
-    - Test template sharing and community features
-
-### Phase 12: Production Readiness and Deployment
-
-- [ ] 20. Production Deployment and Monitoring
-  - [ ] 20.1 Set up production infrastructure for enhanced platform
-    - Deploy containerized services with Core Backend Engines to cloud platform
-    - Configure auto-scaling for simulation workloads and load balancing
-    - Set up database clustering and replication for multi-tenant data
-    - Implement backup and disaster recovery for all enhanced features
-    - _Requirements: 21.1, 21.2, 21.4_
-
-  - [ ] 20.2 Implement comprehensive monitoring and alerting
-    - Set up application performance monitoring for Core Backend Engines
-    - Create health checks and uptime monitoring for enhanced features
-    - Implement security monitoring and threat detection for multi-tenant platform
-    - Add business metrics and usage analytics for learning effectiveness
-    - _Requirements: 21.3, 21.5_
-
-  - [ ] 20.3 Security hardening and compliance
-    - Implement rate limiting and DDoS protection for simulation workloads
-    - Add security headers and HTTPS enforcement
-    - Set up data encryption at rest and in transit for multi-tenant data
-    - Implement audit logging and compliance reporting
-    - _Requirements: 21.5_
-
-- [ ] 21. Final checkpoint - Complete Enhanced Platform Validation
-  - Ensure all tests pass, all Core Backend Engines are functioning correctly, enhanced frontend components provide real-time feedback, multi-tenant architecture is secure and scalable, and the platform successfully teaches causality and engineering intuition through hands-on simulation. Ask the user if questions arise.
+### Phase 1: SRS FR-1 - User Authentication & Account Management
+
+- [ ] 1. User Authentication System (SRS FR-1)
+  - [ ] 1.1 Create user registration with email and OAuth
+    - Implement email registration per SRS FR-1.1
+    - Integrate Google and GitHub OAuth providers per SRS FR-1.1
+    - Create secure account creation with email verification
+    - Add user profile management and preferences
+    - _Requirements: SRS FR-1.1_
+
+  - [ ]* 1.2 Write property test for user authentication
+    - **Property 1: User Authentication Round-Trip**
+    - **Validates: SRS FR-1.1, FR-1.2**
+
+  - [ ] 1.3 Implement login and logout functionality
+    - Create secure login system per SRS FR-1.2
+    - Implement session management with JWT tokens per SRS FR-1.2
+    - Add logout functionality with session cleanup per SRS FR-1.2
+    - Create password reset and account recovery flows
+    - _Requirements: SRS FR-1.2_
+
+  - [ ] 1.4 Implement design management features
+    - Create save, load, and delete design functionality per SRS FR-1.3
+    - Add design versioning and history tracking per SRS FR-1.3
+    - Implement design sharing and export capabilities per SRS FR-1.3
+    - _Requirements: SRS FR-1.3_
+
+  - [ ] 1.5 Create subscription tier system
+    - Implement free and paid tier support per SRS FR-1.4
+    - Add billing integration and subscription management per SRS FR-1.4
+    - Create feature access controls based on subscription tier per SRS FR-1.4
+    - _Requirements: SRS FR-1.4_
+
+### Phase 2: SRS FR-2 - Visual System Design Canvas
+
+- [ ] 2. Visual Canvas Implementation (SRS FR-2)
+  - [ ] 2.1 Create drag-and-drop canvas interface
+    - Implement drag-and-drop component placement per SRS FR-2.1
+    - Create visual canvas with grid snapping and zoom per SRS FR-2.1
+    - Add component selection and highlighting per SRS FR-2.1
+    - Implement component positioning and movement per SRS FR-2.1
+    - _Requirements: SRS FR-2.1_
+
+  - [ ]* 2.2 Write property test for canvas operations
+    - **Property 2: Canvas Component Management**
+    - **Validates: SRS FR-2.1, FR-2.2**
+
+  - [ ] 2.3 Implement component connection system
+    - Create visual edge connections between components per SRS FR-2.2
+    - Add connection parameter configuration per SRS FR-2.2
+    - Implement connection validation and feedback per SRS FR-2.2
+    - _Requirements: SRS FR-2.2_
+
+  - [ ] 2.4 Add component parameter configuration
+    - Create component-specific configuration panels per SRS FR-2.3
+    - Implement parameter validation and real-time updates per SRS FR-2.3
+    - Add parameter presets and templates per SRS FR-2.3
+    - _Requirements: SRS FR-2.3_
+
+  - [ ] 2.5 Implement connection validation
+    - Create connection compatibility checking per SRS FR-2.4
+    - Add invalid connection prevention with clear feedback per SRS FR-2.4
+    - Implement connection type validation per SRS FR-2.4
+    - _Requirements: SRS FR-2.4_
+
+  - [ ] 2.6 Add component grouping and labeling
+    - Implement component grouping functionality per SRS FR-2.5
+    - Create labeling system for component organization per SRS FR-2.5
+    - Add visual grouping indicators and management per SRS FR-2.5
+    - _Requirements: SRS FR-2.5_
+
+### Phase 3: SRS FR-3 - Component Library
+
+- [ ] 3. Standard Component Library (SRS FR-3)
+  - [ ] 3.1 Create standard component catalog
+    - Implement Load Balancer component per SRS FR-3.1
+    - Create Database component with ACID properties per SRS FR-3.1
+    - Add Cache component with eviction policies per SRS FR-3.1
+    - Implement Queue component with messaging patterns per SRS FR-3.1
+    - Create CDN component with geographic distribution per SRS FR-3.1
+    - Add Service component with scaling options per SRS FR-3.1
+    - _Requirements: SRS FR-3.1_
+
+  - [ ]* 3.2 Write property test for component library
+    - **Property 3: Component Library Functionality**
+    - **Validates: SRS FR-3.1, FR-3.2**
+
+  - [ ] 3.3 Implement component capacity limits
+    - Add realistic capacity limits for each component type per SRS FR-3.2
+    - Create capacity monitoring and alerting per SRS FR-3.2
+    - Implement capacity-based performance modeling per SRS FR-3.2
+    - _Requirements: SRS FR-3.2_
+
+  - [ ] 3.4 Add scaling strategies
+    - Implement vertical scaling options per SRS FR-3.3
+    - Create horizontal scaling configurations per SRS FR-3.3
+    - Add auto-scaling policies and triggers per SRS FR-3.3
+    - _Requirements: SRS FR-3.3_
+
+  - [ ] 3.5 Implement consistency and replication options
+    - Add database consistency levels (strong, eventual, weak) per SRS FR-3.4
+    - Create cache consistency and replication settings per SRS FR-3.4
+    - Implement replication factor configuration per SRS FR-3.4
+    - _Requirements: SRS FR-3.4_
+
+### Phase 4: SRS FR-4 - Traffic & Load Simulation Engine
+
+- [ ] 4. Traffic Simulation Engine (SRS FR-4)
+  - [ ] 4.1 Create traffic generation system
+    - Implement user count and QPS configuration per SRS FR-4.1
+    - Create traffic pattern generation (steady, bursty) per SRS FR-4.1
+    - Add realistic user behavior modeling per SRS FR-4.1
+    - _Requirements: SRS FR-4.1_
+
+  - [ ] 4.2 Implement load propagation
+    - Create system graph traversal for load distribution per SRS FR-4.2
+    - Implement realistic load propagation through components per SRS FR-4.2
+    - Add load balancing and routing logic per SRS FR-4.2
+    - _Requirements: SRS FR-4.2_
+
+  - [ ] 4.3 Add queueing and backpressure modeling
+    - Implement queueing theory calculations (M/M/1, M/M/c) per SRS FR-4.3
+    - Create backpressure propagation through system graph per SRS FR-4.3
+    - Add queue overflow and capacity handling per SRS FR-4.3
+    - _Requirements: SRS FR-4.3_
+
+  - [ ]* 4.4 Write property test for traffic simulation
+    - **Property 4: Traffic Simulation Accuracy**
+    - **Validates: SRS FR-4.1, FR-4.2, FR-4.3**
+
+  - [ ] 4.5 Implement retry and timeout mechanisms
+    - Create retry logic with exponential backoff per SRS FR-4.4
+    - Add timeout handling and circuit breaker patterns per SRS FR-4.4
+    - Implement failure detection and recovery per SRS FR-4.4
+    - _Requirements: SRS FR-4.4_
+
+  - [ ] 4.6 Add traffic pattern support
+    - Implement bursty traffic generation per SRS FR-4.5
+    - Create steady-state load simulation per SRS FR-4.5
+    - Add gradual ramp-up and ramp-down patterns per SRS FR-4.5
+    - _Requirements: SRS FR-4.5_
+
+### Phase 5: SRS FR-5 - Scale Control
+
+- [ ] 5. Dynamic Scale Control (SRS FR-5)
+  - [ ] 5.1 Create scale control interface
+    - Implement dynamic scale adjustment from 1 user to 1 billion per SRS FR-5.1
+    - Create logarithmic scale slider with key points per SRS FR-5.1
+    - Add real-time scale parameter updates per SRS FR-5.1
+    - _Requirements: SRS FR-5.1_
+
+  - [ ] 5.2 Implement real-time metrics updates
+    - Create sub-100ms metric update system per SRS FR-5.2 and NFR-1
+    - Implement real-time performance monitoring per SRS FR-5.2
+    - Add live metric streaming via WebSocket per SRS FR-5.2
+    - _Requirements: SRS FR-5.2, NFR-1_
+
+  - [ ]* 5.3 Write property test for scale control
+    - **Property 5: Scale Control Accuracy**
+    - **Validates: SRS FR-5.1, FR-5.2**
+
+  - [ ] 5.4 Add bottleneck visualization
+    - Implement visual bottleneck highlighting per SRS FR-5.3
+    - Create color-coded component status indicators per SRS FR-5.3
+    - Add bottleneck analysis and reporting per SRS FR-5.3
+    - _Requirements: SRS FR-5.3_
+
+  - [ ] 5.5 Implement system collapse detection
+    - Create system failure detection algorithms per SRS FR-5.4
+    - Add cascade failure modeling per SRS FR-5.4
+    - Implement system recovery monitoring per SRS FR-5.4
+    - _Requirements: SRS FR-5.4_
+
+### Phase 6: SRS FR-6 - Failure & Constraint Injection
+
+- [ ] 6. Failure Injection System (SRS FR-6)
+  - [ ] 6.1 Create component failure injection
+    - Implement component disable functionality per SRS FR-6.1
+    - Add partial failure and degraded mode simulation per SRS FR-6.1
+    - Create failure impact propagation per SRS FR-6.1
+    - _Requirements: SRS FR-6.1_
+
+  - [ ] 6.2 Implement latency injection
+    - Create configurable network latency injection per SRS FR-6.2
+    - Add latency spike simulation per SRS FR-6.2
+    - Implement jitter and packet loss modeling per SRS FR-6.2
+    - _Requirements: SRS FR-6.2_
+
+  - [ ] 6.3 Add network partition simulation
+    - Implement network partition scenarios per SRS FR-6.3
+    - Create split-brain condition modeling per SRS FR-6.3
+    - Add partition recovery simulation per SRS FR-6.3
+    - _Requirements: SRS FR-6.3_
+
+  - [ ]* 6.4 Write property test for failure injection
+    - **Property 6: Failure Injection and Recovery**
+    - **Validates: SRS FR-6.1, FR-6.2, FR-6.3**
+
+  - [ ] 6.5 Implement regional outage simulation
+    - Create multi-component regional failure per SRS FR-6.4
+    - Add geographic failure pattern modeling per SRS FR-6.4
+    - Implement disaster recovery scenarios per SRS FR-6.4
+    - _Requirements: SRS FR-6.4_
+
+  - [ ] 6.6 Add recovery behavior monitoring
+    - Create recovery pattern observation per SRS FR-6.5
+    - Implement recovery time tracking per SRS FR-6.5
+    - Add recovery strategy analysis per SRS FR-6.5
+    - _Requirements: SRS FR-6.5_
+
+### Phase 7: SRS FR-7 - Metrics & Observability Dashboard
+
+- [ ] 7. Metrics and Observability (SRS FR-7)
+  - [ ] 7.1 Implement latency metrics
+    - Create p50, p95, p99 latency tracking per SRS FR-7.1
+    - Add latency histogram and distribution analysis per SRS FR-7.1
+    - Implement latency trend monitoring per SRS FR-7.1
+    - _Requirements: SRS FR-7.1_
+
+  - [ ] 7.2 Add error rate monitoring
+    - Implement error rate calculation and tracking per SRS FR-7.2
+    - Create error categorization and analysis per SRS FR-7.2
+    - Add error rate alerting and thresholds per SRS FR-7.2
+    - _Requirements: SRS FR-7.2_
+
+  - [ ] 7.3 Create throughput monitoring
+    - Implement throughput measurement and tracking per SRS FR-7.3
+    - Add throughput trend analysis per SRS FR-7.3
+    - Create throughput capacity planning per SRS FR-7.3
+    - _Requirements: SRS FR-7.3_
+
+  - [ ]* 7.4 Write property test for metrics accuracy
+    - **Property 7: Metrics Collection Accuracy**
+    - **Validates: SRS FR-7.1, FR-7.2, FR-7.3**
+
+  - [ ] 7.5 Add resource saturation monitoring
+    - Implement CPU, memory, network, storage monitoring per SRS FR-7.4
+    - Create resource utilization visualization per SRS FR-7.4
+    - Add resource saturation alerting per SRS FR-7.4
+    - _Requirements: SRS FR-7.4_
+
+  - [ ] 7.6 Create component and global views
+    - Implement component-specific metrics per SRS FR-7.5
+    - Create system-wide performance dashboards per SRS FR-7.5
+    - Add drill-down capabilities from global to component level per SRS FR-7.5
+    - _Requirements: SRS FR-7.5_
+
+### Phase 8: SRS FR-8 - Cost Modeling Engine
+
+- [ ] 8. Cost Modeling System (SRS FR-8)
+  - [ ] 8.1 Implement compute cost estimation
+    - Create compute cost calculation per SRS FR-8.1
+    - Add instance type and sizing cost modeling per SRS FR-8.1
+    - Implement auto-scaling cost implications per SRS FR-8.1
+    - _Requirements: SRS FR-8.1_
+
+  - [ ] 8.2 Add storage cost modeling
+    - Implement storage cost calculation per SRS FR-8.2
+    - Create data volume and replication cost modeling per SRS FR-8.2
+    - Add storage tier and lifecycle cost analysis per SRS FR-8.2
+    - _Requirements: SRS FR-8.2_
+
+  - [ ] 8.3 Create network cost estimation
+    - Implement data transfer cost calculation per SRS FR-8.3
+    - Add bandwidth and geographic cost modeling per SRS FR-8.3
+    - Create CDN and edge cost analysis per SRS FR-8.3
+    - _Requirements: SRS FR-8.3_
+
+  - [ ]* 8.4 Write property test for cost modeling
+    - **Property 8: Cost Calculation Accuracy**
+    - **Validates: SRS FR-8.1, FR-8.2, FR-8.3**
+
+  - [ ] 8.5 Implement traffic-based cost scaling
+    - Create cost scaling with user load per SRS FR-8.4
+    - Add traffic pattern cost implications per SRS FR-8.4
+    - Implement peak vs average cost analysis per SRS FR-8.4
+    - _Requirements: SRS FR-8.4_
+
+  - [ ] 8.6 Add cost vs performance tradeoff analysis
+    - Create cost optimization recommendations per SRS FR-8.5
+    - Implement performance vs cost comparison per SRS FR-8.5
+    - Add cost-effective scaling strategy suggestions per SRS FR-8.5
+    - _Requirements: SRS FR-8.5_
+
+### Phase 9: SRS FR-9 - Learning & Scenario Mode
+
+- [ ] 9. Learning and Scenario System (SRS FR-9)
+  - [ ] 9.1 Create predefined scenario library
+    - Implement scenario catalog and management per SRS FR-9.1
+    - Create scenario templates with objectives per SRS FR-9.1
+    - Add scenario difficulty levels and prerequisites per SRS FR-9.1
+    - _Requirements: SRS FR-9.1_
+
+  - [ ] 9.2 Implement progressive constraint system
+    - Create progressive constraint introduction per SRS FR-9.2
+    - Add adaptive difficulty adjustment per SRS FR-9.2
+    - Implement constraint timing and sequencing per SRS FR-9.2
+    - _Requirements: SRS FR-9.2_
+
+  - [ ] 9.3 Add hint and explanation system
+    - Create contextual hint delivery per SRS FR-9.3
+    - Implement progressive disclosure of complexity per SRS FR-9.3
+    - Add explanation and learning content per SRS FR-9.3
+    - _Requirements: SRS FR-9.3_
+
+  - [ ]* 9.4 Write property test for learning progression
+    - **Property 9: Learning Scenario Progression**
+    - **Validates: SRS FR-9.1, FR-9.2, FR-9.3**
+
+  - [ ] 9.5 Implement progress tracking
+    - Create scenario completion tracking per SRS FR-9.4
+    - Add learning progress analytics per SRS FR-9.4
+    - Implement achievement and milestone system per SRS FR-9.4
+    - _Requirements: SRS FR-9.4_
+
+### Phase 10: SRS FR-10 - Collaboration
+
+- [ ] 10. Real-time Collaboration (SRS FR-10)
+  - [ ] 10.1 Create design sharing system
+    - Implement design sharing functionality per SRS FR-10.1
+    - Add permission management (view, edit, admin) per SRS FR-10.1
+    - Create sharing link generation and access per SRS FR-10.1
+    - _Requirements: SRS FR-10.1_
+
+  - [ ] 10.2 Implement multi-user editing
+    - Create simultaneous multi-user editing per SRS FR-10.2
+    - Add real-time cursor and selection tracking per SRS FR-10.2
+    - Implement user presence indicators per SRS FR-10.2
+    - _Requirements: SRS FR-10.2_
+
+  - [ ] 10.3 Add real-time synchronization
+    - Implement operational transformation for conflict resolution per SRS FR-10.3
+    - Create real-time change propagation per SRS FR-10.3
+    - Add WebSocket-based real-time communication per SRS FR-10.3
+    - _Requirements: SRS FR-10.3_
+
+  - [ ]* 10.4 Write property test for collaboration
+    - **Property 10: Real-time Collaboration Consistency**
+    - **Validates: SRS FR-10.2, FR-10.3**
+
+  - [ ] 10.5 Implement version history
+    - Create complete version history tracking per SRS FR-10.4
+    - Add rollback and branch management per SRS FR-10.4
+    - Implement change attribution and timestamps per SRS FR-10.4
+    - _Requirements: SRS FR-10.4_
+
+### Phase 11: SRS Non-Functional Requirements Implementation
+
+- [ ] 11. Performance Optimization (SRS NFR-1, NFR-2, NFR-3)
+  - [ ] 11.1 Implement sub-100ms simulation updates
+    - Optimize simulation engine for <100ms updates per SRS NFR-1
+    - Create efficient metric calculation and caching per SRS NFR-1
+    - Add performance monitoring and alerting per SRS NFR-1
+    - _Requirements: SRS NFR-1_
+
+  - [ ] 11.2 Ensure real-time UI responsiveness
+    - Optimize UI interactions for real-time feel per SRS NFR-2
+    - Implement optimistic updates and rollback per SRS NFR-2
+    - Add UI performance monitoring per SRS NFR-2
+    - _Requirements: SRS NFR-2_
+
+  - [ ] 11.3 Implement user isolation
+    - Create complete user simulation isolation per SRS NFR-3
+    - Add resource quotas and limits per SRS NFR-3
+    - Implement tenant-scoped data access per SRS NFR-3
+    - _Requirements: SRS NFR-3_
+
+- [ ] 12. Scalability Implementation (SRS NFR-4, NFR-5)
+  - [ ] 12.1 Support thousands of concurrent users
+    - Implement horizontal scaling architecture per SRS NFR-4
+    - Add auto-scaling and load balancing per SRS NFR-4
+    - Create concurrent user monitoring per SRS NFR-4
+    - _Requirements: SRS NFR-4_
+
+  - [ ] 12.2 Scale simulation workloads
+    - Implement simulation load distribution per SRS NFR-5
+    - Add simulation queuing and resource management per SRS NFR-5
+    - Create simulation performance optimization per SRS NFR-5
+    - _Requirements: SRS NFR-5_
+
+### Phase 12: Integration and System Testing
+
+- [ ] 13. SRS Compliance Integration Testing
+  - [ ] 13.1 Test complete user journey workflow
+    - Validate "Build → Scale → Break → Observe → Fix" workflow
+    - Test all SRS FR-1 through FR-10 integration
+    - Verify SRS NFR-1 through NFR-17 compliance
+    - Test cross-functional feature interactions
+    - _Requirements: All SRS FR and NFR_
+
+  - [ ] 13.2 Performance and scalability validation
+    - Load test with thousands of concurrent users per SRS NFR-4
+    - Validate sub-100ms simulation updates per SRS NFR-1
+    - Test real-time collaboration under load per SRS NFR-2
+    - Verify user isolation under stress per SRS NFR-3
+    - _Requirements: SRS NFR-1, NFR-2, NFR-3, NFR-4, NFR-5_
+
+### Phase 13: Production Deployment
+
+- [ ] 14. SaaS Platform Deployment
+  - [ ] 14.1 Deploy production infrastructure
+    - Set up containerized microservices architecture
+    - Configure auto-scaling and load balancing
+    - Implement monitoring and alerting systems
+    - Set up backup and disaster recovery
+    - _Requirements: SRS NFR-6, NFR-7, NFR-8_
+
+  - [ ] 14.2 Security and compliance hardening
+    - Implement security controls per SRS NFR-9, NFR-10, NFR-11
+    - Add audit logging and compliance reporting
+    - Configure data encryption and access controls
+    - Set up security monitoring and threat detection
+    - _Requirements: SRS NFR-9, NFR-10, NFR-11_
+
+- [ ] 15. Final SRS Compliance Validation
+  - Ensure all SRS functional requirements (FR-1 through FR-10) are fully implemented and tested
+  - Verify all SRS non-functional requirements (NFR-1 through NFR-17) are met
+  - Validate the core user journey: "Build a system. Scale it. Watch it break. Fix it."
+  - Confirm the learning loop: "Build → Scale → Break → Observe → Fix → Repeat" functions effectively
+  - Test end-to-end user experience from registration to advanced scenarios
 
 ## Notes
 
-- Tasks marked with `*` are optional and can be skipped for faster MVP focusing on core causality-teaching features
-- Each task references specific requirements for traceability to the 22 functional requirements
-- Checkpoints ensure incremental validation and user feedback
-- Property tests validate universal correctness properties across all enhanced features
-- The implementation prioritizes Core Backend Engines and enhanced frontend components that provide the unique value proposition
-- Focus on teaching causality, tradeoffs, and engineering intuition through hands-on simulation
-- Multi-tenant SaaS architecture supports thousands of concurrent users with 99.9% uptime
-- The 10 specific component types and enhanced wire system provide industry-standard learning experiences
-- Real-time feedback through Traffic & Scale Simulator and Bottleneck Visualizer enables sub-100ms responsiveness
-- Multiplayer collaboration similar to Figma enables real-time learning and instruction
-- Comprehensive learning analytics track engineering intuition development and decision-making patterns
+- Tasks marked with `*` are optional and can be skipped for faster MVP while maintaining SRS compliance
+- Each task references specific SRS functional or non-functional requirements for traceability
+- Property tests validate universal correctness properties across all SRS requirements
+- The implementation prioritizes the core user journey and learning loop specified in the workflow
+- All SRS functional requirements (FR-1 through FR-10) are covered in dedicated phases
+- SRS non-functional requirements (NFR-1 through NFR-17) are addressed throughout implementation
+- Focus on experiential learning through the "Build → Scale → Break → Observe → Fix → Repeat" cycle

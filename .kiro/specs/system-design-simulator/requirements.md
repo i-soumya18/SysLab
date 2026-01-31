@@ -2,27 +2,28 @@
 
 ## Project Overview
 
-A comprehensive SaaS-based interactive learning platform that enables users to learn system design from one user to one billion users through hands-on simulation and experimentation. The platform works like "Tinkercad for system design" but with a unique focus on teaching causality, tradeoffs, and engineering intuition through real-time simulation rather than static diagrams.
+A comprehensive SaaS-based System Design Simulation & Learning Platform that enables users to visually design, simulate, and analyze real-world distributed systems under varying scale and constraints, from 1 user to 1 billion users. The platform acts as a "System Design Flight Simulator" that transforms abstract concepts into lived experience through hands-on simulation and experimentation.
 
 ## Problem Statement
 
-Current system design education relies heavily on static diagrams and theoretical knowledge, failing to teach the critical "why" behind architectural decisions. Students memorize patterns without understanding causality, tradeoffs, and engineering intuition needed for real-world system design challenges.
+Current system design education relies heavily on static diagrams and theoretical knowledge, failing to teach the critical "why" behind architectural decisions. Students memorize patterns without understanding causality, tradeoffs, and engineering intuition needed for real-world system design challenges. There is no interactive platform that allows users to build systems, scale them, watch them break, and learn from the failures.
 
 ## Solution Overview
 
-The platform provides an intuitive drag-and-drop interface for building system architectures using specific industry-standard components (Client, Load Balancer, API Gateway, Service, Cache, Queue, Database, CDN, Search Index, Object Storage), where every wire has configurable latency, bandwidth, and retry policies. A single traffic slider scales from 1 → 1K → 1M → 1B users, providing real-time visual feedback with color-coded bottleneck detection. Users can inject real-world constraints and failures to test system resilience.
+The platform provides an intuitive drag-and-drop visual canvas for building system architectures using standard components (Load Balancer, Database, Cache, Queue, CDN, Service), where users can connect components with configurable parameters. A dynamic traffic simulation engine allows scaling from 1 user to 1 billion users with real-time visual feedback and bottleneck detection. Users can inject real-world failures and constraints to test system resilience and observe recovery patterns.
 
-The platform supports multiple learning modes including Free Play, Guided Scenarios (Twitter Feed, WhatsApp Messaging, Netflix Streaming, UPI Payments), Interview Mode with timers and hidden challenges, and Instructor Mode for live teaching. Core backend engines include a System Graph Engine modeling DAGs with capacity curves, a Load Simulation Engine using queueing theory, a Distributed Systems Behavior Library, and a Cost Modeling Engine with live bankruptcy warnings.
+The core learning loop follows: **Build → Scale → Break → Observe → Fix → Repeat**. This experiential learning approach teaches causality and engineering intuition through direct interaction with system behavior rather than memorization of patterns.
 
-The platform features multiplayer collaboration similar to Figma, scenario sharing, and public templates, all built on a multi-tenant SaaS architecture designed to serve thousands of concurrent learners while teaching the fundamental principles of scalable system design through experiential learning.
+The platform supports multiple user classes (Learners, Engineers, Instructors, Interview Candidates, Admins) with tailored experiences including guided scenarios, interview practice modes, and collaborative design sessions. Built as a multi-tenant SaaS platform with real-time collaboration capabilities.
 
 ## Success Criteria
 
-- Users can build realistic system architectures using 10 specific industry-standard components
-- Real-time simulation provides sub-100ms feedback on system performance from 1 to 1 billion users
+- Users can build realistic system architectures using standard distributed system components
+- Real-time simulation provides sub-100ms feedback on system performance across all scales (1 to 1B users)
 - Learners demonstrate improved understanding of causality and engineering tradeoffs through hands-on experimentation
-- Platform supports thousands of concurrent users with 99.9% uptime
+- Platform supports thousands of concurrent users with reliable performance and data isolation
 - Multi-tenant SaaS architecture enables secure collaboration and scenario sharing
+- Users achieve the end state: "I understand system design now — I don't memorize answers"
 
 ## Stakeholders
 
@@ -30,342 +31,190 @@ The platform features multiplayer collaboration similar to Figma, scenario shari
 - **Learners**: Students and job-seekers learning system design fundamentals through progressive curriculum and guided scenarios
 - **Engineers**: Practicing engineers experimenting with architectures and testing design decisions
 - **Interview Candidates**: Users practicing system design interviews with timed challenges and evaluation
-
-### Secondary Users  
 - **Instructors**: Teachers creating guided scenarios, monitoring student progress, and conducting live teaching sessions
-- **Platform Administrators**: Operators managing multi-tenant SaaS infrastructure, monitoring usage, and ensuring system reliability
+- **Administrators**: Platform operators managing multi-tenant SaaS infrastructure, monitoring usage, and ensuring system reliability
 
 ### External Systems
 - **Cloud Provider APIs**: Integration with AWS, GCP, Azure for realistic cost modeling and pricing data
 - **Authentication Providers**: OAuth integration with Google, GitHub for secure user authentication
-- **Content Delivery Networks**: Global content distribution for optimal platform performance
+- **CDN Services**: Global content distribution for optimal platform performance
 
 ## Glossary
-- **Engineers**: Practicing engineers experimenting with architectures and testing design decisions
-- **Interview Candidates**: Users practicing system design interviews with timed challenges and evaluation
 
-### Secondary Users  
-- **Instructors**: Teachers creating guided scenarios, monitoring student progress, and conducting live teaching sessions
-- **Platform Administrators**: Operators managing multi-tenant SaaS infrastructure, monitoring usage, and ensuring system reliability
-
-### External Systems
-- **Cloud Provider APIs**: Integration with AWS, GCP, Azure for realistic cost modeling and pricing data
-- **Authentication Providers**: OAuth integration with Google, GitHub for secure user authentication
-- **Content Delivery Networks**: Global content distribution for optimal platform performance
-
-- **System_Design_Platform**: The main SaaS interactive learning platform
-- **Component**: A draggable system element (Client, Load Balancer, API Gateway, Service, Cache, Queue, Database, CDN, Search Index, Object Storage)
+- **System_Design_Platform**: The main SaaS interactive learning platform for system design simulation
+- **Component**: A draggable system element (Load Balancer, Database, Cache, Queue, CDN, Service)
 - **Canvas**: The visual workspace where users design system architectures
-- **Simulation_Engine**: The backend system that processes and executes simulations
-- **Parameter_Tuner**: Interface for adjusting component configuration values
+- **Simulation_Engine**: The backend system that processes and executes traffic simulations
+- **Node**: A system component in the architecture graph
+- **Edge**: Communication link between components with configurable parameters
+- **Simulation_Tick**: Discrete time step in system simulation execution
+- **QPS**: Queries Per Second - measure of system throughput
+- **DAG**: Directed Acyclic Graph - representation of system architecture
 - **Wire**: Visual connection between components with latency, bandwidth, and retry policy properties
 - **Scenario**: A predefined learning exercise with specific objectives and scale requirements
 - **Workspace**: User's current design session including all components and connections
-- **Learning_Path**: A structured curriculum guiding users through scalability concepts
 - **Scale_Simulation**: Simulation that demonstrates system behavior from 1 user to 1 billion users
 - **Tenant**: An isolated environment for a user or organization within the multi-tenant platform
 - **User_Account**: Individual user profile with authentication, progress tracking, and preferences
-- **Curriculum_Engine**: System that manages learning progression and adaptive content delivery
-- **Scalability_Scenario**: Specific simulation designed to teach scaling concepts at different user loads
-- **Visual_System_Builder**: The drag-and-drop interface for creating system architectures
-- **Traffic_Scale_Simulator**: Engine that simulates load from 1 to 1 billion users with real-time feedback
-- **Constraint_Injector**: System for introducing real-world failures and constraints
-- **System_Graph_Engine**: DAG-based engine modeling capacity, latency curves, and throughput limits
-- **Load_Simulation_Engine**: Engine handling Poisson arrivals, backpressure, and queueing theory
-- **Distributed_Systems_Library**: Library modeling consistency, replication, and sharding behaviors
-- **Cost_Modeling_Engine**: Real-time cost calculation and bankruptcy warning system
-- **Multiplayer_Canvas**: Collaborative editing system similar to Figma
-- **Instructor_Mode**: Teaching interface for live instruction and guidance
 - **Bottleneck_Visualizer**: System for color-coding performance bottlenecks in real-time
+- **Constraint_Injector**: System for introducing real-world failures and constraints
+- **Cost_Modeling_Engine**: Real-time cost calculation and optimization system
+- **Learning_Path**: A structured curriculum guiding users through scalability concepts
+- **Multiplayer_Canvas**: Collaborative editing system for real-time multi-user design
 
 ## Non-Functional Requirements
 
-### Performance Requirements
-- **Real-time Simulation Updates**: System SHALL provide simulation feedback within 100ms of user input
-- **Concurrent User Support**: Platform SHALL support thousands of concurrent users with auto-scaling capabilities
-- **Simulation Responsiveness**: Traffic & Scale Simulator SHALL update visual feedback within 100ms of slider movement
+### Performance Requirements (SRS NFR-1, NFR-2, NFR-3)
+- **Real-time Simulation Updates**: Simulation updates SHALL occur within 100ms per tick to maintain responsive user experience
+- **UI Responsiveness**: All UI interactions SHALL feel real-time with immediate visual feedback
+- **Concurrent User Isolation**: Each user's simulation SHALL be isolated and not affect other users' performance
 
-### Scalability Requirements
-- **User Scale Simulation**: System SHALL accurately simulate performance from 1 user to 1 billion users
-- **Multi-tenant Architecture**: Platform SHALL isolate tenant data and provide resource quotas
-- **Horizontal Scaling**: Microservices SHALL scale independently based on demand
+### Scalability Requirements (SRS NFR-4, NFR-5)
+- **Concurrent User Support**: System SHALL support thousands of concurrent users with horizontal scaling capabilities
+- **Simulation Load Scaling**: Simulation workloads SHALL scale horizontally across multiple compute instances
+- **Multi-tenant Architecture**: Platform SHALL efficiently serve multiple tenants with shared infrastructure
 
-### Reliability Requirements
-- **System Uptime**: Platform SHALL maintain 99.9% uptime with proper failover mechanisms
-- **Data Persistence**: User workspaces and progress SHALL be reliably persisted with backup and recovery
-- **Graceful Degradation**: System SHALL handle partial failures without complete service disruption
+### Reliability Requirements (SRS NFR-6, NFR-7, NFR-8)
+- **User Isolation**: No user simulation SHALL affect another user's system or data
+- **Partial Failure Recovery**: System SHALL recover gracefully from partial component failures
+- **Data Persistence**: User workspaces and progress SHALL be reliably persisted with backup and recovery mechanisms
 
-### Security Requirements
-- **Multi-tenant Isolation**: Tenant data SHALL be completely isolated with encrypted separation
-- **Authentication**: System SHALL support secure multi-provider OAuth and session management
-- **Access Control**: Platform SHALL implement role-based access control with granular permissions
+### Security Requirements (SRS NFR-9, NFR-10, NFR-11)
+- **Access Control**: All user data SHALL be access-controlled with proper authentication and authorization
+- **Privacy by Default**: User designs SHALL be private by default with explicit sharing controls
+- **Secure Authentication**: System SHALL implement secure authentication mechanisms including OAuth and session management
 
-### Usability Requirements
-- **Intuitive Interface**: Visual System Builder SHALL provide drag-and-drop functionality with component-specific icons
-- **Progressive Learning**: System SHALL provide contextual hints and progressive complexity disclosure
-- **Accessibility**: Platform SHALL support keyboard navigation and accessibility compliance
+### Usability Requirements (SRS NFR-12, NFR-13, NFR-14)
+- **Intuitive Interface**: UI SHALL be intuitive and usable without prior training or extensive documentation
+- **Clear Failure Feedback**: Visual feedback SHALL clearly indicate system failures and bottlenecks with actionable information
+- **Input Support**: System SHALL support both keyboard and mouse controls with full accessibility compliance
+
+### Maintainability Requirements (SRS NFR-15, NFR-16, NFR-17)
+- **Modular Components**: Component models SHALL be modular and independently maintainable
+- **Extensible Design**: New components SHALL be addable without breaking existing functionality
+- **Testable Logic**: Simulation logic SHALL be deterministic, testable, and reproducible
 
 ## Functional Requirements
 
-### Requirement 1: Visual System Builder with Specific Components
-
-**User Story:** As a learner, I want to access a comprehensive library of specific system design components and drag them onto a canvas, so that I can build realistic system architectures with industry-standard components.
-
-#### Acceptance Criteria
-
-1. THE Visual_System_Builder SHALL provide exactly these component types: Client, Load Balancer, API Gateway, Service, Cache, Queue, Database, CDN, Search Index, and Object Storage
-2. WHEN a user drags a component from the library, THE Visual_System_Builder SHALL create a visual representation on the canvas with component-specific icons and labels
-3. WHEN a component is dropped on the canvas, THE Visual_System_Builder SHALL position it at the drop location and make it selectable with component-specific configuration options
-4. THE Visual_System_Builder SHALL support multiple instances of the same component type on a single canvas with unique identifiers
-5. WHEN a user selects a component, THE Visual_System_Builder SHALL highlight it and display component-specific configuration panels
-
-### Requirement 2: Enhanced Wiring System with Network Properties
-
-**User Story:** As a learner, I want to connect components with wires that have realistic network properties, so that I can model real-world communication constraints and performance characteristics.
-
-#### Acceptance Criteria
-
-1. WHEN a user creates a wire between components, THE Visual_System_Builder SHALL require configuration of latency, bandwidth, and retry policy properties
-2. WHEN a wire is established, THE Visual_System_Builder SHALL display these properties visually on the connection (thickness for bandwidth, color for latency, icons for retry policies)
-3. THE Visual_System_Builder SHALL validate connection compatibility based on component types and prevent invalid connections
-4. WHEN a user selects a wire, THE Visual_System_Builder SHALL allow real-time modification of latency (1ms-1000ms), bandwidth (1Mbps-100Gbps), and retry policy (exponential backoff, circuit breaker, none)
-5. THE Simulation_Engine SHALL use wire properties to calculate realistic communication delays and failure scenarios during simulation
-
-### Requirement 3: Traffic & Scale Simulator with Real-Time Feedback
-
-**User Story:** As a learner, I want to use a single slider to simulate traffic from 1 user to 1 billion users and see real-time visual feedback, so that I can understand how scale affects system performance and identify bottlenecks.
-
-#### Acceptance Criteria
-
-1. THE Traffic_Scale_Simulator SHALL provide a single slider control with logarithmic scale points: 1, 1K, 1M, 1B users
-2. WHEN the scale slider is adjusted, THE Traffic_Scale_Simulator SHALL automatically calculate and update QPS, concurrent connections, data volume, cache hit ratios, queue depth, disk IOPS, and network saturation
-3. THE Bottleneck_Visualizer SHALL provide real-time color-coded feedback on all components (green=healthy, yellow=stressed, red=bottleneck, black=failed)
-4. WHEN bottlenecks occur, THE Traffic_Scale_Simulator SHALL display specific metrics causing the bottleneck (CPU %, memory %, network %, disk I/O %)
-5. THE Traffic_Scale_Simulator SHALL update all visual feedback within 100ms of slider movement to maintain real-time responsiveness
-
-### Requirement 4: Constraint Injection System
-
-**User Story:** As a learner, I want to inject real-world failures and constraints into my running simulation, so that I can test system resilience and learn how to handle production incidents.
-
-#### Acceptance Criteria
-
-1. THE Constraint_Injector SHALL provide these specific failure types: DB node down, network latency spikes, cache eviction storms, cost ceiling exceeded, GC pauses, and cold starts
-2. WHEN a constraint is injected, THE Constraint_Injector SHALL apply it immediately to the running simulation without stopping the simulation
-3. THE Constraint_Injector SHALL allow users to configure constraint severity (mild, moderate, severe) and duration (5s, 30s, 5min, permanent)
-4. WHEN constraints are active, THE Bottleneck_Visualizer SHALL display constraint indicators on affected components with specific failure icons
-5. THE Constraint_Injector SHALL provide a "chaos mode" that randomly injects multiple constraints to simulate realistic production environments
-
-### Requirement 5: Learning Modes System
-
-**User Story:** As a learner, I want different learning modes tailored to my goals, so that I can learn through free exploration, guided scenarios, or interview preparation.
-
-#### Acceptance Criteria
-
-1. THE System_Design_Platform SHALL provide exactly four learning modes: Free Play Mode, Guided Scenarios, Interview Mode, and Instructor Mode
-2. WHEN Free Play Mode is selected, THE System_Design_Platform SHALL provide unlimited access to all components and constraints with no time limits or objectives
-3. WHEN Guided Scenarios mode is selected, THE System_Design_Platform SHALL offer these specific scenarios: Twitter Feed, WhatsApp Messaging, Netflix Streaming, and UPI Payments
-4. WHEN Interview Mode is selected, THE System_Design_Platform SHALL include a visible timer, hidden traffic spikes that occur during simulation, and post-simulation critique with scoring
-5. WHEN a guided scenario is completed, THE System_Design_Platform SHALL provide detailed feedback comparing the user's solution to industry best practices
-
-### Requirement 6: System Graph Engine
-
-**User Story:** As a platform operator, I want a robust backend engine that models system components as a directed acyclic graph with realistic performance characteristics, so that simulations accurately reflect real-world system behavior.
-
-#### Acceptance Criteria
-
-1. THE System_Graph_Engine SHALL model each component as a DAG node with capacity limits, latency curves, and throughput limits based on component type
-2. THE System_Graph_Engine SHALL calculate end-to-end latency by traversing the graph and summing component processing times and wire latencies
-3. WHEN system capacity is exceeded, THE System_Graph_Engine SHALL model realistic degradation patterns (increased latency, dropped requests, cascading failures)
-4. THE System_Graph_Engine SHALL detect circular dependencies and prevent invalid graph configurations
-5. THE System_Graph_Engine SHALL support dynamic reconfiguration during simulation without requiring simulation restart
-
-### Requirement 7: Load Simulation Engine with Queueing Theory
-
-**User Story:** As a learner, I want realistic load simulation that models actual traffic patterns and queueing behavior, so that I can understand how real systems behave under load.
-
-#### Acceptance Criteria
-
-1. THE Load_Simulation_Engine SHALL generate traffic using Poisson arrival processes with configurable lambda values based on user scale selection
-2. THE Load_Simulation_Engine SHALL model backpressure propagation through the system graph when components reach capacity limits
-3. THE Load_Simulation_Engine SHALL implement queueing theory calculations (M/M/1, M/M/c queues) to determine wait times and queue lengths
-4. WHEN queues reach capacity, THE Load_Simulation_Engine SHALL model realistic overflow behavior (request dropping, circuit breaker activation)
-5. THE Load_Simulation_Engine SHALL provide burst traffic patterns and gradual ramp-up scenarios in addition to steady-state load
-
-### Requirement 8: Distributed Systems Behavior Library
-
-**User Story:** As a learner, I want components to exhibit realistic distributed systems behaviors, so that I can learn about consistency, replication, and sharding challenges.
-
-#### Acceptance Criteria
-
-1. THE Distributed_Systems_Library SHALL model database consistency levels (strong, eventual, weak) with corresponding performance and availability tradeoffs
-2. THE Distributed_Systems_Library SHALL simulate replication lag and split-brain scenarios for distributed database components
-3. THE Distributed_Systems_Library SHALL model sharding strategies (range-based, hash-based, directory-based) with hotspot detection
-4. THE Distributed_Systems_Library SHALL simulate network partitions and their impact on system availability and consistency
-5. THE Distributed_Systems_Library SHALL model consensus algorithms (Raft, PBFT) for distributed coordination scenarios
-
-### Requirement 9: Cost Modeling Engine with Live Feedback
-
-**User Story:** As a learner, I want to see real-time cost implications of my architectural decisions, so that I can learn to balance performance with cost efficiency.
-
-#### Acceptance Criteria
-
-1. THE Cost_Modeling_Engine SHALL calculate real-time costs based on component types, instance sizes, data transfer, and storage usage
-2. THE Cost_Modeling_Engine SHALL display a live cost meter showing current monthly cost projection with breakdown by component type
-3. WHEN costs exceed configurable thresholds, THE Cost_Modeling_Engine SHALL display bankruptcy warnings and suggest cost optimization strategies
-4. THE Cost_Modeling_Engine SHALL model realistic cloud pricing (compute, storage, network, managed services) based on major cloud providers
-5. THE Cost_Modeling_Engine SHALL provide cost comparison views showing how architectural changes impact total cost of ownership
-
-### Requirement 10: Multiplayer Canvas and Collaboration
-
-**User Story:** As a learner and instructor, I want real-time collaborative editing capabilities similar to Figma, so that I can work with others and teach system design interactively.
-
-#### Acceptance Criteria
-
-1. THE Multiplayer_Canvas SHALL support real-time collaborative editing with multiple users working on the same workspace simultaneously
-2. WHEN multiple users are editing, THE Multiplayer_Canvas SHALL display user cursors with names and colors, and show live component movements
-3. THE Multiplayer_Canvas SHALL implement operational transformation to handle concurrent edits without conflicts
-4. WHEN in Instructor_Mode, THE System_Design_Platform SHALL allow instructors to take control, highlight components, and guide student attention
-5. THE Multiplayer_Canvas SHALL provide voice/video integration for live teaching sessions with screen sharing capabilities
-
-### Requirement 11: Scenario Sharing and Public Templates
-
-**User Story:** As a learner and community member, I want to share my scenarios and access public templates, so that I can learn from others and contribute to the community knowledge base.
-
-#### Acceptance Criteria
-
-1. THE System_Design_Platform SHALL allow users to publish their completed scenarios as public templates with descriptions and learning objectives
-2. THE System_Design_Platform SHALL provide a searchable template gallery organized by difficulty level, use case, and architectural patterns
-3. WHEN a user imports a public template, THE System_Design_Platform SHALL preserve all component configurations, wires, and simulation parameters
-4. THE System_Design_Platform SHALL implement a rating and review system for public templates to highlight high-quality content
-5. THE System_Design_Platform SHALL provide template versioning and update notifications when template authors publish improvements
-
-### Requirement 12: Parameter Tuning and Configuration
-
-**User Story:** As a learner, I want to adjust component parameters and configuration settings, so that I can experiment with different system behaviors and performance characteristics.
-
-#### Acceptance Criteria
-
-1. WHEN a component is selected, THE Parameter_Tuner SHALL display relevant configuration options for that component type
-2. THE Parameter_Tuner SHALL provide appropriate input controls (sliders, dropdowns, text fields) for different parameter types
-3. WHEN a parameter is modified, THE System_Design_Platform SHALL update the component's behavior in real-time during simulation
-4. THE Parameter_Tuner SHALL validate parameter values and prevent invalid configurations
-5. THE Parameter_Tuner SHALL provide preset configurations for common use cases and performance profiles
-
-### Requirement 13: Enhanced Simulation Engine with Causality Focus
-
-**User Story:** As a learner, I want simulations that teach causality, tradeoffs, and engineering intuition through hands-on experimentation, so that I can understand the "why" behind architectural decisions rather than just memorizing patterns.
-
-#### Acceptance Criteria
-
-1. WHEN a user starts a simulation, THE Simulation_Engine SHALL demonstrate clear cause-and-effect relationships between architectural decisions and system performance
-2. THE Simulation_Engine SHALL generate realistic load patterns including traffic spikes, gradual increases, and steady-state conditions with clear explanations of why bottlenecks occur
-3. WHEN simulation is running, THE System_Design_Platform SHALL display real-time metrics with contextual explanations of how each metric relates to architectural choices
-4. THE Simulation_Engine SHALL model component failures and recovery scenarios with detailed analysis of failure propagation and mitigation strategies
-5. WHEN simulation completes, THE System_Design_Platform SHALL provide detailed performance reports highlighting tradeoffs made and alternative approaches
-
-### Requirement 14: Guided Learning Scenarios with Specific Use Cases
-
-**User Story:** As a learner, I want access to specific, realistic scenarios based on well-known systems, so that I can practice system design skills with concrete, industry-relevant examples.
-
-#### Acceptance Criteria
-
-1. THE System_Design_Platform SHALL provide exactly these guided scenarios: Twitter Feed, WhatsApp Messaging, Netflix Streaming, and UPI Payments
-2. WHEN a user selects a scenario, THE System_Design_Platform SHALL load the initial requirements, constraints, and success criteria specific to that use case
-3. THE System_Design_Platform SHALL provide progressive hints and guidance during scenario execution, revealing complexity gradually
-4. WHEN a scenario is completed, THE System_Design_Platform SHALL evaluate the solution against real-world implementations and provide detailed feedback
-5. THE System_Design_Platform SHALL track user progress across scenarios and unlock advanced variations (e.g., Twitter at different scales, WhatsApp with end-to-end encryption)
-
-### Requirement 15: Workspace Management and Persistence
-
-**User Story:** As a learner, I want to save, load, and share my system designs, so that I can iterate on designs and collaborate with others.
-
-#### Acceptance Criteria
-
-1. WHEN a user creates a design, THE System_Design_Platform SHALL automatically save workspace state including all components, connections, and configurations
-2. THE System_Design_Platform SHALL allow users to save named workspace snapshots for later retrieval
-3. THE System_Design_Platform SHALL provide export functionality to share designs with other users
-4. WHEN loading a saved workspace, THE System_Design_Platform SHALL restore all components, connections, and parameter settings exactly as saved
-5. THE System_Design_Platform SHALL support importing shared designs from other users
-
-### Requirement 16: Performance Visualization and Analytics with Bottleneck Detection
-
-**User Story:** As a learner, I want to visualize system performance through real-time color-coded feedback and detailed analytics, so that I can quickly identify bottlenecks and understand performance patterns.
-
-#### Acceptance Criteria
-
-1. WHEN simulation is running, THE Bottleneck_Visualizer SHALL display real-time color-coded feedback on all components (green=healthy, yellow=stressed, red=bottleneck, black=failed)
-2. THE System_Design_Platform SHALL provide interactive charts showing performance trends over time with drill-down capabilities for specific metrics
-3. THE Bottleneck_Visualizer SHALL highlight performance bottlenecks with specific indicators showing the limiting resource (CPU, memory, network, disk)
-4. THE System_Design_Platform SHALL allow users to compare performance across different design iterations with side-by-side visualizations
-5. THE System_Design_Platform SHALL generate performance reports with actionable insights, optimization suggestions, and cost-performance tradeoff analysis
-
-### Requirement 17: Enhanced Component Behavior Modeling
-
-**User Story:** As a learner, I want each specific component type to behave realistically with accurate performance characteristics, so that simulations teach real-world system behavior and constraints.
-
-#### Acceptance Criteria
-
-1. THE Simulation_Engine SHALL model Database components with realistic query processing times, connection pooling, transaction isolation, and storage I/O patterns
-2. THE Simulation_Engine SHALL model Load Balancer components with different algorithms (round-robin, least connections, weighted, consistent hashing) and health checking with failure detection
-3. THE Simulation_Engine SHALL model Cache components with configurable hit/miss ratios, eviction policies (LRU, LFU, TTL), memory constraints, and cache warming behavior
-4. THE Simulation_Engine SHALL model API Gateway components with rate limiting, authentication overhead, request routing, and protocol translation latencies
-5. THE Simulation_Engine SHALL model CDN components with geographic distribution, cache hierarchies, origin pull behavior, and edge server performance characteristics
-6. THE Simulation_Engine SHALL model Queue components with different messaging patterns (FIFO, priority, pub/sub), backpressure handling, and durability guarantees
-7. THE Simulation_Engine SHALL model Search Index components with indexing latency, query complexity scaling, and relevance scoring performance
-8. THE Simulation_Engine SHALL model Object Storage components with throughput limits, consistency models, and multi-part upload behavior
-
-### Requirement 18: User Authentication and Account Management
-
-### Requirement 18: User Authentication and Account Management
+### Requirement 1: User Authentication & Account Management (SRS FR-1)
 
 **User Story:** As a user, I want to create and manage my account with secure authentication, so that I can access my personal learning journey and save my progress.
 
 #### Acceptance Criteria
 
-1. WHEN a new user registers, THE System_Design_Platform SHALL create a secure account with email verification
-2. THE System_Design_Platform SHALL support multiple authentication methods including email/password, Google OAuth, and GitHub OAuth
-3. WHEN a user logs in, THE System_Design_Platform SHALL authenticate credentials and establish a secure session
-4. THE System_Design_Platform SHALL provide password reset functionality with secure token-based verification
-5. WHEN a user updates their profile, THE System_Design_Platform SHALL validate changes and update account information securely
-6. THE System_Design_Platform SHALL support account deletion with proper data cleanup and retention policies
+1. WHEN a new user registers, THE System_Design_Platform SHALL create a secure account using email or OAuth providers (Google, GitHub)
+2. WHEN a user logs in, THE System_Design_Platform SHALL authenticate credentials and establish a secure session
+3. WHEN a user accesses their account, THE System_Design_Platform SHALL allow them to save, load, and delete their designs
+4. THE System_Design_Platform SHALL support both free and paid subscription tiers with appropriate feature access
+5. WHEN a user logs out, THE System_Design_Platform SHALL securely terminate the session and clear authentication tokens
 
-### Requirement 19: Multi-Tenant Architecture and Data Isolation
+### Requirement 2: Visual System Design Canvas (SRS FR-2)
 
-**User Story:** As a platform operator, I want to serve multiple users and organizations with complete data isolation, so that the platform can scale securely as a SaaS service.
-
-#### Acceptance Criteria
-
-1. THE System_Design_Platform SHALL isolate user data and workspaces using tenant-based access controls
-2. WHEN a user accesses their workspace, THE System_Design_Platform SHALL ensure they can only view and modify their own data
-3. THE System_Design_Platform SHALL support organization-level tenancy for team collaboration and shared resources
-4. THE System_Design_Platform SHALL implement resource quotas per tenant to ensure fair usage and prevent abuse
-5. THE System_Design_Platform SHALL provide tenant-level analytics and usage monitoring for platform operators
-
-### Requirement 20: Scalability Learning Progression and Curriculum
-
-**User Story:** As a learner, I want a structured learning path that teaches me system design from simple single-server setups to billion-user systems, so that I can progressively understand scalability concepts and engineering intuition.
+**User Story:** As a user, I want to use a drag-and-drop canvas to build system architectures, so that I can visually design distributed systems with intuitive interactions.
 
 #### Acceptance Criteria
 
-1. THE Curriculum_Engine SHALL provide a structured learning path starting from single-server architectures and progressing to distributed systems serving billions of users
-2. WHEN a user completes a learning module, THE Curriculum_Engine SHALL unlock the next appropriate level based on their demonstrated understanding of causality and tradeoffs
-3. THE System_Design_Platform SHALL offer specialized tracks for different domains (web applications, mobile backends, data processing, real-time systems)
-4. THE Curriculum_Engine SHALL adapt content difficulty based on user performance and provide personalized recommendations focusing on engineering intuition
-5. THE System_Design_Platform SHALL provide progress tracking with visual indicators showing advancement through scalability concepts and decision-making skills
+1. WHEN a user accesses the canvas, THE System_Design_Platform SHALL provide a drag-and-drop interface for building system architectures
+2. WHEN a user drags a component onto the canvas, THE System_Design_Platform SHALL place it at the drop location and make it selectable
+3. WHEN a user connects components, THE System_Design_Platform SHALL create visual edges between components with configurable parameters
+4. WHEN a user attempts invalid connections, THE System_Design_Platform SHALL prevent the connection and provide clear feedback
+5. WHEN a user works with complex designs, THE System_Design_Platform SHALL allow grouping and labeling of components for organization
 
-### Requirement 21: SaaS Infrastructure and Deployment
+### Requirement 3: Component Library (SRS FR-3)
 
-**User Story:** As a platform operator, I want the system deployed as a scalable SaaS service with proper monitoring and reliability, so that it can serve thousands of concurrent learners effectively.
+**User Story:** As a user, I want access to standard distributed system components with realistic behavior, so that I can build architectures using industry-standard building blocks.
 
 #### Acceptance Criteria
 
-1. THE System_Design_Platform SHALL be deployed using containerized microservices architecture for scalability and maintainability
-2. THE System_Design_Platform SHALL implement auto-scaling capabilities to handle varying user loads efficiently
-3. THE System_Design_Platform SHALL provide comprehensive monitoring, logging, and alerting for system health and performance
-4. THE System_Design_Platform SHALL maintain 99.9% uptime with proper failover and disaster recovery mechanisms
-5. THE System_Design_Platform SHALL implement rate limiting and DDoS protection to ensure service stability
+1. THE System_Design_Platform SHALL provide standard components including Load Balancer, Database, Cache, Queue, CDN, and Service
+2. WHEN a component is selected, THE System_Design_Platform SHALL expose configurable parameters specific to that component type
+3. WHEN components are configured, THE System_Design_Platform SHALL enforce realistic capacity limits based on component type
+4. THE System_Design_Platform SHALL allow components to expose scaling strategies (vertical and horizontal scaling options)
+5. THE System_Design_Platform SHALL provide consistency and replication options for applicable components (databases, caches)
 
-### Requirement 22: Advanced Analytics and Learning Insights
+### Requirement 4: Traffic & Load Simulation Engine (SRS FR-4)
+
+**User Story:** As a user, I want to simulate realistic traffic and load patterns, so that I can understand how my system behaves under different conditions.
+
+#### Acceptance Criteria
+
+1. WHEN a user configures simulation parameters, THE System_Design_Platform SHALL allow setting user count or QPS (Queries Per Second)
+2. WHEN simulation runs, THE Simulation_Engine SHALL propagate load through the system graph according to component connections
+3. THE Simulation_Engine SHALL model queueing behavior and backpressure when components reach capacity limits
+4. THE Simulation_Engine SHALL simulate realistic retry mechanisms and timeout behaviors for failed requests
+5. THE System_Design_Platform SHALL support both bursty traffic patterns and steady-state load simulation
+
+### Requirement 5: Scale Control (SRS FR-5)
+
+**User Story:** As a user, I want to dynamically scale my system from 1 user to 1 billion users, so that I can observe how architectural decisions impact performance at different scales.
+
+#### Acceptance Criteria
+
+1. WHEN a user adjusts the scale control, THE System_Design_Platform SHALL allow dynamic scaling from 1 user to 1 billion users
+2. WHEN scale changes occur, THE System_Design_Platform SHALL update system metrics in real-time with sub-100ms response
+3. WHEN bottlenecks occur, THE Bottleneck_Visualizer SHALL highlight problematic components with visual indicators
+4. WHEN system capacity is exceeded, THE System_Design_Platform SHALL detect and display system collapse scenarios
+5. THE System_Design_Platform SHALL provide clear visual feedback showing the relationship between scale and system performance
+
+### Requirement 6: Failure & Constraint Injection (SRS FR-6)
+
+**User Story:** As a user, I want to inject realistic failures and constraints into my running system, so that I can test resilience and learn about failure recovery patterns.
+
+#### Acceptance Criteria
+
+1. WHEN a user selects failure injection, THE Constraint_Injector SHALL allow disabling individual components to simulate outages
+2. WHEN latency injection is applied, THE Constraint_Injector SHALL introduce configurable network latency between components
+3. WHEN network partitions are simulated, THE Constraint_Injector SHALL model realistic partition scenarios and their effects
+4. WHEN regional outages occur, THE Constraint_Injector SHALL simulate multi-component failures affecting entire regions
+5. WHEN failures are injected, THE System_Design_Platform SHALL make recovery behavior observable through metrics and visualization
+
+### Requirement 7: Metrics & Observability Dashboard (SRS FR-7)
+
+**User Story:** As a user, I want comprehensive metrics and observability into my system's behavior, so that I can understand performance characteristics and identify issues.
+
+#### Acceptance Criteria
+
+1. THE System_Design_Platform SHALL display latency metrics including p50, p95, and p99 percentiles for all components
+2. THE System_Design_Platform SHALL show error rates and success rates for all system operations
+3. THE System_Design_Platform SHALL display throughput metrics showing requests processed per second
+4. THE System_Design_Platform SHALL show resource saturation levels (CPU, memory, network, storage) for each component
+5. THE System_Design_Platform SHALL provide both component-specific metrics and global system-wide performance views
+
+### Requirement 8: Cost Modeling Engine (SRS FR-8)
+
+**User Story:** As a user, I want to understand the cost implications of my architectural decisions, so that I can make informed tradeoffs between performance and cost.
+
+#### Acceptance Criteria
+
+1. WHEN components are configured, THE Cost_Modeling_Engine SHALL estimate compute costs based on instance types and scaling
+2. THE Cost_Modeling_Engine SHALL calculate storage costs based on data volume and replication requirements
+3. THE Cost_Modeling_Engine SHALL estimate network costs based on data transfer between components and regions
+4. WHEN traffic scales, THE Cost_Modeling_Engine SHALL show how costs scale proportionally with load
+5. THE System_Design_Platform SHALL display cost vs performance tradeoffs to help users optimize their designs
+
+### Requirement 9: Learning & Scenario Mode (SRS FR-9)
+
+**User Story:** As a learner, I want guided learning experiences and predefined scenarios, so that I can learn system design concepts through structured practice.
+
+#### Acceptance Criteria
+
+1. THE System_Design_Platform SHALL provide predefined scenarios covering common system design challenges
+2. WHEN scenarios are loaded, THE System_Design_Platform SHALL introduce constraints and requirements progressively
+3. THE System_Design_Platform SHALL provide contextual hints and explanations during scenario execution
+4. WHEN scenarios are completed, THE System_Design_Platform SHALL track completion status and learning progress
+5. THE System_Design_Platform SHALL offer multiple difficulty levels and learning paths for different skill levels
+
+### Requirement 10: Collaboration (SRS FR-10)
+
+**User Story:** As a user, I want to collaborate with others on system designs, so that I can share knowledge and work together on complex architectures.
+
+#### Acceptance Criteria
+
+1. WHEN a user creates a design, THE System_Design_Platform SHALL allow sharing designs with other users
+2. WHEN multiple users access a shared design, THE Multiplayer_Canvas SHALL enable simultaneous editing by multiple users
+3. WHEN collaborative changes occur, THE System_Design_Platform SHALL synchronize changes in real-time across all participants
+4. THE System_Design_Platform SHALL maintain complete version history for all collaborative designs
+5. THE System_Design_Platform SHALL provide appropriate access controls and permissions for shared designs2: Advanced Analytics and Learning Insights
 
 **User Story:** As a learner and platform operator, I want detailed analytics about learning progress and system usage patterns, so that I can optimize my learning path and the platform can improve educational effectiveness.
 
@@ -379,11 +228,13 @@ The platform features multiplayer collaboration similar to Figma, scenario shari
 
 ## Constraints and Assumptions
 
-### Technical Constraints
-- Platform must be web-based for cross-platform accessibility
-- Real-time collaboration requires WebSocket or similar technology
-- Simulation accuracy limited by computational resources and queueing theory models
-- Multi-tenant architecture requires careful data isolation and security measures
+### Technical Constraints (SRS Section 2.4)
+- Simulations must run within bounded compute resources to ensure platform scalability
+- Results must be deterministic per seed to enable reproducible learning experiences
+- System behavior must be explainable to support educational objectives
+- Multi-user isolation required to prevent interference between concurrent users
+- Platform must be web browser-based (desktop-first) for accessibility
+- Real-time WebSocket communication required for collaboration features
 
 ### Business Constraints
 - SaaS model requires subscription management and billing integration
@@ -391,11 +242,13 @@ The platform features multiplayer collaboration similar to Figma, scenario shari
 - Platform must scale cost-effectively to serve thousands of concurrent users
 - Compliance with data protection regulations (GDPR, CCPA) required
 
-### Assumptions
+### Assumptions (SRS Section 5)
 - Users have basic understanding of system design concepts
-- Reliable internet connectivity for real-time collaboration features
+- Platform is educational, not for production infrastructure provisioning
+- Behavior models approximate real-world systems with acceptable accuracy
+- Cloud pricing models may be simplified for educational purposes
+- Reliable internet connectivity available for real-time collaboration features
 - Cloud infrastructure availability for auto-scaling and global distribution
-- Integration APIs available from major cloud providers for cost modeling
 
 ## Dependencies
 
@@ -413,13 +266,28 @@ The platform features multiplayer collaboration similar to Figma, scenario shari
 
 ## Acceptance Criteria Summary
 
-The Enhanced System Design Simulator SaaS Platform will be considered complete when:
+The System Design Simulation & Learning Platform will be considered complete when it successfully implements the core user journey: **"Build a system. Scale it. Watch it break. Fix it."**
 
-1. **Core Functionality**: All 10 specific component types are available with realistic behavior modeling
-2. **Simulation Accuracy**: Traffic & Scale Simulator provides accurate performance feedback from 1 to 1 billion users
-3. **Learning Effectiveness**: Users demonstrate improved understanding of causality and engineering tradeoffs
-4. **Collaboration**: Real-time multiplayer editing works seamlessly with conflict resolution
-5. **SaaS Readiness**: Multi-tenant architecture supports thousands of concurrent users with 99.9% uptime
-6. **Educational Value**: Guided scenarios and learning paths effectively teach system design principles
+### Core Functionality Validation
+1. **Visual Canvas**: Users can drag standard components (Load Balancer, Database, Cache, Queue, CDN, Service) onto a canvas and connect them with configurable parameters
+2. **Scale Simulation**: Traffic simulation accurately demonstrates system behavior from 1 user to 1 billion users with real-time feedback
+3. **Failure Injection**: Users can inject realistic failures and observe system recovery patterns
+4. **Learning Loop**: The core learning cycle (Build → Scale → Break → Observe → Fix → Repeat) functions effectively
 
-The platform should successfully transform system design education from static diagram memorization to hands-on experiential learning focused on causality, tradeoffs, and engineering intuition.
+### SaaS Platform Validation
+1. **Multi-tenant Architecture**: Platform supports thousands of concurrent users with complete data isolation
+2. **Authentication & Authorization**: Secure user account management with OAuth integration
+3. **Collaboration**: Real-time multi-user editing with conflict resolution
+4. **Performance**: Sub-100ms simulation updates and responsive UI interactions
+
+### Educational Effectiveness Validation
+1. **Guided Learning**: Predefined scenarios provide structured learning experiences
+2. **Metrics & Observability**: Comprehensive performance metrics help users understand system behavior
+3. **Cost Modeling**: Users understand cost implications of architectural decisions
+4. **Progress Tracking**: Learning progression and skill development are measurable
+
+### End State Success Criteria
+- Users achieve the mindset: **"I understand system design now — I don't memorize answers"**
+- Platform demonstrates strong user engagement with repeat usage and long session times
+- Educational effectiveness is validated through user learning outcomes and feedback
+- SaaS platform operates reliably with 99.9% uptime and scalable performance
