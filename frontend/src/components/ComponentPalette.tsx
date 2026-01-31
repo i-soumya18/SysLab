@@ -87,174 +87,35 @@ interface ComponentPaletteProps {
 
 // Main component palette
 export const ComponentPalette: React.FC<ComponentPaletteProps> = ({ className }) => {
-  // Define available components with their display properties
-  const paletteComponents = [
-    // Databases
+  // Define the 4 MVLE components: Client, LB, Service, DB
+  const mvleComponents = [
     { 
-      componentType: 'database' as ComponentType, 
-      componentKey: 'database-mysql', 
-      name: 'MySQL', 
-      icon: '🗄️', 
-      color: '#4CAF50' 
+      componentType: 'client' as ComponentType, 
+      componentKey: 'client-web', 
+      name: 'Client', 
+      icon: '👤', 
+      color: '#6C63FF' 
     },
-    { 
-      componentType: 'database' as ComponentType, 
-      componentKey: 'database-postgresql', 
-      name: 'PostgreSQL', 
-      icon: '🗄️', 
-      color: '#336791' 
-    },
-    { 
-      componentType: 'database' as ComponentType, 
-      componentKey: 'database-mongodb', 
-      name: 'MongoDB', 
-      icon: '🗄️', 
-      color: '#47A248' 
-    },
-    { 
-      componentType: 'database' as ComponentType, 
-      componentKey: 'database-redis', 
-      name: 'Redis', 
-      icon: '🗄️', 
-      color: '#DC382D' 
-    },
-
-    // Load Balancers
     { 
       componentType: 'load-balancer' as ComponentType, 
       componentKey: 'load-balancer-nginx', 
-      name: 'Nginx LB', 
+      name: 'Load Balancer', 
       icon: '⚖️', 
       color: '#2196F3' 
     },
     { 
-      componentType: 'load-balancer' as ComponentType, 
-      componentKey: 'load-balancer-haproxy', 
-      name: 'HAProxy', 
-      icon: '⚖️', 
-      color: '#1976D2' 
-    },
-    { 
-      componentType: 'load-balancer' as ComponentType, 
-      componentKey: 'load-balancer-awsAlb', 
-      name: 'AWS ALB', 
-      icon: '⚖️', 
-      color: '#FF9900' 
-    },
-
-    // Web Servers
-    { 
       componentType: 'web-server' as ComponentType, 
-      componentKey: 'web-server-apache', 
-      name: 'Apache', 
-      icon: '🖥️', 
+      componentKey: 'web-server-nodejs', 
+      name: 'Service', 
+      icon: '🔧', 
       color: '#FF9800' 
     },
     { 
-      componentType: 'web-server' as ComponentType, 
-      componentKey: 'web-server-nginx', 
-      name: 'Nginx', 
-      icon: '🖥️', 
-      color: '#009639' 
-    },
-    { 
-      componentType: 'web-server' as ComponentType, 
-      componentKey: 'web-server-nodejs', 
-      name: 'Node.js', 
-      icon: '🖥️', 
-      color: '#339933' 
-    },
-
-    // Caches
-    { 
-      componentType: 'cache' as ComponentType, 
-      componentKey: 'cache-memcached', 
-      name: 'Memcached', 
-      icon: '💾', 
-      color: '#9C27B0' 
-    },
-    { 
-      componentType: 'cache' as ComponentType, 
-      componentKey: 'cache-redis', 
-      name: 'Redis Cache', 
-      icon: '💾', 
-      color: '#DC382D' 
-    },
-    { 
-      componentType: 'cache' as ComponentType, 
-      componentKey: 'cache-varnish', 
-      name: 'Varnish', 
-      icon: '💾', 
-      color: '#673AB7' 
-    },
-
-    // Message Queues
-    { 
-      componentType: 'message-queue' as ComponentType, 
-      componentKey: 'message-queue-kafka', 
-      name: 'Kafka', 
-      icon: '📬', 
-      color: '#F44336' 
-    },
-    { 
-      componentType: 'message-queue' as ComponentType, 
-      componentKey: 'message-queue-rabbitmq', 
-      name: 'RabbitMQ', 
-      icon: '📬', 
-      color: '#FF6600' 
-    },
-    { 
-      componentType: 'message-queue' as ComponentType, 
-      componentKey: 'message-queue-awsSqs', 
-      name: 'AWS SQS', 
-      icon: '📬', 
-      color: '#FF9900' 
-    },
-
-    // CDNs
-    { 
-      componentType: 'cdn' as ComponentType, 
-      componentKey: 'cdn-cloudflare', 
-      name: 'Cloudflare', 
-      icon: '🌐', 
-      color: '#00BCD4' 
-    },
-    { 
-      componentType: 'cdn' as ComponentType, 
-      componentKey: 'cdn-awsCloudfront', 
-      name: 'CloudFront', 
-      icon: '🌐', 
-      color: '#FF9900' 
-    },
-    { 
-      componentType: 'cdn' as ComponentType, 
-      componentKey: 'cdn-fastly', 
-      name: 'Fastly', 
-      icon: '🌐', 
-      color: '#FF282D' 
-    },
-
-    // Proxies
-    { 
-      componentType: 'proxy' as ComponentType, 
-      componentKey: 'proxy-squid', 
-      name: 'Squid', 
-      icon: '🔀', 
-      color: '#795548' 
-    },
-    { 
-      componentType: 'proxy' as ComponentType, 
-      componentKey: 'proxy-envoy', 
-      name: 'Envoy', 
-      icon: '🔀', 
-      color: '#AC6199' 
-    },
-    { 
-      componentType: 'proxy' as ComponentType, 
-      componentKey: 'proxy-traefik', 
-      name: 'Traefik', 
-      icon: '🔀', 
-      color: '#24A1C1' 
+      componentType: 'database' as ComponentType, 
+      componentKey: 'database-mysql', 
+      name: 'Database', 
+      icon: '🗄️', 
+      color: '#4CAF50' 
     }
   ];
 
@@ -286,89 +147,33 @@ export const ComponentPalette: React.FC<ComponentPaletteProps> = ({ className })
         flexDirection: 'column',
         gap: '12px'
       }}>
-        {/* Group components by type */}
         <div>
-          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>Databases</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {paletteComponents
-              .filter(comp => comp.componentType === 'database')
-              .map(comp => (
-                <PaletteItem key={comp.componentKey} {...comp} />
-              ))
-            }
+          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>
+            Essential Components
+          </h4>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px' 
+          }}>
+            {mvleComponents.map(comp => (
+              <PaletteItem key={comp.componentKey} {...comp} />
+            ))}
           </div>
         </div>
 
-        <div>
-          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>Load Balancers</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {paletteComponents
-              .filter(comp => comp.componentType === 'load-balancer')
-              .map(comp => (
-                <PaletteItem key={comp.componentKey} {...comp} />
-              ))
-            }
-          </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>Web Servers</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {paletteComponents
-              .filter(comp => comp.componentType === 'web-server')
-              .map(comp => (
-                <PaletteItem key={comp.componentKey} {...comp} />
-              ))
-            }
-          </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>Caches</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {paletteComponents
-              .filter(comp => comp.componentType === 'cache')
-              .map(comp => (
-                <PaletteItem key={comp.componentKey} {...comp} />
-              ))
-            }
-          </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>Message Queues</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {paletteComponents
-              .filter(comp => comp.componentType === 'message-queue')
-              .map(comp => (
-                <PaletteItem key={comp.componentKey} {...comp} />
-              ))
-            }
-          </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>CDNs</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {paletteComponents
-              .filter(comp => comp.componentType === 'cdn')
-              .map(comp => (
-                <PaletteItem key={comp.componentKey} {...comp} />
-              ))
-            }
-          </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '12px', color: '#666', margin: '0 0 8px 0' }}>Proxies</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {paletteComponents
-              .filter(comp => comp.componentType === 'proxy')
-              .map(comp => (
-                <PaletteItem key={comp.componentKey} {...comp} />
-              ))
-            }
-          </div>
+        <div style={{
+          marginTop: '16px',
+          padding: '12px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '6px',
+          fontSize: '11px',
+          color: '#1976d2',
+          lineHeight: '1.4'
+        }}>
+          <strong>Getting Started:</strong><br />
+          Drag these 4 components onto the canvas to build your first system:
+          <br />• Client → Load Balancer → Service → Database
         </div>
       </div>
     </div>

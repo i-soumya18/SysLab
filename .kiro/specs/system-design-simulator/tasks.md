@@ -36,8 +36,8 @@ The implementation emphasizes the unique value proposition of experiential learn
 
 These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 
-- [ ] **MVLE-1**: User can drag 4 components onto canvas (Client, LB, Service, DB)
-- [ ] **MVLE-2**: User can connect components with visual edges
+- [x] **MVLE-1**: User can drag 4 components onto canvas (Client, LB, Service, DB)
+- [x] **MVLE-2**: User can connect components with visual edges
 - [ ] **MVLE-3**: User can set traffic scale (100 to 1M users)
 - [ ] **MVLE-4**: User clicks "Run" and simulation executes
 - [ ] **MVLE-5**: System visually shows bottleneck (e.g., DB glowing red)
@@ -63,7 +63,7 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - **Property 1: User Authentication Round-Trip**
     - **Validates: SRS FR-1.1, FR-1.2**
 
-  - [ ] 1.3 Implement login and logout functionality
+  - [x] 1.3 Implement login and logout functionality
     - Create secure login system per SRS FR-1.2
     - Implement session management with JWT tokens per SRS FR-1.2
     - Add logout functionality with session cleanup per SRS FR-1.2

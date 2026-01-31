@@ -1,5 +1,15 @@
 import { Server, Socket } from 'socket.io';
 import { SimulationEngine } from '../simulation/SimulationEngine';
+import { AuthService } from '../services/authService';
+
+// Lazy-load auth service to avoid initialization issues
+let authService: AuthService;
+function getAuthService(): AuthService {
+  if (!authService) {
+    authService = new AuthService();
+  }
+  return authService;
+}
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -27,17 +37,33 @@ interface CanvasUpdateData {
 const activeSimulations = new Map<string, SimulationEngine>();
 
 export function setupWebSocket(io: Server): void {
-  // Middleware for authentication (basic implementation)
-  io.use((socket: AuthenticatedSocket, next) => {
+  // Middleware for authentication
+  io.use(async (socket: AuthenticatedSocket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.headers.authorization;
     
-    // For now, we'll accept any connection but log the authentication attempt
-    // In a real implementation, you would validate the token here
     if (token) {
-      console.log(`Authentication token provided: ${token.substring(0, 10)}...`);
-      // socket.userId = extractUserIdFromToken(token);
+      try {
+        // Extract token if it's in Bearer format
+        const actualToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+        
+        // Verify token using auth service
+        const verification = await getAuthService().verifyToken(actualToken);
+        
+        if (verification.valid && verification.user) {
+          socket.userId = verification.user.id;
+          console.log(`Authenticated WebSocket connection for user: ${verification.user.email}`);
+        } else {
+          console.log('Invalid token provided for WebSocket connection');
+        }
+      } catch (error) {
+        console.log('WebSocket authentication error:', error);
+      }
+    } else {
+      console.log('No authentication token provided for WebSocket connection');
     }
     
+    // Allow connection regardless of authentication status
+    // Individual operations will check authentication as needed
     next();
   });
 

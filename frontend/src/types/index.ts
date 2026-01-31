@@ -5,6 +5,7 @@
 
 // Component Types
 export type ComponentType = 
+  | 'client'
   | 'database' 
   | 'load-balancer' 
   | 'web-server' 

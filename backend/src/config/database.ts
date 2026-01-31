@@ -41,6 +41,40 @@ async function initializeSchema(): Promise<void> {
   const client = await pool.connect();
   
   try {
+    // Create users table for authentication
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255),
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        oauth_provider VARCHAR(50),
+        oauth_id VARCHAR(255),
+        email_verified BOOLEAN DEFAULT FALSE,
+        email_verification_token VARCHAR(255),
+        password_reset_token VARCHAR(255),
+        password_reset_expires TIMESTAMP WITH TIME ZONE,
+        subscription_tier VARCHAR(50) DEFAULT 'free',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        last_login TIMESTAMP WITH TIME ZONE
+      );
+    `);
+
+    // Create user sessions table for JWT token management
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        user_agent TEXT,
+        ip_address INET
+      );
+    `);
+
     // Create tables if they don't exist
     await client.query(`
       CREATE TABLE IF NOT EXISTS workspaces (
@@ -159,6 +193,13 @@ async function initializeSchema(): Promise<void> {
 
     // Create indexes for better performance
     await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
+      CREATE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token);
+      CREATE INDEX IF NOT EXISTS idx_users_password_reset_token ON users(password_reset_token);
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
       CREATE INDEX IF NOT EXISTS idx_workspaces_user_id ON workspaces(user_id);
       CREATE INDEX IF NOT EXISTS idx_components_workspace_id ON components(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_connections_workspace_id ON connections(workspace_id);

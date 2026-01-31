@@ -1,4 +1,5 @@
 import { Express } from 'express';
+import authRoutes from './auth';
 import workspaceRoutes from './workspaces';
 import componentRoutes from './components';
 import simulationRoutes from './simulation';
@@ -11,6 +12,9 @@ import reportRoutes from './reports';
 export function setupRoutes(app: Express): void {
   // API version prefix
   const apiPrefix = '/api/v1';
+
+  // Authentication routes
+  app.use(`${apiPrefix}/auth`, authRoutes);
 
   // Mount route modules
   app.use(`${apiPrefix}/workspaces`, workspaceRoutes);
@@ -30,6 +34,7 @@ export function setupRoutes(app: Express): void {
       name: 'System Design Simulator API',
       version: '1.0.0',
       endpoints: {
+        auth: `${apiPrefix}/auth`,
         workspaces: `${apiPrefix}/workspaces`,
         versions: `${apiPrefix}/versions`,
         reports: `${apiPrefix}/reports`,
