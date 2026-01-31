@@ -8,8 +8,22 @@ import { VersionService } from '../services/versionService';
 import { WorkspaceService } from '../services/workspaceService';
 
 const router = express.Router();
-const versionService = new VersionService();
-const workspaceService = new WorkspaceService();
+let versionService: VersionService;
+let workspaceService: WorkspaceService;
+
+function getVersionService(): VersionService {
+  if (!versionService) {
+    versionService = new VersionService();
+  }
+  return versionService;
+}
+
+function getWorkspaceService(): WorkspaceService {
+  if (!workspaceService) {
+    workspaceService = new WorkspaceService();
+  }
+  return workspaceService;
+}
 
 /**
  * Create a new workspace version
@@ -22,7 +36,7 @@ router.post('/:workspaceId/versions', async (req, res) => {
     const createdBy = req.headers['x-user-id'] as string || 'anonymous';
 
     // Validate workspace exists
-    const workspace = await workspaceService.getWorkspaceById(workspaceId);
+    const workspace = await getWorkspaceService().getWorkspaceById(workspaceId);
     if (!workspace) {
       return res.status(404).json({
         error: {
@@ -46,7 +60,7 @@ router.post('/:workspaceId/versions', async (req, res) => {
       });
     }
 
-    const version = await versionService.createVersion({
+    const version = await getVersionService().createVersion({
       workspaceId,
       name: name.trim(),
       description: description?.trim(),
@@ -78,7 +92,7 @@ router.get('/:workspaceId/versions', async (req, res) => {
     const { workspaceId } = req.params;
     const { limit, offset, includeMetrics } = req.query;
 
-    const versions = await versionService.getVersions({
+    const versions = await getVersionService().getVersions({
       workspaceId,
       limit: limit ? parseInt(limit as string) : undefined,
       offset: offset ? parseInt(offset as string) : undefined,
@@ -108,7 +122,7 @@ router.get('/versions/:versionId', async (req, res) => {
   try {
     const { versionId } = req.params;
 
-    const version = await versionService.getVersionById(versionId);
+    const version = await getVersionService().getVersionById(versionId);
     if (!version) {
       return res.status(404).json({
         error: {
@@ -154,7 +168,7 @@ router.post('/versions/compare', async (req, res) => {
       });
     }
 
-    const comparison = await versionService.compareVersions(baselineVersionId, comparisonVersionId);
+    const comparison = await getVersionService().compareVersions(baselineVersionId, comparisonVersionId);
     return res.json(comparison);
   } catch (error: any) {
     console.error('Error comparing versions:', error);
@@ -228,7 +242,7 @@ router.post('/:workspaceId/ab-tests', async (req, res) => {
       }
     }
 
-    const abTest = await versionService.createABTest({
+    const abTest = await getVersionService().createABTest({
       name,
       description,
       workspaceId,

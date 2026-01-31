@@ -4,7 +4,15 @@ import { WorkspaceService, WorkspaceImportRequest } from '../services/workspaceS
 import { WorkspaceSchema, ComponentSchema, ConnectionSchema } from '../types/validation';
 
 const router = Router();
-const workspaceService = new WorkspaceService();
+let workspaceService: WorkspaceService;
+
+// Lazy initialize the service
+function getWorkspaceService(): WorkspaceService {
+  if (!workspaceService) {
+    workspaceService = new WorkspaceService();
+  }
+  return workspaceService;
+}
 
 // Validation schemas for requests
 const CreateWorkspaceRequestSchema = z.object({
@@ -49,7 +57,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const query = WorkspaceSearchQuerySchema.parse(req.query);
     
-    const result = await workspaceService.listWorkspaces(query);
+    const result = await getWorkspaceService().listWorkspaces(query);
     
     res.json({
       success: true,
@@ -97,7 +105,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const requestData = CreateWorkspaceRequestSchema.parse(req.body);
     
-    const workspace = await workspaceService.createWorkspace(requestData);
+    const workspace = await getWorkspaceService().createWorkspace(requestData);
     
     res.status(201).json({
       success: true,
@@ -154,7 +162,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const workspace = await workspaceService.getWorkspaceById(id, userId);
+    const workspace = await getWorkspaceService().getWorkspaceById(id, userId);
     
     if (!workspace) {
       res.status(404).json({
@@ -212,7 +220,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 
     const requestData = UpdateWorkspaceRequestSchema.parse(req.body);
     
-    const workspace = await workspaceService.updateWorkspace(id, requestData, userId);
+    const workspace = await getWorkspaceService().updateWorkspace(id, requestData, userId);
     
     if (!workspace) {
       res.status(404).json({
@@ -282,7 +290,7 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const deleted = await workspaceService.deleteWorkspace(id, userId);
+    const deleted = await getWorkspaceService().deleteWorkspace(id, userId);
     
     if (!deleted) {
       res.status(404).json({
@@ -339,7 +347,7 @@ router.get('/:id/export', async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const exportData = await workspaceService.exportWorkspace(id, userId, exportedBy);
+    const exportData = await getWorkspaceService().exportWorkspace(id, userId, exportedBy);
     
     if (!exportData) {
       res.status(404).json({
@@ -383,7 +391,7 @@ router.post('/import', async (req: Request, res: Response): Promise<void> => {
     const requestData = WorkspaceImportRequestSchema.parse(req.body);
     
     // Type assertion since Zod validation ensures exportData is present
-    const result = await workspaceService.importWorkspace(requestData as WorkspaceImportRequest);
+    const result = await getWorkspaceService().importWorkspace(requestData as WorkspaceImportRequest);
     
     if (requestData.validateOnly) {
       res.json({
@@ -464,7 +472,7 @@ router.post('/validate-import', async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const validation = await workspaceService.validateWorkspaceImport(exportData);
+    const validation = await getWorkspaceService().validateWorkspaceImport(exportData);
     
     res.json({
       success: true,
