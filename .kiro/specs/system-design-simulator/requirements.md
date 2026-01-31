@@ -6,7 +6,20 @@ A comprehensive SaaS-based System Design Simulation & Learning Platform that ena
 
 ## Problem Statement
 
-Current system design education relies heavily on static diagrams and theoretical knowledge, failing to teach the critical "why" behind architectural decisions. Students memorize patterns without understanding causality, tradeoffs, and engineering intuition needed for real-world system design challenges. There is no interactive platform that allows users to build systems, scale them, watch them break, and learn from the failures.
+Current system design education relies heavily on static diagrams and theoretical knowledge, failing to teach the critical "why" behind architectural decisions. Students memorize patterns without understanding causality, tradeoffs, and engineering intuition needed for real-world system design challenges.
+
+**The Core Gap**: There is no interactive platform that implements the natural learning loop:
+
+```
+Build → Scale → Break → Observe → Fix → Repeat
+```
+
+Learners need a "System Design Flight Simulator" that transforms abstract concepts into lived experience through hands-on interaction, where they can:
+- Drag components to build systems
+- Run simulations to watch behavior under scale
+- Observe bottlenecks and failures in real-time
+- Fix issues and learn from the outcomes
+- Repeat the cycle with increasing complexity
 
 ## Solution Overview
 
@@ -18,12 +31,25 @@ The platform supports multiple user classes (Learners, Engineers, Instructors, I
 
 ## Success Criteria
 
-- Users can build realistic system architectures using standard distributed system components
+### Primary Success Metric (The "Wow" Moment)
+Users experience the "Oh Sh*t" moment within 5 minutes:
+- Build a simple system (Client → LB → Service → DB)
+- Scale from 100 to 1M users
+- Watch it collapse with visual feedback
+- Understand WHY it failed through observable metrics
+
+### Product Success Metrics
+- **Time to First Simulation**: < 2 minutes from landing page
+- **Core Learning Loop Completion**: Users complete Build → Scale → Break → Observe → Fix cycle
+- **Session Duration**: Average 20+ minutes indicating deep engagement
+- **Repeat Usage**: 40%+ users return within 7 days
+- **End State Achievement**: Users achieve "I understand system design now — I don't memorize answers"
+
+### Technical Success Metrics
 - Real-time simulation provides sub-100ms feedback on system performance across all scales (1 to 1B users)
-- Learners demonstrate improved understanding of causality and engineering tradeoffs through hands-on experimentation
 - Platform supports thousands of concurrent users with reliable performance and data isolation
 - Multi-tenant SaaS architecture enables secure collaboration and scenario sharing
-- Users achieve the end state: "I understand system design now — I don't memorize answers"
+- System maintains 99.9% uptime with graceful degradation
 
 ## Stakeholders
 

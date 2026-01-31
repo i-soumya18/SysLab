@@ -2,9 +2,50 @@
 
 ## Overview
 
-This implementation plan breaks down the System Design Simulation & Learning Platform into discrete coding tasks that build incrementally toward a fully functional SaaS platform implementing all SRS functional requirements (FR-1 through FR-10). The approach prioritizes the core user journey: **"Build a system. Scale it. Watch it break. Fix it."** while ensuring compliance with all SRS non-functional requirements (NFR-1 through NFR-17).
+This implementation plan breaks down the System Design Simulation & Learning Platform into discrete coding tasks that build incrementally toward a fully functional SaaS platform implementing all SRS functional requirements (FR-1 through FR-10). 
+
+### Implementation Philosophy: User Journey First
+
+The approach prioritizes delivering the **"Oh Sh*t" moment** within the first 5 minutes of user interaction:
+
+```
+Build → Scale → Break → Observe → Fix → Repeat
+```
+
+**Core Experience Target:**
+- User lands on homepage: "Build a system. Scale it. Watch it break. Fix it."
+- Within 2 minutes: User has dragged 4 components and connected them
+- Within 5 minutes: User runs simulation, watches system collapse, understands WHY
+- Within 10 minutes: User fixes issue, re-runs simulation, sees improvement
+
+**This transforms system design education from static diagram memorization to hands-on experiential learning.**
+
+### Phase Priority
+
+Phases are ordered to deliver the Minimum Viable Learning Experience (MVLE) first:
+1. **Phase 1-3**: Canvas + Components = "Build" capability
+2. **Phase 4-5**: Simulation + Scale Control = "Scale → Break" experience  
+3. **Phase 7**: Metrics Dashboard = "Observe" feedback
+4. **Phase 2 (revisit)**: Component Config = "Fix" capability
+5. **Phases 6, 8-10**: Advanced features (failures, cost, scenarios, collaboration)
+6. **Phases 11-13**: Production readiness (performance, scale, deployment)
 
 The implementation emphasizes the unique value proposition of experiential learning through realistic simulation, focusing on the **Build → Scale → Break → Observe → Fix → Repeat** learning loop that transforms system design education from static diagram memorization to hands-on experience.
+
+## Minimum Viable Learning Experience (MVLE) Checklist
+
+These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
+
+- [ ] **MVLE-1**: User can drag 4 components onto canvas (Client, LB, Service, DB)
+- [ ] **MVLE-2**: User can connect components with visual edges
+- [ ] **MVLE-3**: User can set traffic scale (100 to 1M users)
+- [ ] **MVLE-4**: User clicks "Run" and simulation executes
+- [ ] **MVLE-5**: System visually shows bottleneck (e.g., DB glowing red)
+- [ ] **MVLE-6**: Metrics dashboard shows latency spike
+- [ ] **MVLE-7**: User can add cache/replica to fix issue
+- [ ] **MVLE-8**: Re-run simulation shows improvement
+
+**Target: All MVLE tasks complete = Core learning loop functional**
 
 ## Tasks
 

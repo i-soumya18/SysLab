@@ -2,7 +2,25 @@
 
 ## Overview
 
-The System Design Simulation & Learning Platform is a comprehensive SaaS-based interactive learning platform that enables users to visually design, simulate, and analyze real-world distributed systems under varying scale and constraints, from 1 user to 1 billion users. The platform acts as a "System Design Flight Simulator" that transforms abstract concepts into lived experience through the core learning loop: **Build → Scale → Break → Observe → Fix → Repeat**.
+The System Design Simulation & Learning Platform is a comprehensive SaaS-based interactive learning platform that enables users to visually design, simulate, and analyze real-world distributed systems under varying scale and constraints, from 1 user to 1 billion users. The platform acts as a **"System Design Flight Simulator"** that transforms abstract concepts into lived experience through the core learning loop:
+
+```
+Build → Scale → Break → Observe → Fix → Repeat
+```
+
+### The Golden User Journey
+
+The platform is architected around a 9-step user journey designed to deliver the "Oh Sh*t" moment that drives deep learning:
+
+1. **Landing & Value Clarity** (30s): "Build a system. Scale it. Watch it break. Fix it."
+2. **Onboarding** (2min): Choose learning path (Learn / Practice / Free Play)
+3. **Canvas Opens** (First Wow): Empty canvas with gentle guidance
+4. **Build First System** (Hands-On): Drag Client → LB → Service → DB
+5. **Run Simulation** ("Oh Sh*t" Moment): Watch system collapse at scale
+6. **Observe Metrics & Cost**: See bottlenecks, latency spikes, cost explosion
+7. **Fix the System** (Core Loop): Add cache, replicas, queues - re-run simulation
+8. **Inject Failures** (Advanced): Network partitions, node failures, cascading issues
+9. **Save, Share, Reflect**: Build habit and enable collaboration
 
 ### Core Value Proposition
 
@@ -13,6 +31,37 @@ The platform addresses the critical gap in system design education by providing 
 - **Failure Injection**: Realistic failure scenarios to test system resilience and recovery patterns
 - **Cost Modeling**: Real-time cost implications to understand performance vs cost tradeoffs
 - **Collaborative Learning**: Multi-user real-time editing and sharing capabilities
+
+### Learning Loop Architecture
+
+The entire architecture is designed to support the core learning loop with sub-second feedback:
+
+```mermaid
+graph LR
+    A[Build: Canvas] --> B[Scale: Traffic Control]
+    B --> C[Break: Simulation Engine]
+    C --> D[Observe: Metrics Dashboard]
+    D --> E[Fix: Component Config]
+    E --> A
+    
+    style C fill:#ff6b6b
+    style D fill:#4ecdc4
+```
+
+**Loop Execution Flow:**
+1. **Build Phase**: User drags components → Canvas Service persists state → System validates connections
+2. **Scale Phase**: User adjusts traffic slider → Simulation Service prepares load profile
+3. **Break Phase**: Simulation Engine executes → Bottlenecks detected → Visual feedback via WebSocket < 100ms
+4. **Observe Phase**: Metrics Dashboard updates in real-time → Cost implications calculated → Bottlenecks highlighted
+5. **Fix Phase**: User modifies architecture → Changes propagated → Re-simulation ready
+6. **Repeat**: Cycle continues with increasing complexity and scale
+
+**Critical Performance Requirements:**
+- Canvas operations: < 16ms (60 FPS)
+- Simulation tick: < 100ms (SRS NFR-1)
+- Metrics update: Real-time WebSocket streaming
+- Bottleneck detection: Immediate visual feedback
+- State persistence: Async, non-blocking
 
 ### SRS Compliance Architecture
 
