@@ -3,7 +3,7 @@
  * These types define the structure of workspaces, components, connections, and simulation configurations
  */
 
-// Component Types
+// Legacy Component Types (for backward compatibility)
 export type ComponentType = 
   | 'database' 
   | 'load-balancer' 
@@ -12,6 +12,19 @@ export type ComponentType =
   | 'message-queue' 
   | 'cdn' 
   | 'proxy';
+
+// Enhanced System Component Types (10 specific components per SRS)
+export type SystemComponentType = 
+  | 'Client'
+  | 'LoadBalancer' 
+  | 'APIGateway'
+  | 'Service'
+  | 'Cache'
+  | 'Queue'
+  | 'Database'
+  | 'CDN'
+  | 'SearchIndex'
+  | 'ObjectStorage';
 
 // Position interface for canvas positioning
 export interface Position {
@@ -52,6 +65,10 @@ export interface ConnectionConfig {
   latency: number;
   protocol: 'HTTP' | 'TCP' | 'UDP' | 'DATABASE';
   reliability: number;
+  // Enhanced properties for System Graph Engine
+  retryPolicy?: 'exponential-backoff' | 'circuit-breaker' | 'none';
+  maxRetries?: number;
+  timeoutMs?: number;
 }
 
 // Connection interface for wiring components
@@ -65,13 +82,77 @@ export interface Connection {
 }
 
 // Load pattern types and interfaces
-export type LoadPatternType = 'constant' | 'ramp' | 'spike' | 'realistic';
+export type LoadPatternType = 'constant' | 'ramp' | 'spike' | 'realistic' | 'burst' | 'geographic' | 'seasonal';
 
 export interface LoadPattern {
   type: LoadPatternType;
   baseLoad: number; // requests per second
   peakLoad?: number;
   pattern?: number[]; // Custom load curve
+}
+
+// Enhanced traffic pattern interfaces
+export interface TrafficBurst {
+  startTime: number;
+  duration: number;
+  multiplier: number;
+  pattern?: 'spike' | 'plateau' | 'wave';
+}
+
+export interface GradualRampUp {
+  startTime: number;
+  duration: number;
+  startMultiplier: number;
+  endMultiplier: number;
+  curve?: 'linear' | 'exponential' | 'logarithmic';
+}
+
+export interface RealisticUserBehavior {
+  dailyPattern: number[]; // 24-hour traffic pattern (0-1 multipliers)
+  weeklyPattern: number[]; // 7-day traffic pattern (0-1 multipliers)
+  seasonalEvents: SeasonalEvent[];
+  userSessionDuration: number; // average session duration in seconds
+  concurrentSessionRatio: number; // ratio of concurrent to total users
+  retryBehavior: RetryBehavior;
+}
+
+export interface SeasonalEvent {
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  trafficMultiplier: number;
+  pattern: 'gradual' | 'sudden' | 'wave';
+}
+
+export interface RetryBehavior {
+  maxRetries: number;
+  backoffMultiplier: number;
+  retryProbability: number; // probability user retries after failure
+}
+
+export interface GeographicDistribution {
+  regions: GeographicRegion[];
+  timeZoneOffsets: number[]; // hours offset from UTC
+  latencyMatrix: number[][]; // inter-region latency matrix
+  loadBalancing: 'round-robin' | 'geographic' | 'latency-based';
+}
+
+export interface GeographicRegion {
+  id: string;
+  name: string;
+  userPercentage: number; // percentage of total users in this region
+  peakHours: number[]; // peak traffic hours (0-23)
+  baseLatency: number; // base latency for this region in ms
+  networkQuality: 'excellent' | 'good' | 'fair' | 'poor';
+}
+
+export interface TrafficPattern {
+  id: string;
+  name: string;
+  type: 'burst' | 'ramp' | 'realistic' | 'geographic' | 'seasonal';
+  configuration: TrafficBurst | GradualRampUp | RealisticUserBehavior | GeographicDistribution;
+  isActive: boolean;
+  priority: number; // higher priority patterns override lower ones
 }
 
 // Failure scenario interface

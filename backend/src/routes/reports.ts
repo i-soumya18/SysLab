@@ -8,7 +8,14 @@ import { ReportService } from '../services/reportService';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
-const reportService = new ReportService();
+let reportService: ReportService;
+
+function getReportService(): ReportService {
+  if (!reportService) {
+    reportService = new ReportService();
+  }
+  return reportService;
+}
 
 /**
  * Generate performance report
@@ -74,7 +81,7 @@ router.post('/generate', async (req, res) => {
       });
     }
 
-    const report = await reportService.generateReport({
+    const report = await getReportService().generateReport({
       workspaceId,
       versionId,
       comparisonVersionId,
@@ -119,7 +126,7 @@ router.get('/:reportId', async (req, res) => {
   try {
     const { reportId } = req.params;
 
-    const report = await reportService.getReportById(reportId);
+    const report = await getReportService().getReportById(reportId);
     if (!report) {
       return res.status(404).json({
         error: {
@@ -167,7 +174,7 @@ router.get('/:reportId/export/:format', async (req, res) => {
       });
     }
 
-    const exportData = await reportService.exportReport(reportId, format as 'json' | 'html' | 'pdf');
+    const exportData = await getReportService().exportReport(reportId, format as 'json' | 'html' | 'pdf');
 
     // Set appropriate headers based on format
     switch (format) {

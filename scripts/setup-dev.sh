@@ -10,15 +10,19 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
+# Check if Docker Compose is installed (V2 uses 'docker compose')
+if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
     echo "❌ Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
 
 # Start PostgreSQL and Redis containers
 echo "📦 Starting PostgreSQL and Redis containers..."
-docker-compose up -d postgres redis
+if command -v docker-compose &> /dev/null; then
+    docker-compose up -d postgres redis
+else
+    docker compose up -d postgres redis
+fi
 
 # Wait for services to be healthy
 echo "⏳ Waiting for services to be ready..."
@@ -26,17 +30,31 @@ sleep 10
 
 # Check if PostgreSQL is ready
 echo "🔍 Checking PostgreSQL connection..."
-until docker-compose exec postgres pg_isready -U postgres; do
-    echo "Waiting for PostgreSQL..."
-    sleep 2
-done
+if command -v docker-compose &> /dev/null; then
+    until docker-compose exec postgres pg_isready -U postgres; do
+        echo "Waiting for PostgreSQL..."
+        sleep 2
+    done
+else
+    until docker compose exec postgres pg_isready -U postgres; do
+        echo "Waiting for PostgreSQL..."
+        sleep 2
+    done
+fi
 
 # Check if Redis is ready
 echo "🔍 Checking Redis connection..."
-until docker-compose exec redis redis-cli ping; do
-    echo "Waiting for Redis..."
-    sleep 2
-done
+if command -v docker-compose &> /dev/null; then
+    until docker-compose exec redis redis-cli ping; do
+        echo "Waiting for Redis..."
+        sleep 2
+    done
+else
+    until docker compose exec redis redis-cli ping; do
+        echo "Waiting for Redis..."
+        sleep 2
+    done
+fi
 
 echo "✅ Database services are ready!"
 
