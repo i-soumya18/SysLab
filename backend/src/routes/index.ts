@@ -1,5 +1,6 @@
 import { Express } from 'express';
 import authRoutes from './auth';
+import subscriptionRoutes from './subscription';
 import workspaceRoutes from './workspaces';
 import componentRoutes from './components';
 import simulationRoutes from './simulation';
@@ -15,6 +16,9 @@ export function setupRoutes(app: Express): void {
 
   // Authentication routes
   app.use(`${apiPrefix}/auth`, authRoutes);
+
+  // Subscription routes (SRS FR-1.4)
+  app.use(`${apiPrefix}/subscription`, subscriptionRoutes);
 
   // Mount route modules
   app.use(`${apiPrefix}/workspaces`, workspaceRoutes);
@@ -35,6 +39,7 @@ export function setupRoutes(app: Express): void {
       version: '1.0.0',
       endpoints: {
         auth: `${apiPrefix}/auth`,
+        subscription: `${apiPrefix}/subscription`,
         workspaces: `${apiPrefix}/workspaces`,
         versions: `${apiPrefix}/versions`,
         reports: `${apiPrefix}/reports`,

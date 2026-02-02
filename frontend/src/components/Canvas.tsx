@@ -3,7 +3,7 @@
  * Implements the main workspace for designing system architectures
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDrop } from 'react-dnd';
 import type { Component, ComponentType, Position, Connection, ConnectionConfig } from '../types';
 import { componentLibrary } from './ComponentLibrary';
@@ -22,6 +22,17 @@ export interface DragItem {
   componentKey: string;
 }
 
+// Component group interface
+interface ComponentGroup {
+  id: string;
+  name: string;
+  componentIds: string[];
+  color: string;
+  position: Position;
+  size: { width: number; height: number };
+  collapsed: boolean;
+}
+
 // Canvas props interface
 interface CanvasProps {
   width?: number;
@@ -34,6 +45,11 @@ interface CanvasProps {
   onConnectionCreate?: (connection: Connection) => void;
   onConnectionDelete?: (connectionId: string) => void;
   onConnectionSelect?: (connection: Connection | null) => void;
+  enableGridSnapping?: boolean;
+  gridSize?: number;
+  enableZoom?: boolean;
+  minZoom?: number;
+  maxZoom?: number;
 }
 
 // Canvas component
@@ -47,7 +63,12 @@ export const Canvas: React.FC<CanvasProps> = ({
   onComponentCountChange,
   onConnectionCreate,
   onConnectionDelete,
-  onConnectionSelect
+  onConnectionSelect,
+  enableGridSnapping = true,
+  gridSize = 20,
+  enableZoom = true,
+  minZoom = 0.25,
+  maxZoom = 3.0
 }) => {
   const [components, setComponents] = useState<Component[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -63,6 +84,22 @@ export const Canvas: React.FC<CanvasProps> = ({
     component: Component;
     position: { x: number; y: number };
   } | null>(null);
+  
+  // Grouping state
+  const [groups, setGroups] = useState<ComponentGroup[]>([]);
+  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionBox, setSelectionBox] = useState<{
+    start: Position;
+    end: Position;
+  } | null>(null);
+  
+  // Zoom and pan state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Initialize connection manager
   const connectionManager = useConnectionManager({
@@ -90,24 +127,192 @@ export const Canvas: React.FC<CanvasProps> = ({
     selectedConnection
   });
 
+  // Grid snapping helper function
+  const snapToGrid = useCallback((position: Position): Position => {
+    if (!enableGridSnapping) return position;
+    
+    return {
+      x: Math.round(position.x / gridSize) * gridSize,
+      y: Math.round(position.y / gridSize) * gridSize
+    };
+  }, [enableGridSnapping, gridSize]);
+
+  // Convert screen coordinates to canvas coordinates
+  const screenToCanvas = useCallback((screenX: number, screenY: number): Position => {
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return { x: screenX, y: screenY };
+    
+    return {
+      x: (screenX - canvasRect.left - pan.x) / zoom,
+      y: (screenY - canvasRect.top - pan.y) / zoom
+    };
+  }, [pan, zoom]);
+
+  // Zoom handling
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!enableZoom) return;
+    
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * delta));
+    
+    // Zoom towards mouse position
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (canvasRect) {
+      const mouseX = e.clientX - canvasRect.left;
+      const mouseY = e.clientY - canvasRect.top;
+      
+      const zoomRatio = newZoom / zoom;
+      const newPan = {
+        x: mouseX - (mouseX - pan.x) * zoomRatio,
+        y: mouseY - (mouseY - pan.y) * zoomRatio
+      };
+      
+      setZoom(newZoom);
+      setPan(newPan);
+    }
+  }, [enableZoom, zoom, minZoom, maxZoom, pan]);
+
+  // Pan handling
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 1 || (e.button === 0 && e.ctrlKey)) { // Middle mouse or Ctrl+click
+      e.preventDefault();
+      setIsPanning(true);
+      setLastPanPoint({ x: e.clientX, y: e.clientY });
+    } else if (e.button === 0 && e.shiftKey) { // Shift+click for selection
+      handleSelectionStart(e);
+    }
+  }, [handleSelectionStart]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isPanning) {
+      const deltaX = e.clientX - lastPanPoint.x;
+      const deltaY = e.clientY - lastPanPoint.y;
+      
+      setPan(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+      
+      setLastPanPoint({ x: e.clientX, y: e.clientY });
+    }
+    
+    // Handle selection box
+    if (isSelecting) {
+      handleSelectionMove(e);
+    }
+    
+    // Pass through to connection manager
+    connectionManager.handleMouseMove(e);
+  }, [isPanning, lastPanPoint, connectionManager, isSelecting, handleSelectionMove]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+    
+    // End selection if we were selecting
+    if (isSelecting && selectionBox) {
+      const selectedIds = components
+        .filter(component => {
+          const compX = component.position.x;
+          const compY = component.position.y;
+          const compRight = compX + 100;
+          const compBottom = compY + 80;
+          
+          const selLeft = Math.min(selectionBox.start.x, selectionBox.end.x);
+          const selTop = Math.min(selectionBox.start.y, selectionBox.end.y);
+          const selRight = Math.max(selectionBox.start.x, selectionBox.end.x);
+          const selBottom = Math.max(selectionBox.start.y, selectionBox.end.y);
+          
+          return compX < selRight && compRight > selLeft && compY < selBottom && compBottom > selTop;
+        })
+        .map(comp => comp.id);
+      
+      setSelectedComponents(selectedIds);
+      setIsSelecting(false);
+      setSelectionBox(null);
+    }
+  }, [isSelecting, selectionBox, components]);
+
+  // Group management functions
+  const createGroup = useCallback((componentIds: string[], name: string = 'New Group') => {
+    if (componentIds.length < 2) return;
+    
+    const groupComponents = components.filter(comp => componentIds.includes(comp.id));
+    if (groupComponents.length === 0) return;
+    
+    // Calculate group bounds
+    const minX = Math.min(...groupComponents.map(comp => comp.position.x));
+    const minY = Math.min(...groupComponents.map(comp => comp.position.y));
+    const maxX = Math.max(...groupComponents.map(comp => comp.position.x + 100));
+    const maxY = Math.max(...groupComponents.map(comp => comp.position.y + 80));
+    
+    const newGroup: ComponentGroup = {
+      id: crypto.randomUUID(),
+      name,
+      componentIds,
+      color: `hsl(${Math.random() * 360}, 70%, 85%)`,
+      position: { x: minX - 10, y: minY - 30 },
+      size: { width: maxX - minX + 20, height: maxY - minY + 40 },
+      collapsed: false
+    };
+    
+    setGroups(prev => [...prev, newGroup]);
+    setSelectedComponents([]);
+  }, [components]);
+
+  const updateGroupName = useCallback((groupId: string, newName: string) => {
+    setGroups(prev => prev.map(group => 
+      group.id === groupId ? { ...group, name: newName } : group
+    ));
+  }, []);
+
+  const deleteGroup = useCallback((groupId: string) => {
+    setGroups(prev => prev.filter(group => group.id !== groupId));
+  }, []);
+
+  const toggleGroupCollapse = useCallback((groupId: string) => {
+    setGroups(prev => prev.map(group => 
+      group.id === groupId ? { ...group, collapsed: !group.collapsed } : group
+    ));
+  }, []);
+
+  // Selection box handling
+  const handleSelectionStart = useCallback((e: React.MouseEvent) => {
+    if (e.button === 0 && e.shiftKey && !isPanning) {
+      const canvasPosition = screenToCanvas(e.clientX, e.clientY);
+      setIsSelecting(true);
+      setSelectionBox({
+        start: canvasPosition,
+        end: canvasPosition
+      });
+    }
+  }, [screenToCanvas, isPanning]);
+
+  const handleSelectionMove = useCallback((e: React.MouseEvent) => {
+    if (isSelecting && selectionBox) {
+      const canvasPosition = screenToCanvas(e.clientX, e.clientY);
+      setSelectionBox(prev => prev ? { ...prev, end: canvasPosition } : null);
+    }
+  }, [isSelecting, selectionBox, screenToCanvas]);
+
   // Drop handler for components from the palette
   const [{ isOver }, drop] = useDrop({
     accept: 'component',
     drop: (item: DragItem, monitor) => {
       const offset = monitor.getClientOffset();
-      const canvasRect = (monitor.getDropResult() as any)?.getBoundingClientRect?.() || 
-                        document.getElementById('canvas')?.getBoundingClientRect();
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
       
       if (offset && canvasRect) {
-        const position: Position = {
-          x: Math.max(0, Math.min(width - 100, offset.x - canvasRect.left)),
-          y: Math.max(0, Math.min(height - 100, offset.y - canvasRect.top))
-        };
+        const canvasPosition = screenToCanvas(offset.x, offset.y);
+        const snappedPosition = snapToGrid({
+          x: Math.max(0, Math.min(width - 100, canvasPosition.x)),
+          y: Math.max(0, Math.min(height - 100, canvasPosition.y))
+        });
 
         const newComponent = componentLibrary.createComponent(
           item.componentKey,
           item.componentType,
-          position
+          snappedPosition
         );
 
         if (newComponent) {
@@ -138,21 +343,23 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Handle component position updates
   const handleComponentMove = useCallback((componentId: string, newPosition: Position) => {
+    const snappedPosition = snapToGrid(newPosition);
+    
     setComponents(prev => 
       prev.map(comp => 
         comp.id === componentId 
-          ? { ...comp, position: newPosition }
+          ? { ...comp, position: snappedPosition }
           : comp
       )
     );
 
     // Update the selected component if it's the one being moved
     if (selectedComponent?.id === componentId) {
-      const updatedComponent = { ...selectedComponent, position: newPosition };
+      const updatedComponent = { ...selectedComponent, position: snappedPosition };
       setSelectedComponent(updatedComponent);
       onComponentUpdate?.(updatedComponent);
     }
-  }, [selectedComponent, onComponentUpdate]);
+  }, [selectedComponent, onComponentUpdate, snapToGrid]);
 
   // Handle component configuration updates
   const handleComponentUpdate = useCallback((updatedComponent: Component) => {
@@ -284,6 +491,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setConnectionContextMenu(null);
             onConnectionSelect?.(null);
             setContextMenu(null);
+            setSelectedComponents([]);
             break;
         }
       } else if (selectedConnection) {
@@ -301,6 +509,21 @@ export const Canvas: React.FC<CanvasProps> = ({
             onConnectionSelect?.(null);
             break;
         }
+      } else if (selectedComponents.length > 0) {
+        switch (e.key) {
+          case 'g':
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault();
+              const groupName = prompt('Enter group name:', 'New Group');
+              if (groupName) {
+                createGroup(selectedComponents, groupName);
+              }
+            }
+            break;
+          case 'Escape':
+            setSelectedComponents([]);
+            break;
+        }
       }
     };
 
@@ -308,12 +531,15 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedComponent, selectedConnection, handleComponentDelete, handleComponentDuplicate, handleComponentSelect, onConnectionSelect, connectionManager]);
+  }, [selectedComponent, selectedConnection, selectedComponents, handleComponentDelete, handleComponentDuplicate, handleComponentSelect, onConnectionSelect, connectionManager, createGroup]);
 
   return (
     <div
       id="canvas"
-      ref={drop as any}
+      ref={(node) => {
+        canvasRef.current = node;
+        drop(node);
+      }}
       className={`canvas ${isOver ? 'canvas--drop-active' : ''}`}
       style={{
         width: `${width}px`,
@@ -322,92 +548,216 @@ export const Canvas: React.FC<CanvasProps> = ({
         border: '2px solid #e0e0e0',
         borderRadius: '8px',
         backgroundColor: isOver ? '#f0f8ff' : '#fafafa',
-        backgroundImage: `
+        backgroundImage: enableGridSnapping ? `
           radial-gradient(circle, #ddd 1px, transparent 1px)
-        `,
-        backgroundSize: '20px 20px',
+        ` : 'none',
+        backgroundSize: enableGridSnapping ? `${gridSize * zoom}px ${gridSize * zoom}px` : 'auto',
+        backgroundPosition: `${pan.x % (gridSize * zoom)}px ${pan.y % (gridSize * zoom)}px`,
         overflow: 'hidden',
-        cursor: 'default'
+        cursor: isPanning ? 'grabbing' : (enableZoom ? 'grab' : 'default')
       }}
       onClick={handleCanvasClick}
-      onMouseMove={connectionManager.handleMouseMove}
+      onMouseMove={handleMouseMove}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onWheel={handleWheel}
     >
-      {/* SVG layer for connections */}
-      <svg
+      {/* Canvas content with zoom and pan transform */}
+      <div
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: '0 0',
           width: '100%',
           height: '100%',
-          pointerEvents: 'auto',
-          zIndex: 1
+          position: 'relative'
         }}
       >
-        {/* Render existing connections */}
-        {connections.map(connection => {
-          const sourceComponent = components.find(c => c.id === connection.sourceComponentId);
-          const targetComponent = components.find(c => c.id === connection.targetComponentId);
+        {/* Groups layer (behind components) */}
+        {groups.map(group => (
+          <div
+            key={group.id}
+            style={{
+              position: 'absolute',
+              left: `${group.position.x}px`,
+              top: `${group.position.y}px`,
+              width: `${group.size.width}px`,
+              height: `${group.size.height}px`,
+              backgroundColor: group.color,
+              border: '2px dashed #666',
+              borderRadius: '8px',
+              zIndex: 0,
+              pointerEvents: 'none'
+            }}
+          >
+            {/* Group label */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '-25px',
+                left: '0px',
+                backgroundColor: '#666',
+                color: 'white',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                pointerEvents: 'auto',
+                cursor: 'pointer'
+              }}
+              onClick={() => {
+                const newName = prompt('Enter new group name:', group.name);
+                if (newName) updateGroupName(group.id, newName);
+              }}
+              onDoubleClick={() => toggleGroupCollapse(group.id)}
+              title="Click to rename, double-click to collapse/expand"
+            >
+              {group.collapsed ? '▶' : '▼'} {group.name}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteGroup(group.id);
+                }}
+                style={{
+                  marginLeft: '8px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '10px'
+                }}
+                title="Delete group"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        ))}
+        
+        {/* Selection box */}
+        {isSelecting && selectionBox && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${Math.min(selectionBox.start.x, selectionBox.end.x)}px`,
+              top: `${Math.min(selectionBox.start.y, selectionBox.end.y)}px`,
+              width: `${Math.abs(selectionBox.end.x - selectionBox.start.x)}px`,
+              height: `${Math.abs(selectionBox.end.y - selectionBox.start.y)}px`,
+              border: '2px dashed #007bff',
+              backgroundColor: 'rgba(0, 123, 255, 0.1)',
+              pointerEvents: 'none',
+              zIndex: 50
+            }}
+          />
+        )}
+        
+        {/* SVG layer for connections */}
+        <svg
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'auto',
+            zIndex: 1
+          }}
+        >
+          {/* Render existing connections */}
+          {connections.map(connection => {
+            const sourceComponent = components.find(c => c.id === connection.sourceComponentId);
+            const targetComponent = components.find(c => c.id === connection.targetComponentId);
+            
+            if (!sourceComponent || !targetComponent) return null;
+            
+            return (
+              <ConnectionWire
+                key={connection.id}
+                connection={connection}
+                sourceComponent={sourceComponent}
+                targetComponent={targetComponent}
+                isSelected={selectedConnection?.id === connection.id}
+                onSelect={connectionManager.onConnectionSelect}
+                onDelete={connectionManager.onConnectionDelete}
+                onContextMenu={handleConnectionContextMenu}
+              />
+            );
+          })}
           
-          if (!sourceComponent || !targetComponent) return null;
+          {/* Wire preview during connection creation */}
+          {connectionManager.wireInProgress && (
+            (() => {
+              const sourceComponent = components.find(c => c.id === connectionManager.wireInProgress!.sourceComponentId);
+              if (!sourceComponent) return null;
+              
+              const sourcePoint = connectionManager.getConnectionPointPosition(sourceComponent, connectionManager.wireInProgress!.sourcePort);
+              const targetPoint = connectionManager.wireInProgress!.currentPosition;
+              
+              return (
+                <line
+                  x1={sourcePoint.x}
+                  y1={sourcePoint.y}
+                  x2={targetPoint.x}
+                  y2={targetPoint.y}
+                  stroke="#007bff"
+                  strokeWidth="2"
+                  strokeDasharray="5,5"
+                  opacity="0.7"
+                  style={{ pointerEvents: 'none' }}
+                />
+              );
+            })()
+          )}
+        </svg>
+        
+        {/* Components layer */}
+        {components.map(component => {
+          // Get connection validation for this component if we're connecting
+          let connectionValidation;
+          if (connectionManager.isConnecting && connectionManager.wireInProgress) {
+            const sourceComponent = components.find(c => c.id === connectionManager.wireInProgress!.sourceComponentId);
+            if (sourceComponent && sourceComponent.id !== component.id) {
+              connectionValidation = connectionManager.validateConnection(sourceComponent, component);
+            }
+          }
+          
+          // Check if component is in a collapsed group
+          const parentGroup = groups.find(group => group.componentIds.includes(component.id));
+          const isInCollapsedGroup = parentGroup?.collapsed;
+          
+          if (isInCollapsedGroup) return null; // Don't render components in collapsed groups
           
           return (
-            <ConnectionWire
-              key={connection.id}
-              connection={connection}
-              sourceComponent={sourceComponent}
-              targetComponent={targetComponent}
-              isSelected={selectedConnection?.id === connection.id}
-              onSelect={connectionManager.onConnectionSelect}
-              onDelete={connectionManager.onConnectionDelete}
-              onContextMenu={handleConnectionContextMenu}
+            <CanvasComponent
+              key={component.id}
+              component={component}
+              isSelected={selectedComponent?.id === component.id || selectedComponents.includes(component.id)}
+              onSelect={(comp) => {
+                if (comp && selectedComponents.length > 0) {
+                  // If we have multiple selected and clicking on one, select just that one
+                  setSelectedComponents([]);
+                  handleComponentSelect(comp);
+                } else {
+                  handleComponentSelect(comp);
+                }
+              }}
+              onMove={handleComponentMove}
+              onContextMenu={handleContextMenu}
+              onConnectionPointClick={connectionManager.handleConnectionPointClick}
+              isConnecting={connectionManager.isConnecting}
+              canConnect={(comp) => {
+                const validation = connectionManager.validateConnection(
+                  components.find(c => c.id === connectionManager.wireInProgress?.sourceComponentId) || comp,
+                  comp
+                );
+                return validation.valid;
+              }}
+              connectionValidation={connectionValidation}
             />
           );
         })}
-        
-        {/* Wire preview during connection creation */}
-        {connectionManager.wireInProgress && (
-          (() => {
-            const sourceComponent = components.find(c => c.id === connectionManager.wireInProgress!.sourceComponentId);
-            if (!sourceComponent) return null;
-            
-            const sourcePoint = connectionManager.getConnectionPointPosition(sourceComponent, connectionManager.wireInProgress!.sourcePort);
-            const targetPoint = connectionManager.wireInProgress!.currentPosition;
-            
-            return (
-              <line
-                x1={sourcePoint.x}
-                y1={sourcePoint.y}
-                x2={targetPoint.x}
-                y2={targetPoint.y}
-                stroke="#007bff"
-                strokeWidth="2"
-                strokeDasharray="5,5"
-                opacity="0.7"
-                style={{ pointerEvents: 'none' }}
-              />
-            );
-          })()
-        )}
-      </svg>
+      </div>
       
-      {/* Components layer */}
-      {components.map(component => (
-        <CanvasComponent
-          key={component.id}
-          component={component}
-          isSelected={selectedComponent?.id === component.id}
-          onSelect={handleComponentSelect}
-          onMove={handleComponentMove}
-          onContextMenu={handleContextMenu}
-          onConnectionPointClick={connectionManager.handleConnectionPointClick}
-          isConnecting={connectionManager.isConnecting}
-          canConnect={(comp) => connectionManager.validateConnection(
-            components.find(c => c.id === connectionManager.wireInProgress?.sourceComponentId) || comp,
-            comp
-          )}
-        />
-      ))}
+      {/* UI Overlays (not affected by zoom/pan) */}
       
       {/* Context Menu */}
       {contextMenu && (
@@ -481,6 +831,181 @@ export const Canvas: React.FC<CanvasProps> = ({
         </div>
       )}
       
+      {/* Grouping Controls */}
+      {selectedComponents.length > 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid #ddd',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 100,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+          }}
+        >
+          <span style={{ fontSize: '12px', color: '#666' }}>
+            {selectedComponents.length} components selected
+          </span>
+          <button
+            onClick={() => {
+              const groupName = prompt('Enter group name:', 'New Group');
+              if (groupName) {
+                createGroup(selectedComponents, groupName);
+              }
+            }}
+            style={{
+              padding: '4px 8px',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+            title="Create Group (Ctrl+G)"
+          >
+            📦 Group
+          </button>
+          <button
+            onClick={() => setSelectedComponents([])}
+            style={{
+              padding: '4px 8px',
+              backgroundColor: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+      
+      {/* Instructions */}
+      {selectedComponents.length === 0 && !connectionManager.isConnecting && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '50px',
+            left: '10px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            padding: '8px',
+            fontSize: '11px',
+            color: '#666',
+            maxWidth: '200px',
+            zIndex: 100
+          }}
+        >
+          <div><strong>Canvas Controls:</strong></div>
+          <div>• Shift+Drag: Select multiple</div>
+          <div>• Ctrl+G: Group selected</div>
+          <div>• Ctrl+Wheel: Zoom</div>
+          <div>• Middle-drag: Pan</div>
+        </div>
+      )}
+      
+      {/* Zoom and Grid Controls */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '10px',
+          right: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          zIndex: 100
+        }}
+      >
+        {/* Zoom Controls */}
+        {enableZoom && (
+          <div
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              padding: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <button
+              onClick={() => setZoom(prev => Math.min(maxZoom, prev * 1.2))}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '2px 6px'
+              }}
+              title="Zoom In"
+            >
+              +
+            </button>
+            <div style={{ fontSize: '10px', color: '#666' }}>
+              {Math.round(zoom * 100)}%
+            </div>
+            <button
+              onClick={() => setZoom(prev => Math.max(minZoom, prev / 1.2))}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '2px 6px'
+              }}
+              title="Zoom Out"
+            >
+              -
+            </button>
+            <button
+              onClick={() => {
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '10px',
+                cursor: 'pointer',
+                padding: '2px 4px',
+                marginTop: '4px'
+              }}
+              title="Reset View"
+            >
+              Reset
+            </button>
+          </div>
+        )}
+        
+        {/* Grid Toggle */}
+        {enableGridSnapping && (
+          <div
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              fontSize: '10px',
+              color: '#666'
+            }}
+          >
+            Grid: {gridSize}px
+          </div>
+        )}
+      </div>
       {/* Connection Configuration Panel */}
       {showConnectionConfig && selectedConnection && (
         <ConnectionConfigPanel

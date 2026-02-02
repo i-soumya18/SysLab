@@ -3,15 +3,20 @@
  * These types define the structure of workspaces, components, connections, and simulation configurations
  */
 
-// Legacy Component Types (for backward compatibility)
+// Export subscription types (SRS FR-1.4)
+export * from './subscription';
+
+// Enhanced Component Types implementing SRS FR-3.1
 export type ComponentType = 
-  | 'database' 
-  | 'load-balancer' 
-  | 'web-server' 
-  | 'cache' 
-  | 'message-queue' 
-  | 'cdn' 
-  | 'proxy';
+  | 'load-balancer'  // Load Balancer component per SRS FR-3.1
+  | 'database'       // Database component with ACID properties per SRS FR-3.1
+  | 'cache'          // Cache component with eviction policies per SRS FR-3.1
+  | 'queue'          // Queue component with messaging patterns per SRS FR-3.1 (renamed from message-queue)
+  | 'cdn'            // CDN component with geographic distribution per SRS FR-3.1
+  | 'service'        // Service component with scaling options per SRS FR-3.1 (renamed from web-server)
+  | 'message-queue'  // Legacy support
+  | 'web-server'     // Legacy support
+  | 'proxy';         // Legacy support
 
 // Enhanced System Component Types (10 specific components per SRS)
 export type SystemComponentType = 

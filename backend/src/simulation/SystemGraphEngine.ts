@@ -852,6 +852,8 @@ export class SystemGraphEngine extends EventEmitter {
       'web-server': 'Service',
       'cache': 'Cache',
       'message-queue': 'Queue',
+      'queue': 'Queue',
+      'service': 'Service',
       'cdn': 'CDN',
       'proxy': 'APIGateway'
     };

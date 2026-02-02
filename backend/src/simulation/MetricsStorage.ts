@@ -315,4 +315,36 @@ export class MetricsStorage {
     // Import system metrics
     this.systemMetrics = [...data.systemMetrics];
   }
+
+  /**
+   * Get latest raw metrics for all components in a workspace
+   */
+  getLatestRawMetricsForWorkspace(workspaceId: string): Map<string, ComponentMetrics> {
+    const result = new Map<string, ComponentMetrics>();
+    
+    for (const [componentId, metrics] of this.rawMetrics) {
+      if (metrics.length > 0) {
+        const latest = metrics[metrics.length - 1];
+        result.set(componentId, latest);
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Get latest aggregated metrics for all components in a workspace
+   */
+  getLatestAggregatedMetricsForWorkspace(workspaceId: string): Map<string, AggregatedMetrics> {
+    const result = new Map<string, AggregatedMetrics>();
+    
+    for (const [componentId, metrics] of this.aggregatedMetrics) {
+      if (metrics.length > 0) {
+        const latest = metrics[metrics.length - 1];
+        result.set(componentId, latest);
+      }
+    }
+    
+    return result;
+  }
 }

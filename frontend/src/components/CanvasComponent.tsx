@@ -16,6 +16,7 @@ interface CanvasComponentProps {
   onConnectionPointClick?: (componentId: string, port: string, position: { x: number; y: number }) => void;
   isConnecting?: boolean;
   canConnect?: (component: Component) => boolean;
+  connectionValidation?: { valid: boolean; reason?: string };
 }
 
 export const CanvasComponent: React.FC<CanvasComponentProps> = ({
@@ -26,7 +27,8 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
   onContextMenu,
   onConnectionPointClick,
   isConnecting = false,
-  canConnect: _canConnect = () => true
+  canConnect: _canConnect = () => true,
+  connectionValidation
 }) => {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -39,12 +41,31 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
     }),
     end: (_item, monitor) => {
       const offset = monitor.getClientOffset();
-      const canvasRect = document.getElementById('canvas')?.getBoundingClientRect();
+      const canvasElement = document.getElementById('canvas');
+      const canvasRect = canvasElement?.getBoundingClientRect();
       
       if (offset && canvasRect) {
+        // Get the transform values from the canvas content div
+        const canvasContent = canvasElement?.querySelector('div[style*="transform"]') as HTMLElement;
+        let zoom = 1;
+        let panX = 0;
+        let panY = 0;
+        
+        if (canvasContent) {
+          const transform = canvasContent.style.transform;
+          const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+          const translateMatch = transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+          
+          if (scaleMatch) zoom = parseFloat(scaleMatch[1]);
+          if (translateMatch) {
+            panX = parseFloat(translateMatch[1]);
+            panY = parseFloat(translateMatch[2]);
+          }
+        }
+        
         const newPosition: Position = {
-          x: Math.max(0, offset.x - canvasRect.left - 50), // Center the component
-          y: Math.max(0, offset.y - canvasRect.top - 25)
+          x: Math.max(0, (offset.x - canvasRect.left - panX) / zoom - 50), // Center the component
+          y: Math.max(0, (offset.y - canvasRect.top - panY) / zoom - 25)
         };
         onMove(component.id, newPosition);
       }
@@ -127,6 +148,12 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const componentColor = getComponentColor(component.type);
   const componentIcon = getComponentIcon(component.type);
   const showConnectionPoints = isSelected || isConnecting;
+  
+  // Determine connection feedback styling
+  const connectionFeedback = isConnecting && connectionValidation ? {
+    borderColor: connectionValidation.valid ? '#28a745' : '#dc3545',
+    backgroundColor: connectionValidation.valid ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)'
+  } : {};
 
   return (
     <div
@@ -138,8 +165,10 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
         top: `${component.position.y}px`,
         width: '100px',
         height: '80px',
-        backgroundColor: componentColor,
-        border: isSelected ? '3px solid #007bff' : '2px solid #fff',
+        backgroundColor: connectionFeedback.backgroundColor || componentColor,
+        border: isSelected ? '3px solid #007bff' : 
+                isConnecting && connectionValidation ? `2px solid ${connectionFeedback.borderColor}` :
+                '2px solid #fff',
         borderRadius: '8px',
         cursor: isDragging ? 'grabbing' : 'grab',
         opacity: isDragging ? 0.5 : 1,
@@ -154,6 +183,8 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
         padding: '4px',
         boxShadow: isSelected 
           ? '0 4px 12px rgba(0, 123, 255, 0.3)' 
+          : isConnecting && connectionValidation && !connectionValidation.valid
+          ? '0 4px 12px rgba(220, 53, 69, 0.3)'
           : '0 2px 8px rgba(0, 0, 0, 0.1)',
         transition: 'all 0.2s ease',
         userSelect: 'none',
@@ -192,6 +223,28 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
       }}>
         {component.metadata.name}
       </div>
+      
+      {/* Connection validation feedback */}
+      {isConnecting && connectionValidation && !connectionValidation.valid && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '-35px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#dc3545',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '10px',
+            whiteSpace: 'nowrap',
+            zIndex: 30,
+            pointerEvents: 'none'
+          }}
+        >
+          {connectionValidation.reason}
+        </div>
+      )}
       
       {/* Connection points */}
       <div

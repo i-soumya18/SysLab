@@ -1,17 +1,28 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { WorkspaceService, WorkspaceImportRequest } from '../services/workspaceService';
+import { SharingService } from '../services/sharingService';
 import { WorkspaceSchema, ComponentSchema, ConnectionSchema } from '../types/validation';
+import { authenticateToken } from '../middleware/auth';
+import { subscriptionMiddleware } from '../middleware/subscriptionMiddleware';
 
 const router = Router();
 let workspaceService: WorkspaceService;
+let sharingService: SharingService;
 
-// Lazy initialize the service
+// Lazy initialize the services
 function getWorkspaceService(): WorkspaceService {
   if (!workspaceService) {
     workspaceService = new WorkspaceService();
   }
   return workspaceService;
+}
+
+function getSharingService(): SharingService {
+  if (!sharingService) {
+    sharingService = new SharingService();
+  }
+  return sharingService;
 }
 
 // Validation schemas for requests
@@ -47,6 +58,26 @@ const WorkspaceImportRequestSchema = z.object({
   userId: z.string().uuid(),
   exportData: z.any(), // Required field
   validateOnly: z.boolean().default(false)
+});
+
+const CreateShareRequestSchema = z.object({
+  workspaceId: z.string().uuid(),
+  sharedBy: z.string().min(1),
+  permissionLevel: z.enum(['view', 'edit', 'admin']).default('view'),
+  expiresIn: z.number().positive().optional(),
+  isPublic: z.boolean().default(false)
+});
+
+const InviteCollaboratorRequestSchema = z.object({
+  workspaceId: z.string().uuid(),
+  userId: z.string().min(1),
+  invitedBy: z.string().min(1),
+  permissionLevel: z.enum(['view', 'edit', 'admin']).default('view')
+});
+
+const UpdateCollaboratorRequestSchema = z.object({
+  permissionLevel: z.enum(['view', 'edit', 'admin']).optional(),
+  status: z.enum(['accepted', 'declined', 'revoked']).optional()
 });
 
 /**
@@ -100,8 +131,12 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 /**
  * POST /api/v1/workspaces
  * Create a new workspace
+ * Requires authentication and checks workspace limit based on subscription tier (SRS FR-1.4)
  */
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+router.post('/', 
+  authenticateToken, 
+  subscriptionMiddleware.checkUsageLimit('maxWorkspaces', 1),
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const requestData = CreateWorkspaceRequestSchema.parse(req.body);
     
@@ -486,6 +521,517 @@ router.post('/validate-import', async (req: Request, res: Response): Promise<voi
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to validate import data',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * POST /api/v1/workspaces/:id/share
+ * Create a shareable link for a workspace
+ */
+router.post('/:id/share', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    
+    // Validate UUID format
+    if (!z.string().uuid().safeParse(id).success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid workspace ID format',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    const requestData = CreateShareRequestSchema.parse({
+      ...req.body,
+      workspaceId: id
+    });
+    
+    const share = await getSharingService().createShare(requestData);
+    
+    // Generate shareable URL
+    const shareUrl = `${req.protocol}://${req.get('host')}/shared/workspaces/${share.shareToken}`;
+    
+    res.status(201).json({
+      success: true,
+      data: {
+        ...share,
+        shareUrl
+      },
+      message: 'Share created successfully'
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid share request data',
+          details: error.errors,
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    console.error('Error creating share:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to create share',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/workspaces/:id/shares
+ * Get all shares for a workspace
+ */
+router.get('/:id/shares', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.query.userId as string;
+
+    // Validate UUID format
+    if (!z.string().uuid().safeParse(id).success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid workspace ID format',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_USER_ID',
+          message: 'User ID is required',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    const shares = await getSharingService().getWorkspaceShares(id, userId);
+    
+    res.json({
+      success: true,
+      data: shares
+    });
+  } catch (error) {
+    console.error('Error getting workspace shares:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to get workspace shares',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * DELETE /api/v1/workspaces/shares/:shareId
+ * Revoke a workspace share
+ */
+router.delete('/shares/:shareId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { shareId } = req.params;
+    const userId = req.query.userId as string;
+
+    // Validate UUID format
+    if (!z.string().uuid().safeParse(shareId).success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid share ID format',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_USER_ID',
+          message: 'User ID is required',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    const revoked = await getSharingService().revokeShare(shareId, userId);
+    
+    if (!revoked) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'SHARE_NOT_FOUND',
+          message: 'Share not found or access denied',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Share revoked successfully'
+    });
+  } catch (error) {
+    console.error('Error revoking share:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to revoke share',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * POST /api/v1/workspaces/:id/collaborators
+ * Invite a collaborator to a workspace
+ */
+router.post('/:id/collaborators', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    
+    // Validate UUID format
+    if (!z.string().uuid().safeParse(id).success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid workspace ID format',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    const requestData = InviteCollaboratorRequestSchema.parse({
+      ...req.body,
+      workspaceId: id
+    });
+    
+    const collaborator = await getSharingService().inviteCollaborator(requestData);
+    
+    res.status(201).json({
+      success: true,
+      data: collaborator,
+      message: 'Collaborator invited successfully'
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid collaborator invitation data',
+          details: error.errors,
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    console.error('Error inviting collaborator:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to invite collaborator',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/workspaces/:id/collaborators
+ * Get all collaborators for a workspace
+ */
+router.get('/:id/collaborators', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.query.userId as string;
+
+    // Validate UUID format
+    if (!z.string().uuid().safeParse(id).success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid workspace ID format',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_USER_ID',
+          message: 'User ID is required',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    const collaborators = await getSharingService().getWorkspaceCollaborators(id, userId);
+    
+    res.json({
+      success: true,
+      data: collaborators
+    });
+  } catch (error) {
+    console.error('Error getting workspace collaborators:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to get workspace collaborators',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * PUT /api/v1/workspaces/:id/collaborators/:userId
+ * Update collaborator permissions or status
+ */
+router.put('/:id/collaborators/:userId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, userId } = req.params;
+    const updatedBy = req.query.updatedBy as string;
+
+    // Validate UUID format
+    if (!z.string().uuid().safeParse(id).success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid workspace ID format',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    if (!updatedBy) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_UPDATED_BY',
+          message: 'updatedBy parameter is required',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    const requestData = UpdateCollaboratorRequestSchema.parse(req.body);
+    
+    const collaborator = await getSharingService().updateCollaborator(id, userId, requestData, updatedBy);
+    
+    if (!collaborator) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'COLLABORATOR_NOT_FOUND',
+          message: 'Collaborator not found',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: collaborator,
+      message: 'Collaborator updated successfully'
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid collaborator update data',
+          details: error.errors,
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    console.error('Error updating collaborator:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to update collaborator',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * DELETE /api/v1/workspaces/:id/collaborators/:userId
+ * Remove a collaborator from a workspace
+ */
+router.delete('/:id/collaborators/:userId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, userId } = req.params;
+    const removedBy = req.query.removedBy as string;
+
+    // Validate UUID format
+    if (!z.string().uuid().safeParse(id).success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid workspace ID format',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    if (!removedBy) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_REMOVED_BY',
+          message: 'removedBy parameter is required',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    const removed = await getSharingService().removeCollaborator(id, userId, removedBy);
+    
+    if (!removed) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'COLLABORATOR_NOT_FOUND',
+          message: 'Collaborator not found or access denied',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Collaborator removed successfully'
+    });
+  } catch (error) {
+    console.error('Error removing collaborator:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to remove collaborator',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/shared/workspaces/:shareToken
+ * Access a shared workspace via share token
+ */
+router.get('/shared/:shareToken', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { shareToken } = req.params;
+    const accessorUserId = req.query.userId as string;
+
+    const shareInfo = await getSharingService().getWorkspaceByShareToken(shareToken, accessorUserId);
+    
+    if (!shareInfo.hasAccess) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'ACCESS_DENIED',
+          message: shareInfo.accessDeniedReason || 'Access denied to shared workspace',
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] || 'unknown'
+        }
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        workspace: shareInfo.workspace,
+        share: shareInfo.share
+      }
+    });
+  } catch (error) {
+    console.error('Error accessing shared workspace:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to access shared workspace',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] || 'unknown'
       }

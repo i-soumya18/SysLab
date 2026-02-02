@@ -75,6 +75,38 @@ async function initializeSchema(): Promise<void> {
       );
     `);
 
+    // Create user subscriptions table for subscription management (SRS FR-1.4)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_subscriptions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        tier VARCHAR(50) NOT NULL DEFAULT 'free',
+        status VARCHAR(50) NOT NULL DEFAULT 'active',
+        billing_cycle VARCHAR(20),
+        current_period_start TIMESTAMP WITH TIME ZONE,
+        current_period_end TIMESTAMP WITH TIME ZONE,
+        cancel_at_period_end BOOLEAN DEFAULT FALSE,
+        trial_end TIMESTAMP WITH TIME ZONE,
+        stripe_customer_id VARCHAR(255),
+        stripe_subscription_id VARCHAR(255) UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Create billing events table for audit trail
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS billing_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subscription_id UUID REFERENCES user_subscriptions(id) ON DELETE CASCADE,
+        event_type VARCHAR(50) NOT NULL,
+        event_data JSONB NOT NULL DEFAULT '{}',
+        stripe_event_id VARCHAR(255),
+        processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     // Create tables if they don't exist
     await client.query(`
       CREATE TABLE IF NOT EXISTS workspaces (
@@ -191,15 +223,55 @@ async function initializeSchema(): Promise<void> {
       );
     `);
 
+    // Create workspace sharing table for design sharing functionality
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workspace_shares (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        shared_by VARCHAR(255) NOT NULL,
+        share_token VARCHAR(255) UNIQUE NOT NULL,
+        permission_level VARCHAR(20) NOT NULL DEFAULT 'view',
+        expires_at TIMESTAMP WITH TIME ZONE,
+        is_public BOOLEAN DEFAULT FALSE,
+        access_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Create workspace collaborators table for multi-user editing
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workspace_collaborators (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        user_id VARCHAR(255) NOT NULL,
+        invited_by VARCHAR(255) NOT NULL,
+        permission_level VARCHAR(20) NOT NULL DEFAULT 'view',
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        invited_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        accepted_at TIMESTAMP WITH TIME ZONE,
+        last_accessed TIMESTAMP WITH TIME ZONE,
+        UNIQUE(workspace_id, user_id)
+      );
+    `);
+
     // Create indexes for better performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
       CREATE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token);
       CREATE INDEX IF NOT EXISTS idx_users_password_reset_token ON users(password_reset_token);
+      CREATE INDEX IF NOT EXISTS idx_users_subscription_tier ON users(subscription_tier);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON user_subscriptions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status ON user_subscriptions(status);
+      CREATE INDEX IF NOT EXISTS idx_user_subscriptions_stripe_customer_id ON user_subscriptions(stripe_customer_id);
+      CREATE INDEX IF NOT EXISTS idx_user_subscriptions_stripe_subscription_id ON user_subscriptions(stripe_subscription_id);
+      CREATE INDEX IF NOT EXISTS idx_billing_events_user_id ON billing_events(user_id);
+      CREATE INDEX IF NOT EXISTS idx_billing_events_subscription_id ON billing_events(subscription_id);
+      CREATE INDEX IF NOT EXISTS idx_billing_events_stripe_event_id ON billing_events(stripe_event_id);
       CREATE INDEX IF NOT EXISTS idx_workspaces_user_id ON workspaces(user_id);
       CREATE INDEX IF NOT EXISTS idx_components_workspace_id ON components(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_connections_workspace_id ON connections(workspace_id);
@@ -211,6 +283,12 @@ async function initializeSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_performance_reports_workspace_id ON performance_reports(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_performance_reports_version_id ON performance_reports(version_id);
       CREATE INDEX IF NOT EXISTS idx_performance_reports_share_token ON performance_reports(share_token);
+      CREATE INDEX IF NOT EXISTS idx_workspace_shares_workspace_id ON workspace_shares(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_workspace_shares_share_token ON workspace_shares(share_token);
+      CREATE INDEX IF NOT EXISTS idx_workspace_shares_shared_by ON workspace_shares(shared_by);
+      CREATE INDEX IF NOT EXISTS idx_workspace_collaborators_workspace_id ON workspace_collaborators(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_workspace_collaborators_user_id ON workspace_collaborators(user_id);
+      CREATE INDEX IF NOT EXISTS idx_workspace_collaborators_status ON workspace_collaborators(status);
     `);
 
     console.log('✅ Database schema initialized');
