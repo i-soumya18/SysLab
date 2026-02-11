@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDrop } from 'react-dnd';
-import type { Component, ComponentType, Position, Connection, ConnectionConfig } from '../types';
+import type { Component, ComponentType, Position, Connection, ConnectionConfig, BottleneckInfo } from '../types';
 import { componentLibrary } from './ComponentLibrary';
 import { CanvasComponent } from './CanvasComponent';
 import { ContextMenu } from './ContextMenu';
@@ -50,6 +50,7 @@ interface CanvasProps {
   enableZoom?: boolean;
   minZoom?: number;
   maxZoom?: number;
+  bottlenecks?: Map<string, BottleneckInfo>;
 }
 
 // Canvas component
@@ -68,7 +69,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   gridSize = 20,
   enableZoom = true,
   minZoom = 0.25,
-  maxZoom = 3.0
+  maxZoom = 3.0,
+  bottlenecks = new Map()
 }) => {
   const [components, setComponents] = useState<Component[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -173,6 +175,25 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [enableZoom, zoom, minZoom, maxZoom, pan]);
 
+  // Selection box handling
+  const handleSelectionStart = useCallback((e: React.MouseEvent) => {
+    if (e.button === 0 && e.shiftKey && !isPanning) {
+      const canvasPosition = screenToCanvas(e.clientX, e.clientY);
+      setIsSelecting(true);
+      setSelectionBox({
+        start: canvasPosition,
+        end: canvasPosition
+      });
+    }
+  }, [screenToCanvas, isPanning]);
+
+  const handleSelectionMove = useCallback((e: React.MouseEvent) => {
+    if (isSelecting && selectionBox) {
+      const canvasPosition = screenToCanvas(e.clientX, e.clientY);
+      setSelectionBox(prev => prev ? { ...prev, end: canvasPosition } : null);
+    }
+  }, [isSelecting, selectionBox, screenToCanvas]);
+
   // Pan handling
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && e.ctrlKey)) { // Middle mouse or Ctrl+click
@@ -271,29 +292,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   }, []);
 
   const toggleGroupCollapse = useCallback((groupId: string) => {
-    setGroups(prev => prev.map(group => 
+    setGroups(prev => prev.map(group =>
       group.id === groupId ? { ...group, collapsed: !group.collapsed } : group
     ));
   }, []);
-
-  // Selection box handling
-  const handleSelectionStart = useCallback((e: React.MouseEvent) => {
-    if (e.button === 0 && e.shiftKey && !isPanning) {
-      const canvasPosition = screenToCanvas(e.clientX, e.clientY);
-      setIsSelecting(true);
-      setSelectionBox({
-        start: canvasPosition,
-        end: canvasPosition
-      });
-    }
-  }, [screenToCanvas, isPanning]);
-
-  const handleSelectionMove = useCallback((e: React.MouseEvent) => {
-    if (isSelecting && selectionBox) {
-      const canvasPosition = screenToCanvas(e.clientX, e.clientY);
-      setSelectionBox(prev => prev ? { ...prev, end: canvasPosition } : null);
-    }
-  }, [isSelecting, selectionBox, screenToCanvas]);
 
   // Drop handler for components from the palette
   const [{ isOver }, drop] = useDrop({
@@ -537,8 +539,16 @@ export const Canvas: React.FC<CanvasProps> = ({
     <div
       id="canvas"
       ref={(node) => {
-        canvasRef.current = node;
-        drop(node);
+        // Use Object.defineProperty to work around readonly constraint
+        if (node) {
+          Object.defineProperty(canvasRef, 'current', {
+            value: node,
+            writable: false,
+            enumerable: true,
+            configurable: true
+          });
+          drop(node);
+        }
       }}
       className={`canvas ${isOver ? 'canvas--drop-active' : ''}`}
       style={{
@@ -752,6 +762,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                 return validation.valid;
               }}
               connectionValidation={connectionValidation}
+              isBottleneck={bottlenecks.has(component.id)}
+              bottleneckSeverity={bottlenecks.get(component.id)?.severity || 'low'}
             />
           );
         })}

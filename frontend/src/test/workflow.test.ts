@@ -314,12 +314,14 @@ describe('Frontend Workflow Tests', () => {
               componentId: 'web-1',
               failureType: 'crash',
               startTime: 30,
-              duration: 10
+              duration: 10,
+              severity: 0.8
             }
           ],
           metricsCollection: {
-            interval: 1000,
-            enabled: true
+            collectionInterval: 1000,
+            retentionPeriod: 3600,
+            enabledMetrics: ['latency', 'throughput', 'errorRate']
           }
         },
         createdAt: new Date(),
@@ -354,20 +356,33 @@ describe('Frontend Workflow Tests', () => {
       const { WorkspaceApiService } = await import('../services/workspaceApi');
 
       const importData = {
-        name: 'Imported Workspace',
-        components: [],
-        connections: [],
-        configuration: {
-          duration: 30,
-          loadPattern: { type: 'constant', baseLoad: 100 },
-          failureScenarios: [],
-          metricsCollection: { interval: 1000, enabled: true }
+        userId: 'test-user',
+        exportData: {
+          version: '1.0.0',
+          exportedAt: new Date().toISOString(),
+          workspace: {
+            name: 'Imported Workspace',
+            components: [],
+            connections: [],
+            configuration: {
+              duration: 30,
+              loadPattern: { type: 'constant', baseLoad: 100 },
+              failureScenarios: [],
+              metricsCollection: { collectionInterval: 1000, retentionPeriod: 3600, enabledMetrics: [] }
+            }
+          },
+          metadata: {
+            exportedBy: 'test-user',
+            originalWorkspaceId: 'original-workspace',
+            componentCount: 0,
+            connectionCount: 0
+          }
         }
       };
 
       // The mock should be called
-      await WorkspaceApiService.importWorkspace(importData, 'test-user');
-      expect(WorkspaceApiService.importWorkspace).toHaveBeenCalledWith(importData, 'test-user');
+      await WorkspaceApiService.importWorkspace(importData);
+      expect(WorkspaceApiService.importWorkspace).toHaveBeenCalledWith(importData);
     });
   });
 
@@ -381,7 +396,7 @@ describe('Frontend Workflow Tests', () => {
         duration: 60,
         loadPattern: { type: 'constant', baseLoad: 100 },
         failureScenarios: [],
-        metricsCollection: { interval: 1000, enabled: true }
+        metricsCollection: { collectionInterval: 1000, retentionPeriod: 3600, enabledMetrics: [] }
       };
 
       // Start simulation
@@ -406,7 +421,7 @@ describe('Frontend Workflow Tests', () => {
         duration: 60,
         loadPattern: { type: 'constant', baseLoad: 100 },
         failureScenarios: [],
-        metricsCollection: { interval: 1000, enabled: true }
+        metricsCollection: { collectionInterval: 1000, retentionPeriod: 3600, enabledMetrics: [] }
       };
 
       // Update load pattern
@@ -426,7 +441,8 @@ describe('Frontend Workflow Tests', () => {
             componentId: 'web-1',
             failureType: 'slowdown',
             startTime: 20,
-            duration: 15
+            duration: 15,
+            severity: 0.6
           }
         ]
       };
@@ -555,7 +571,7 @@ describe('Frontend Workflow Tests', () => {
           duration: 300,
           loadPattern: { type: 'realistic', baseLoad: 1000 },
           failureScenarios: [],
-          metricsCollection: { interval: 500, enabled: true }
+          metricsCollection: { collectionInterval: 500, retentionPeriod: 3600, enabledMetrics: [] }
         },
         createdAt: new Date(),
         updatedAt: new Date()

@@ -1,4 +1,4 @@
-import { Workspace } from '../types';
+import type { Workspace } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 

@@ -4,7 +4,7 @@
  * Implements SRS FR-5.4: Visual system collapse detection and recovery monitoring
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Component } from '../types';
 import './SystemCollapseMonitor.css';
 
@@ -257,7 +257,7 @@ export const SystemCollapseMonitor: React.FC<SystemCollapseMonitorProps> = ({
                           return (
                             <React.Fragment key={componentId}>
                               <span className="path-component">
-                                {component?.name || componentId}
+                                {component?.metadata.name || componentId}
                               </span>
                               {index < collapse.propagationPath.length - 1 && (
                                 <span className="path-arrow">→</span>

@@ -28,7 +28,7 @@ export interface CreateVersionRequest {
 }
 
 export interface VersionListOptions {
-  workspaceId: string;
+  workspaceId?: string;
   limit?: number;
   offset?: number;
   includeMetrics?: boolean;
@@ -53,7 +53,7 @@ export interface PerformanceComparison {
   summary: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
 export class VersionApiService {
   /**
@@ -89,7 +89,7 @@ export class VersionApiService {
     };
   }> {
     const params = new URLSearchParams();
-    params.append('workspaceId', options.workspaceId);
+    if (options.workspaceId) params.append('workspaceId', options.workspaceId);
     if (options.limit !== undefined) params.append('limit', options.limit.toString());
     if (options.offset !== undefined) params.append('offset', options.offset.toString());
     if (options.includeMetrics !== undefined) params.append('includeMetrics', options.includeMetrics.toString());
@@ -204,7 +204,7 @@ export class VersionApiService {
   /**
    * Restore workspace to a specific version
    */
-  static async restoreToVersion(workspaceId: string, versionId: string, userId: string): Promise<any> {
+  static async restoreToVersion(_workspaceId: string, versionId: string, userId: string): Promise<any> {
     // Get the version data
     const version = await this.getVersionById(versionId);
     

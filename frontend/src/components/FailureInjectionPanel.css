@@ -1,0 +1,338 @@
+/* Failure Injection Panel Styles */
+
+.failure-injection-panel {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  max-height: 520px;
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
+
+.panel-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.status-badge.running {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.status-badge.stopped {
+  background-color: #757575;
+  color: white;
+}
+
+.warning-message {
+  padding: 16px;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  margin: 16px;
+  font-size: 14px;
+  color: #856404;
+}
+
+/* Scrollable Content */
+.failure-injection-panel > div:not(.panel-header) {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Injection Form */
+.injection-form {
+  margin-bottom: 24px;
+}
+
+.injection-form h4 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-group select,
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+}
+
+.form-group select:disabled,
+.form-group input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-group input[type="range"] {
+  width: 100%;
+  height: 6px;
+  margin: 8px 0;
+}
+
+.severity-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #666;
+}
+
+.inject-button {
+  width: 100%;
+  padding: 12px;
+  background-color: #F44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.inject-button:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
+.inject-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Active Failures */
+.active-failures-section {
+  margin-bottom: 24px;
+}
+
+.active-failures-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.failures-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.failure-card {
+  padding: 12px;
+  background-color: #f5f5f5;
+  border-left: 4px solid #F44336;
+  border-radius: 4px;
+}
+
+.failure-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.failure-icon {
+  font-size: 20px;
+}
+
+.failure-info {
+  flex: 1;
+}
+
+.failure-component {
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+}
+
+.failure-type {
+  font-size: 11px;
+  color: #666;
+}
+
+.remove-button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.remove-button:hover {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.failure-details {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.detail-label {
+  color: #666;
+}
+
+.detail-value {
+  font-weight: bold;
+  color: #333;
+}
+
+.failure-progress {
+  height: 4px;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  transition: width 1s linear;
+}
+
+/* Quick Scenarios */
+.quick-scenarios-section {
+  margin-bottom: 24px;
+}
+
+.quick-scenarios-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.quick-scenarios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-scenario-btn {
+  padding: 10px 12px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.quick-scenario-btn:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.quick-scenario-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Learning Tips */
+.learning-tips {
+  padding: 12px;
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196F3;
+  border-radius: 4px;
+}
+
+.learning-tips h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: bold;
+  color: #1976D2;
+}
+
+.learning-tips ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: #333;
+  line-height: 1.6;
+}
+
+.learning-tips li {
+  margin-bottom: 4px;
+}
+
+/* Scrollbar Styling */
+.failure-injection-panel > div::-webkit-scrollbar {
+  width: 6px;
+}
+
+.failure-injection-panel > div::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.failure-injection-panel > div::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.failure-injection-panel > div::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

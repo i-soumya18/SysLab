@@ -142,7 +142,7 @@ export interface ComponentMetrics {
   queueDepth: number;
 }
 
-// Scenario interface for learning exercises
+// Scenario interface for learning exercises implementing SRS FR-9.1
 export interface Scenario {
   id: string;
   name: string;
@@ -151,6 +151,13 @@ export interface Scenario {
   initialWorkspace: Partial<Workspace>;
   hints: string[];
   evaluationCriteria: string[];
+  // Enhanced properties for SRS FR-9.1
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  prerequisites: string[]; // IDs of scenarios that should be completed first
+  category: string;
+  estimatedTimeMinutes: number;
+  tags: string[];
+  learningOutcomes: string[];
 }
 
 // User progress tracking interface
@@ -362,4 +369,149 @@ export interface SystemMetrics {
   healthyComponents: number;
   totalQueueDepth: number;
   componentMetrics: Map<string, AggregatedMetrics>;
+}
+
+// Progressive Constraint System interfaces implementing SRS FR-9.2
+export interface ConstraintEvent {
+  id: string;
+  type: 'load-increase' | 'failure-injection' | 'latency-spike' | 'resource-limit' | 'network-partition';
+  triggerTime: number; // seconds from scenario start
+  duration: number; // seconds
+  severity: number; // 0.0 to 1.0
+  description: string;
+  learningObjective: string;
+  adaptiveParameters?: AdaptiveParameters;
+}
+
+export interface AdaptiveParameters {
+  userPerformanceThreshold: number; // 0.0 to 1.0
+  difficultyAdjustment: number; // -0.5 to +0.5
+  skipIfPoorPerformance: boolean;
+  prerequisiteEvents: string[]; // IDs of events that must complete first
+}
+
+export interface ConstraintSequence {
+  scenarioId: string;
+  events: ConstraintEvent[];
+  adaptiveDifficulty: boolean;
+  baselineMetrics: {
+    expectedLatency: number;
+    expectedThroughput: number;
+    expectedErrorRate: number;
+  };
+}
+
+export interface UserPerformanceMetrics {
+  userId: string;
+  scenarioId: string;
+  currentLatency: number;
+  currentThroughput: number;
+  currentErrorRate: number;
+  timeToResolveIssues: number;
+  correctDecisionsMade: number;
+  totalDecisionOpportunities: number;
+  timestamp: number;
+}
+
+// Hint and Explanation System interfaces implementing SRS FR-9.3
+export interface Hint {
+  id: string;
+  scenarioId: string;
+  type: 'contextual' | 'progressive' | 'remedial' | 'advanced';
+  trigger: HintTrigger;
+  content: string;
+  explanation?: string;
+  relatedConcepts: string[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  priority: number; // 1-10, higher is more important
+  prerequisites?: string[]; // Other hint IDs that should be shown first
+  followUpHints?: string[]; // Hints to show after this one
+}
+
+export interface HintTrigger {
+  type: 'time-based' | 'performance-based' | 'action-based' | 'error-based' | 'request-based';
+  condition: HintCondition;
+}
+
+export interface HintCondition {
+  // Time-based triggers
+  timeThreshold?: number; // seconds
+  
+  // Performance-based triggers
+  latencyThreshold?: number; // ms
+  errorRateThreshold?: number; // 0.0 to 1.0
+  throughputThreshold?: number; // requests per second
+  
+  // Action-based triggers
+  requiredAction?: string; // e.g., 'add-component', 'connect-components'
+  componentType?: string;
+  
+  // Error-based triggers
+  errorType?: string;
+  errorCount?: number;
+  
+  // Context
+  userStuckDuration?: number; // seconds without progress
+  attemptCount?: number; // number of failed attempts
+}
+
+export interface ExplanationContent {
+  id: string;
+  title: string;
+  concept: string;
+  level: 'basic' | 'intermediate' | 'advanced' | 'expert';
+  content: {
+    summary: string;
+    detailedExplanation: string;
+    examples: string[];
+    commonMistakes: string[];
+    bestPractices: string[];
+    relatedTopics: string[];
+  };
+  visualAids?: {
+    diagrams: string[];
+    animations: string[];
+    interactiveElements: string[];
+  };
+}
+
+export interface HintContext {
+  userId: string;
+  scenarioId: string;
+  currentTime: number;
+  userPerformance: {
+    latency: number;
+    throughput: number;
+    errorRate: number;
+  };
+  recentActions: string[];
+  componentsAdded: string[];
+  connectionsCreated: number;
+  errorsEncountered: string[];
+  timeStuckOnCurrentStep: number;
+}
+
+// Performance report interface
+export interface PerformanceReport {
+  id: string;
+  workspaceId: string;
+  versionId: string;
+  title: string;
+  reportType: 'baseline' | 'comparison' | 'optimization' | 'regression';
+  summary: string;
+  timestamp: Date;
+  generatedAt: Date;
+  metrics: PerformanceSnapshot;
+  sections: ReportSection[];
+  analysis: string;
+  recommendations: string[];
+}
+
+export interface ReportSection {
+  id: string;
+  title: string;
+  content: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  charts?: any[];
+  tables?: any[];
 }

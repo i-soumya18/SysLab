@@ -3,22 +3,26 @@
  * Comprehensive error handling and recovery mechanisms
  */
 
-export enum ErrorType {
-  NETWORK = 'NETWORK',
-  VALIDATION = 'VALIDATION',
-  WEBSOCKET = 'WEBSOCKET',
-  CANVAS = 'CANVAS',
-  SIMULATION = 'SIMULATION',
-  WORKSPACE = 'WORKSPACE',
-  UNKNOWN = 'UNKNOWN'
-}
+export const ErrorType = {
+  NETWORK: 'NETWORK',
+  VALIDATION: 'VALIDATION',
+  WEBSOCKET: 'WEBSOCKET',
+  CANVAS: 'CANVAS',
+  SIMULATION: 'SIMULATION',
+  WORKSPACE: 'WORKSPACE',
+  UNKNOWN: 'UNKNOWN'
+} as const;
 
-export enum ErrorSeverity {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL'
-}
+export type ErrorType = typeof ErrorType[keyof typeof ErrorType];
+
+export const ErrorSeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL'
+} as const;
+
+export type ErrorSeverity = typeof ErrorSeverity[keyof typeof ErrorSeverity];
 
 export interface AppError {
   id: string;
@@ -207,11 +211,13 @@ export class CircuitBreaker {
   private failures = 0;
   private lastFailureTime = 0;
   private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+  private readonly failureThreshold: number;
+  private readonly recoveryTimeout: number;
 
-  constructor(
-    private readonly failureThreshold: number = 5,
-    private readonly recoveryTimeout: number = 60000 // 1 minute
-  ) {}
+  constructor(failureThreshold: number = 5, recoveryTimeout: number = 60000) {
+    this.failureThreshold = failureThreshold;
+    this.recoveryTimeout = recoveryTimeout;
+  }
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     if (this.state === 'OPEN') {

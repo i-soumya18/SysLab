@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { VersionApiService, WorkspaceVersion, CreateVersionRequest, PerformanceComparison } from '../services/versionApi';
+import { VersionApiService, type WorkspaceVersion, type CreateVersionRequest, type PerformanceComparison } from '../services/versionApi';
 
 interface VersionHistoryProps {
   workspaceId: string;

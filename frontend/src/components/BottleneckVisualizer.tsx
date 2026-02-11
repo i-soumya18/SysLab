@@ -5,7 +5,7 @@
  * status indicators and bottleneck analysis and reporting
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Component, ComponentMetrics } from '../types';
 import './BottleneckVisualizer.css';
 
@@ -162,7 +162,7 @@ export const BottleneckVisualizer: React.FC<BottleneckVisualizerProps> = ({
                   style={{ backgroundColor: color }}
                 />
                 <div className="component-info">
-                  <span className="component-name">{component.name || component.type}</span>
+                  <span className="component-name">{component.metadata.name || component.type}</span>
                   <span className="component-type">{component.type}</span>
                 </div>
               </div>
@@ -221,7 +221,7 @@ export const BottleneckVisualizer: React.FC<BottleneckVisualizerProps> = ({
                     >
                       <div className="bottleneck-header">
                         <span className="component-name">
-                          {components.find(c => c.id === bottleneck.componentId)?.name || bottleneck.componentType}
+                          {components.find(c => c.id === bottleneck.componentId)?.metadata.name || bottleneck.componentType}
                         </span>
                         <span className="utilization">
                           {bottleneck.utilizationPercent.toFixed(1)}% utilized

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { WorkspaceApiService, WorkspaceShare, WorkspaceCollaborator, CreateShareRequest, InviteCollaboratorRequest } from '../services/workspaceApi';
+import { WorkspaceApiService, type WorkspaceShare, type WorkspaceCollaborator, type CreateShareRequest, type InviteCollaboratorRequest } from '../services/workspaceApi';
 
 interface WorkspaceSharingProps {
   workspaceId: string;

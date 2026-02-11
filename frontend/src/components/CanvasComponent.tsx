@@ -17,6 +17,8 @@ interface CanvasComponentProps {
   isConnecting?: boolean;
   canConnect?: (component: Component) => boolean;
   connectionValidation?: { valid: boolean; reason?: string };
+  isBottleneck?: boolean;
+  bottleneckSeverity?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export const CanvasComponent: React.FC<CanvasComponentProps> = ({
@@ -28,7 +30,9 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
   onConnectionPointClick,
   isConnecting = false,
   canConnect: _canConnect = () => true,
-  connectionValidation
+  connectionValidation,
+  isBottleneck = false,
+  bottleneckSeverity = 'low'
 }) => {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -148,12 +152,24 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
   const componentColor = getComponentColor(component.type);
   const componentIcon = getComponentIcon(component.type);
   const showConnectionPoints = isSelected || isConnecting;
-  
+
   // Determine connection feedback styling
   const connectionFeedback = isConnecting && connectionValidation ? {
     borderColor: connectionValidation.valid ? '#28a745' : '#dc3545',
     backgroundColor: connectionValidation.valid ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)'
   } : {};
+
+  // Determine bottleneck styling
+  const bottleneckColor = {
+    'critical': '#dc3545',
+    'high': '#fd7e14',
+    'medium': '#ffc107',
+    'low': '#28a745'
+  }[bottleneckSeverity] || '#dccctt';
+
+  const bottleneckGlowShadow = isBottleneck
+    ? `0 0 20px ${bottleneckColor}, 0 0 30px ${bottleneckColor}80, inset 0 0 10px ${bottleneckColor}40`
+    : 'none';
 
   return (
     <div
@@ -166,7 +182,7 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
         width: '100px',
         height: '80px',
         backgroundColor: connectionFeedback.backgroundColor || componentColor,
-        border: isSelected ? '3px solid #007bff' : 
+        border: isSelected ? '3px solid #007bff' :
                 isConnecting && connectionValidation ? `2px solid ${connectionFeedback.borderColor}` :
                 '2px solid #fff',
         borderRadius: '8px',
@@ -181,14 +197,17 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
         fontWeight: 'bold',
         textAlign: 'center',
         padding: '4px',
-        boxShadow: isSelected 
-          ? '0 4px 12px rgba(0, 123, 255, 0.3)' 
+        boxShadow: isBottleneck
+          ? bottleneckGlowShadow
+          : isSelected
+          ? '0 4px 12px rgba(0, 123, 255, 0.3)'
           : isConnecting && connectionValidation && !connectionValidation.valid
           ? '0 4px 12px rgba(220, 53, 69, 0.3)'
           : '0 2px 8px rgba(0, 0, 0, 0.1)',
         transition: 'all 0.2s ease',
         userSelect: 'none',
-        zIndex: isSelected ? 10 : 1
+        zIndex: isSelected ? 10 : 1,
+        animation: isBottleneck ? 'bottleneck-pulse 1.5s infinite' : 'none'
       }}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -209,7 +228,30 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
           }}
         />
       )}
-      
+
+      {/* Bottleneck Severity Badge */}
+      {isBottleneck && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '-8px',
+            right: '-8px',
+            backgroundColor: bottleneckColor,
+            color: 'white',
+            padding: '2px 6px',
+            borderRadius: '12px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            whiteSpace: 'nowrap',
+            zIndex: 30,
+            pointerEvents: 'none',
+            boxShadow: `0 0 8px ${bottleneckColor}`
+          }}
+        >
+          {bottleneckSeverity.toUpperCase()}
+        </div>
+      )}
+
       <div style={{ fontSize: '24px', marginBottom: '4px' }}>
         {componentIcon}
       </div>
@@ -323,6 +365,18 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
         }}
         onClick={handleConnectionPointClick('right')}
       />
+
+      {/* Animation Styles */}
+      <style>{`
+        @keyframes bottleneck-pulse {
+          0%, 100% {
+            box-shadow: 0 0 20px ${bottleneckColor}, 0 0 30px ${bottleneckColor}80, inset 0 0 10px ${bottleneckColor}40;
+          }
+          50% {
+            box-shadow: 0 0 10px ${bottleneckColor}, 0 0 15px ${bottleneckColor}40, inset 0 0 5px ${bottleneckColor}20;
+          }
+        }
+      `}</style>
     </div>
   );
 };

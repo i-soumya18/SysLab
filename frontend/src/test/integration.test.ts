@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { WebSocketService } from '../services/websocket';
 import type { Component } from '../types';
 
 // Mock WebSocket service
@@ -21,7 +20,18 @@ vi.mock('../services/websocket', () => ({
     getConnectionStatus: vi.fn().mockReturnValue({ connected: true, connecting: false }),
     getCurrentWorkspaceId: vi.fn().mockReturnValue('test-workspace')
   })),
-  getWebSocketService: vi.fn().mockImplementation(() => new WebSocketService({ url: 'test' }))
+  getWebSocketService: vi.fn().mockImplementation(() => ({
+    connect: vi.fn().mockResolvedValue(undefined),
+    disconnect: vi.fn(),
+    joinWorkspace: vi.fn().mockResolvedValue(undefined),
+    leaveWorkspace: vi.fn().mockResolvedValue(undefined),
+    controlSimulation: vi.fn().mockResolvedValue(undefined),
+    updateCanvas: vi.fn().mockResolvedValue(undefined),
+    on: vi.fn(),
+    off: vi.fn(),
+    getConnectionStatus: vi.fn().mockReturnValue({ connected: true, connecting: false }),
+    getCurrentWorkspaceId: vi.fn().mockReturnValue('test-workspace')
+  }))
 }));
 
 // Mock workspace API service
@@ -130,8 +140,6 @@ describe('Frontend Integration Tests', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle WebSocket connection errors gracefully', async () => {
-      const { WebSocketService } = await import('../services/websocket');
-      
       // Create a new mock instance for this test
       const mockConnect = vi.fn().mockRejectedValue(new Error('Connection failed'));
       const mockService = {
