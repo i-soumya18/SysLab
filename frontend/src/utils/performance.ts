@@ -3,7 +3,7 @@
  * Utilities for optimizing canvas performance and handling large diagrams
  */
 
-import { Component, Connection } from '../types';
+import type { Component, Connection } from '../types';
 
 export interface PerformanceConfig {
   maxVisibleComponents: number;

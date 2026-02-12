@@ -33,6 +33,42 @@ interface CanvasUpdate {
   timestamp: string;
 }
 
+export interface CollaborationOperation {
+  type: 'component-add' | 'component-update' | 'component-delete' | 'connection-create' | 'connection-delete';
+  data: any;
+}
+
+export interface CursorPosition {
+  x: number;
+  y: number;
+}
+
+export interface ParticipantInfo {
+  userId: string;
+  socketId: string;
+  cursor: CursorPosition;
+  selection: string[];
+  color: string;
+  isActive: boolean;
+  lastSeen: Date;
+}
+
+interface CollaborationEvent {
+  operation?: {
+    id: string;
+    userId: string;
+    type: string;
+    data: any;
+    timestamp: Date;
+    wasTransformed?: boolean;
+  };
+  userId?: string;
+  position?: CursorPosition;
+  selectedIds?: string[];
+  participants?: ParticipantInfo[];
+  timestamp: string;
+}
+
 export class WebSocketService {
   private socket: Socket | null = null;
   private config: WebSocketConfig;
@@ -225,6 +261,75 @@ export class WebSocketService {
   }
 
   /**
+   * Send collaborative operation
+   */
+  async sendCollaborationOperation(operation: CollaborationOperation): Promise<void> {
+    if (!this.socket?.connected || !this.currentWorkspaceId) {
+      throw new Error('WebSocket not connected or no workspace joined');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket!.emit('collaboration:operation', {
+        workspaceId: this.currentWorkspaceId,
+        operation
+      }, (response: any) => {
+        if (response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Update cursor position
+   */
+  async updateCursor(position: CursorPosition): Promise<void> {
+    if (!this.socket?.connected || !this.currentWorkspaceId) {
+      return; // Silently fail for cursor updates
+    }
+
+    this.socket.emit('collaboration:cursor', {
+      workspaceId: this.currentWorkspaceId,
+      position
+    });
+  }
+
+  /**
+   * Update selection
+   */
+  async updateSelection(selectedIds: string[]): Promise<void> {
+    if (!this.socket?.connected || !this.currentWorkspaceId) {
+      return; // Silently fail for selection updates
+    }
+
+    this.socket.emit('collaboration:selection', {
+      workspaceId: this.currentWorkspaceId,
+      selectedIds
+    });
+  }
+
+  /**
+   * Get current presence information
+   */
+  async getPresenceInfo(): Promise<ParticipantInfo[]> {
+    if (!this.socket?.connected || !this.currentWorkspaceId) {
+      return [];
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket!.emit('collaboration:get-presence', this.currentWorkspaceId, (response: any) => {
+        if (response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response.participants || []);
+        }
+      });
+    });
+  }
+
+  /**
    * Get connection status
    */
   getConnectionStatus(): ConnectionStatus {
@@ -374,6 +479,31 @@ export class WebSocketService {
     // Canvas events
     this.socket.on('canvas:update', (data: CanvasUpdate) => {
       this.emit('canvas:update', data);
+    });
+
+    // Collaboration events
+    this.socket.on('collaboration:presence', (data: CollaborationEvent) => {
+      this.emit('collaboration:presence', data);
+    });
+
+    this.socket.on('collaboration:participant-joined', (data: CollaborationEvent) => {
+      this.emit('collaboration:participant-joined', data);
+    });
+
+    this.socket.on('collaboration:participant-left', (data: CollaborationEvent) => {
+      this.emit('collaboration:participant-left', data);
+    });
+
+    this.socket.on('collaboration:operation-applied', (data: CollaborationEvent) => {
+      this.emit('collaboration:operation-applied', data);
+    });
+
+    this.socket.on('collaboration:cursor-updated', (data: CollaborationEvent) => {
+      this.emit('collaboration:cursor-updated', data);
+    });
+
+    this.socket.on('collaboration:selection-updated', (data: CollaborationEvent) => {
+      this.emit('collaboration:selection-updated', data);
     });
 
     // Connection confirmation

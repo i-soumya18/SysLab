@@ -91,12 +91,20 @@ router.get('/:userId/learning-path', async (req, res) => {
 
 /**
  * POST /api/v1/progress/:userId/complete-scenario
- * Update progress after scenario completion
+ * Update progress after scenario completion with enhanced tracking
+ * Implements SRS FR-9.4 scenario completion tracking
  */
 router.post('/:userId/complete-scenario', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { scenarioId, evaluationResult } = req.body;
+    const { 
+      scenarioId, 
+      evaluationResult, 
+      timeSpent, 
+      hintsUsed, 
+      attemptsCount, 
+      learningObjectivesMet 
+    } = req.body;
 
     if (!scenarioId || !evaluationResult) {
       return res.status(400).json({
@@ -109,11 +117,23 @@ router.post('/:userId/complete-scenario', async (req, res) => {
       });
     }
 
-    const updatedProgress = progressService.updateProgress(userId, scenarioId, evaluationResult);
+    // Record detailed completion
+    const completion = progressService.recordScenarioCompletion(
+      userId,
+      scenarioId,
+      evaluationResult,
+      timeSpent || 0,
+      hintsUsed || 0,
+      attemptsCount || 1,
+      learningObjectivesMet || []
+    );
 
     return res.json({
       success: true,
-      data: updatedProgress
+      data: {
+        completion,
+        message: 'Scenario completion recorded successfully'
+      }
     });
   } catch (error) {
     console.error('Error updating progress:', error);
@@ -235,6 +255,206 @@ router.delete('/:userId/reset', async (req, res) => {
       error: {
         code: 'PROGRESS_RESET_ERROR',
         message: 'Failed to reset progress',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/progress/:userId/completions
+ * Get scenario completion history
+ * Implements SRS FR-9.4 scenario completion tracking
+ */
+router.get('/:userId/completions', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { scenarioId } = req.query;
+    
+    const completions = progressService.getScenarioCompletions(
+      userId, 
+      scenarioId as string
+    );
+
+    res.json({
+      success: true,
+      data: {
+        completions,
+        count: completions.length,
+        userId,
+        scenarioId: scenarioId || null
+      }
+    });
+  } catch (error) {
+    console.error('Error getting completions:', error);
+    res.status(500).json({
+      error: {
+        code: 'COMPLETIONS_ERROR',
+        message: 'Failed to get scenario completions',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/progress/:userId/analytics
+ * Get learning analytics for a user
+ * Implements SRS FR-9.4 learning progress analytics
+ */
+router.get('/:userId/analytics', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const analytics = progressService.getLearningAnalytics(userId);
+
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error) {
+    console.error('Error getting analytics:', error);
+    res.status(500).json({
+      error: {
+        code: 'ANALYTICS_ERROR',
+        message: 'Failed to get learning analytics',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/progress/:userId/summary
+ * Get user learning summary
+ * Implements SRS FR-9.4 learning progress analytics
+ */
+router.get('/:userId/summary', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const summary = progressService.getUserLearningSummary(userId);
+
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    console.error('Error getting summary:', error);
+    res.status(500).json({
+      error: {
+        code: 'SUMMARY_ERROR',
+        message: 'Failed to get learning summary',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/progress/:userId/milestones
+ * Get user milestone progress
+ * Implements SRS FR-9.4 milestone system
+ */
+router.get('/:userId/milestones', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const achievedMilestones = progressService.getAchievedMilestones(userId);
+    const nextMilestone = progressService.getNextMilestone(userId);
+    const allMilestones = progressService.getAllMilestones();
+    
+    // Get progress for all milestones
+    const milestoneProgress = allMilestones.map(milestone => ({
+      milestone,
+      progress: progressService.getMilestoneProgress(userId, milestone.id),
+      achieved: achievedMilestones.some(m => m.id === milestone.id)
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        achievedMilestones,
+        nextMilestone,
+        milestoneProgress,
+        totalMilestones: allMilestones.length,
+        achievedCount: achievedMilestones.length
+      }
+    });
+  } catch (error) {
+    console.error('Error getting milestones:', error);
+    res.status(500).json({
+      error: {
+        code: 'MILESTONES_ERROR',
+        message: 'Failed to get user milestones',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/progress/milestones
+ * Get all available milestones
+ * Implements SRS FR-9.4 milestone system
+ */
+router.get('/milestones', async (req, res) => {
+  try {
+    const milestones = progressService.getAllMilestones();
+
+    res.json({
+      success: true,
+      data: {
+        milestones,
+        count: milestones.length
+      }
+    });
+  } catch (error) {
+    console.error('Error getting milestones:', error);
+    res.status(500).json({
+      error: {
+        code: 'MILESTONES_FETCH_ERROR',
+        message: 'Failed to get milestones',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/v1/progress/achievements/categories
+ * Get achievements by category
+ * Implements SRS FR-9.4 achievement system
+ */
+router.get('/achievements/categories/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    const achievements = progressService.getAchievementsByCategory(category as any);
+
+    res.json({
+      success: true,
+      data: {
+        achievements,
+        count: achievements.length,
+        category
+      }
+    });
+  } catch (error) {
+    console.error('Error getting achievements by category:', error);
+    res.status(500).json({
+      error: {
+        code: 'ACHIEVEMENTS_CATEGORY_ERROR',
+        message: 'Failed to get achievements by category',
         details: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] || 'unknown'

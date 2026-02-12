@@ -1,60 +1,98 @@
-# Design Document: Enhanced System Design Simulator SaaS Platform
+# Design Document: System Design Simulation & Learning Platform (SaaS)
 
 ## Overview
 
-The System Design Simulator is a comprehensive SaaS-based interactive learning platform that enables users to learn system design from one user to one billion users through hands-on simulation and experimentation. The platform works like "Tinkercad for system design" but with a unique focus on teaching causality, tradeoffs, and engineering intuition through real-time simulation rather than static diagrams.
+The System Design Simulation & Learning Platform is a comprehensive SaaS-based interactive learning platform that enables users to visually design, simulate, and analyze real-world distributed systems under varying scale and constraints, from 1 user to 1 billion users. The platform acts as a **"System Design Flight Simulator"** that transforms abstract concepts into lived experience through the core learning loop:
+
+```
+Build → Scale → Break → Observe → Fix → Repeat
+```
+
+### The Golden User Journey
+
+The platform is architected around a 9-step user journey designed to deliver the "Oh Sh*t" moment that drives deep learning:
+
+1. **Landing & Value Clarity** (30s): "Build a system. Scale it. Watch it break. Fix it."
+2. **Onboarding** (2min): Choose learning path (Learn / Practice / Free Play)
+3. **Canvas Opens** (First Wow): Empty canvas with gentle guidance
+4. **Build First System** (Hands-On): Drag Client → LB → Service → DB
+5. **Run Simulation** ("Oh Sh*t" Moment): Watch system collapse at scale
+6. **Observe Metrics & Cost**: See bottlenecks, latency spikes, cost explosion
+7. **Fix the System** (Core Loop): Add cache, replicas, queues - re-run simulation
+8. **Inject Failures** (Advanced): Network partitions, node failures, cascading issues
+9. **Save, Share, Reflect**: Build habit and enable collaboration
 
 ### Core Value Proposition
 
 The platform addresses the critical gap in system design education by providing experiential learning through realistic simulation. Unlike static diagram tools, it teaches the "why" behind architectural decisions through:
 
-- **Causality Teaching**: Clear cause-and-effect relationships between design choices and system behavior
-- **Tradeoff Visualization**: Real-time demonstration of performance vs cost vs reliability tradeoffs  
-- **Engineering Intuition**: Hands-on experience with scaling challenges from 1 to 1 billion users
-- **Realistic Constraints**: Industry-standard failure modes and operational challenges
+- **Interactive Canvas**: Drag-and-drop interface for building system architectures using standard distributed system components
+- **Scale Simulation**: Dynamic traffic simulation from 1 user to 1 billion users with real-time performance feedback
+- **Failure Injection**: Realistic failure scenarios to test system resilience and recovery patterns
+- **Cost Modeling**: Real-time cost implications to understand performance vs cost tradeoffs
+- **Collaborative Learning**: Multi-user real-time editing and sharing capabilities
 
-### Target User Classes
+### Learning Loop Architecture
+
+The entire architecture is designed to support the core learning loop with sub-second feedback:
+
+```mermaid
+graph LR
+    A[Build: Canvas] --> B[Scale: Traffic Control]
+    B --> C[Break: Simulation Engine]
+    C --> D[Observe: Metrics Dashboard]
+    D --> E[Fix: Component Config]
+    E --> A
+    
+    style C fill:#ff6b6b
+    style D fill:#4ecdc4
+```
+
+**Loop Execution Flow:**
+1. **Build Phase**: User drags components → Canvas Service persists state → System validates connections
+2. **Scale Phase**: User adjusts traffic slider → Simulation Service prepares load profile
+3. **Break Phase**: Simulation Engine executes → Bottlenecks detected → Visual feedback via WebSocket < 100ms
+4. **Observe Phase**: Metrics Dashboard updates in real-time → Cost implications calculated → Bottlenecks highlighted
+5. **Fix Phase**: User modifies architecture → Changes propagated → Re-simulation ready
+6. **Repeat**: Cycle continues with increasing complexity and scale
+
+**Critical Performance Requirements:**
+- Canvas operations: < 16ms (60 FPS)
+- Simulation tick: < 100ms (SRS NFR-1)
+- Metrics update: Real-time WebSocket streaming
+- Bottleneck detection: Immediate visual feedback
+- State persistence: Async, non-blocking
+
+### SRS Compliance Architecture
+
+The design directly implements the 10 functional requirements (FR-1 through FR-10) specified in the SRS:
+
+1. **FR-1 User Authentication**: Secure account management with OAuth integration
+2. **FR-2 Visual Canvas**: Drag-and-drop system design interface
+3. **FR-3 Component Library**: Standard distributed system components with realistic behavior
+4. **FR-4 Traffic Simulation**: Load simulation engine with queueing theory
+5. **FR-5 Scale Control**: Dynamic scaling from 1 to 1 billion users
+6. **FR-6 Failure Injection**: Realistic constraint and failure injection capabilities
+7. **FR-7 Metrics Dashboard**: Comprehensive observability and performance metrics
+8. **FR-8 Cost Modeling**: Real-time cost calculation and optimization
+9. **FR-9 Learning Scenarios**: Guided learning experiences and predefined scenarios
+10. **FR-10 Collaboration**: Real-time multi-user collaboration features
+
+### Target User Classes (SRS Section 2.2)
 
 The platform serves five distinct user classes with tailored experiences:
 
-1. **Learners**: Students and job-seekers learning system design fundamentals
-   - Progressive curriculum from single-server to distributed systems
-   - Guided scenarios based on real-world systems (Twitter, WhatsApp, Netflix, UPI)
-   - Achievement tracking and skill assessment
-
-2. **Engineers**: Practicing engineers experimenting with architectures
-   - Advanced simulation capabilities with realistic failure injection
-   - Cost modeling and optimization recommendations
-   - Collaboration features for team architecture discussions
-
-3. **Instructors**: Teachers creating guided scenarios and curricula
-   - Instructor Mode with attention guidance and control takeover
-   - Scenario creation tools with learning objective tracking
-   - Student progress monitoring and analytics dashboards
-
-4. **Interview Candidates**: Users practicing system design interviews
-   - Interview Mode with timers and hidden challenges
-   - Post-simulation critique with industry best practice comparisons
-   - Scoring system aligned with interview evaluation criteria
-
-5. **Administrators**: Platform operators managing the SaaS service
-   - Multi-tenant management and resource allocation
-   - Usage analytics and learning effectiveness metrics
-   - System performance monitoring and optimization
-
-### Platform Features
-
-The platform features a Visual System Builder with specific industry-standard components (Client, Load Balancer, API Gateway, Service, Cache, Queue, Database, CDN, Search Index, Object Storage), where every wire has configurable latency, bandwidth, and retry policies. A single Traffic & Scale Simulator slider scales from 1 → 1K → 1M → 1B users, providing real-time visual feedback with color-coded bottleneck detection. Users can inject real-world constraints and failures to test system resilience.
-
-The system supports multiple learning modes including Free Play, Guided Scenarios (Twitter Feed, WhatsApp Messaging, Netflix Streaming, UPI Payments), Interview Mode with timers and hidden challenges, and Instructor Mode for live teaching. Core backend engines include a System Graph Engine modeling DAGs with capacity curves, a Load Simulation Engine using queueing theory, a Distributed Systems Behavior Library, and a Cost Modeling Engine with live bankruptcy warnings.
-
-The platform features multiplayer collaboration similar to Figma, scenario sharing, and public templates, all built on a multi-tenant SaaS architecture designed to serve thousands of concurrent learners while teaching the fundamental principles of scalable system design through experiential learning focused on causality and engineering intuition.
+1. **Learners**: Students and job-seekers learning system design fundamentals through progressive curriculum
+2. **Engineers**: Practicing engineers experimenting with architectures and testing design decisions
+3. **Instructors**: Teachers creating guided scenarios and monitoring student progress
+4. **Interview Candidates**: Users practicing system design interviews with timed challenges
+5. **Administrators**: Platform operators managing the multi-tenant SaaS infrastructure
 
 ## Architecture
 
-### High-Level Enhanced SaaS Architecture
+### High-Level SaaS Architecture (SRS Compliant)
 
-The architecture follows a microservices pattern optimized for multi-tenant SaaS delivery with emphasis on scalability, security, and educational effectiveness:
+The architecture follows a microservices pattern optimized for multi-tenant SaaS delivery, directly implementing the SRS non-functional requirements (NFR-1 through NFR-17):
 
 ```mermaid
 graph TB
@@ -66,55 +104,52 @@ graph TB
     
     subgraph "API Gateway & Security"
         Gateway[API Gateway]
-        AuthSvc[Auth Service]
-        RateLimit[Rate Limiting]
-        Security[Security Layer]
+        AuthSvc[Auth Service - FR-1]
+        RateLimit[Rate Limiting - NFR-11]
+        Security[Security Layer - NFR-9,10,11]
     end
     
-    subgraph "Frontend Layer"
-        UI[React UI Components]
-        Canvas[Interactive Canvas]
-        DnD[Drag & Drop Engine]
-        Charts[Performance Charts]
-        Collab[Collaboration UI]
-        Learning[Learning Interface]
+    subgraph "Frontend Layer - FR-2"
+        UI[Visual Canvas UI]
+        Canvas[Drag-Drop Interface]
+        Simulator[Scale Simulator - FR-5]
+        Metrics[Metrics Dashboard - FR-7]
+        Collab[Collaboration UI - FR-10]
     end
     
     subgraph "Core Microservices"
-        UserSvc[User Service]
-        WorkspaceSvc[Workspace Service]
-        SimSvc[Simulation Service]
-        CurriculumSvc[Curriculum Service]
-        AnalyticsSvc[Analytics Service]
-        CollabSvc[Collaboration Service]
-        TenantSvc[Tenant Service]
+        UserSvc[User Service - FR-1]
+        CanvasSvc[Canvas Service - FR-2]
+        SimSvc[Simulation Service - FR-4,5]
+        ComponentSvc[Component Service - FR-3]
+        FailureSvc[Failure Injection - FR-6]
+        CostSvc[Cost Modeling - FR-8]
+        LearningSvc[Learning Service - FR-9]
+        CollabSvc[Collaboration Service - FR-10]
     end
     
-    subgraph "Core Backend Engines"
-        SGE[System Graph Engine]
-        LSE[Load Simulation Engine]
-        DSBL[Distributed Systems Library]
-        CME[Cost Modeling Engine]
-        Scheduler[Event Scheduler]
-        Metrics[Metrics Collector]
+    subgraph "Simulation Engine - FR-4,5,6"
+        TrafficEngine[Traffic Simulation]
+        ScaleEngine[Scale Control Engine]
+        FailureEngine[Failure Injection Engine]
+        MetricsEngine[Metrics Collection]
     end
     
     subgraph "Data Layer"
         UserDB[(User Database)]
-        WorkspaceDB[(Workspace Database)]
-        AnalyticsDB[(Analytics Database)]
-        TenantDB[(Tenant Database)]
+        CanvasDB[(Canvas/Workspace DB)]
+        SimDB[(Simulation Results)]
+        LearningDB[(Learning Progress)]
         Cache[(Redis Cache)]
         FileStore[File Storage]
-        MessageQueue[Message Queue]
-        SearchIndex[Search Engine]
+        MessageQueue[Real-time Messages]
     end
     
-    subgraph "Infrastructure & Operations"
+    subgraph "Infrastructure - NFR-4,5,6,7,8"
         Monitor[Monitoring & Logging]
-        Backup[Backup & Recovery]
         AutoScale[Auto Scaling]
-        Compliance[Security & Compliance]
+        Backup[Backup & Recovery]
+        Security2[Security & Compliance]
     end
     
     CDN --> LB
@@ -124,398 +159,208 @@ graph TB
     
     UI --> Gateway
     Canvas --> Gateway
+    Simulator --> Gateway
+    Metrics --> Gateway
     Collab --> Gateway
-    Learning --> Gateway
     
     Gateway --> UserSvc
-    Gateway --> WorkspaceSvc
+    Gateway --> CanvasSvc
     Gateway --> SimSvc
-    Gateway --> CurriculumSvc
-    Gateway --> AnalyticsSvc
+    Gateway --> ComponentSvc
+    Gateway --> FailureSvc
+    Gateway --> CostSvc
+    Gateway --> LearningSvc
     Gateway --> CollabSvc
-    Gateway --> TenantSvc
     
-    SimSvc --> SGE
-    SimSvc --> LSE
-    SimSvc --> DSBL
-    SimSvc --> CME
-    SGE --> Scheduler
-    LSE --> Metrics
+    SimSvc --> TrafficEngine
+    SimSvc --> ScaleEngine
+    FailureSvc --> FailureEngine
+    SimSvc --> MetricsEngine
     
     UserSvc --> UserDB
-    WorkspaceSvc --> WorkspaceDB
-    AnalyticsSvc --> AnalyticsDB
-    TenantSvc --> TenantDB
-    SimSvc --> Cache
+    CanvasSvc --> CanvasDB
+    SimSvc --> SimDB
+    LearningSvc --> LearningDB
+    CollabSvc --> Cache
     CollabSvc --> MessageQueue
-    CurriculumSvc --> SearchIndex
     
     Monitor --> UserSvc
-    Monitor --> WorkspaceSvc
     Monitor --> SimSvc
     AutoScale --> SimSvc
     Backup --> UserDB
-    Backup --> WorkspaceDB
+    Backup --> CanvasDB
 ```
 
-### Non-Functional Requirements Architecture
+### SRS Non-Functional Requirements Implementation
 
-The architecture is designed to meet specific non-functional requirements from the SRS:
+The architecture directly addresses each SRS non-functional requirement:
 
-**Performance Requirements**:
-- **100ms Simulation Updates**: Achieved through optimized Core Backend Engines and efficient WebSocket communication
-- **Real-time UI Responsiveness**: React-based frontend with optimistic updates and conflict resolution
-- **Concurrent User Isolation**: Multi-tenant architecture with resource quotas and isolated execution contexts
+**Performance (NFR-1, NFR-2, NFR-3)**:
+- **Sub-100ms Updates**: Optimized simulation engine with efficient WebSocket communication
+- **Real-time UI**: React-based frontend with optimistic updates and immediate feedback
+- **User Isolation**: Multi-tenant architecture with isolated execution contexts and resource quotas
 
-**Scalability Requirements**:
-- **Thousands of Concurrent Users**: Horizontal scaling of microservices with auto-scaling capabilities
-- **Simulation Engine Scaling**: Dedicated compute clusters for simulation workloads with queue management
-- **Database Scaling**: Sharded multi-tenant database architecture with read replicas
+**Scalability (NFR-4, NFR-5)**:
+- **Thousands of Users**: Horizontal scaling of microservices with auto-scaling capabilities
+- **Simulation Scaling**: Dedicated compute clusters for simulation workloads with intelligent queuing
 
-**Reliability Requirements**:
+**Reliability (NFR-6, NFR-7, NFR-8)**:
 - **User Isolation**: Strict tenant boundaries with encrypted data separation
 - **Partial Failure Recovery**: Circuit breakers and graceful degradation across all services
-- **Reliable Persistence**: Multi-region data replication with automated backup and recovery
+- **Data Persistence**: Multi-region replication with automated backup and recovery
 
-**Security Requirements**:
-- **Access-Controlled Data**: Role-based access control (RBAC) with tenant-scoped permissions
-- **Private by Default**: All user data private unless explicitly shared with granular permissions
+**Security (NFR-9, NFR-10, NFR-11)**:
+- **Access Control**: Role-based access control (RBAC) with tenant-scoped permissions
+- **Private by Default**: All user data private unless explicitly shared
 - **Secure Authentication**: Multi-provider OAuth with JWT tokens and session management
 
-**Usability Requirements**:
+**Usability (NFR-12, NFR-13, NFR-14)**:
 - **Intuitive UI**: Progressive disclosure with contextual help and guided onboarding
-- **Clear Failure Feedback**: Detailed error messages with suggested remediation actions
-- **Keyboard/Mouse Support**: Full accessibility compliance with keyboard navigation
+- **Clear Feedback**: Detailed error messages with suggested remediation actions
+- **Input Support**: Full accessibility compliance with keyboard navigation
 
-**Maintainability Requirements**:
-- **Modular Components**: Microservices architecture with clear API boundaries
-- **Extensible Design**: Plugin architecture for new component types and simulation models
-- **Non-Breaking Extensions**: Versioned APIs and backward compatibility guarantees
-
-### Core Backend Engines Architecture
-
-The platform is built around four specialized backend engines that provide the unique value proposition of teaching causality, tradeoffs, and engineering intuition:
-
-#### System Graph Engine (SGE)
-- **Purpose**: Models system components as a directed acyclic graph with realistic performance characteristics
-- **Technology**: Go for high-performance graph operations and concurrent processing
-- **Key Features**:
-  - DAG representation with capacity limits, latency curves, and throughput limits per component
-  - End-to-end latency calculation by traversing graph and summing processing times
-  - Realistic degradation modeling when capacity is exceeded (increased latency, dropped requests, cascading failures)
-  - Circular dependency detection and prevention
-  - Dynamic reconfiguration during simulation without restart
-
-#### Load Simulation Engine (LSE)
-- **Purpose**: Generates realistic traffic patterns using queueing theory and models backpressure propagation
-- **Technology**: Rust for high-performance concurrent simulation with deterministic results
-- **Key Features**:
-  - Poisson arrival processes with configurable lambda values based on user scale selection
-  - Backpressure propagation through system graph when components reach capacity
-  - Queueing theory calculations (M/M/1, M/M/c queues) for wait times and queue lengths
-  - Realistic overflow behavior (request dropping, circuit breaker activation)
-  - Burst traffic patterns and gradual ramp-up scenarios
-
-#### Distributed Systems Behavior Library (DSBL)
-- **Purpose**: Models realistic distributed systems behaviors for educational purposes
-- **Technology**: TypeScript with pluggable behavior modules for different consistency models
-- **Key Features**:
-  - Database consistency levels (strong, eventual, weak) with performance/availability tradeoffs
-  - Replication lag and split-brain scenario simulation
-  - Sharding strategies (range-based, hash-based, directory-based) with hotspot detection
-  - Network partition simulation and impact on availability/consistency
-  - Consensus algorithms (Raft, PBFT) for distributed coordination
-
-#### Cost Modeling Engine (CME)
-- **Purpose**: Provides real-time cost implications with bankruptcy warnings to teach cost-performance tradeoffs
-- **Technology**: Node.js with real-time pricing data integration from major cloud providers
-- **Key Features**:
-  - Real-time cost calculation based on component types, instance sizes, data transfer, storage
-  - Live cost meter with monthly projection and component-level breakdown
-  - Configurable bankruptcy warnings and cost optimization suggestions
-  - Realistic cloud pricing models (compute, storage, network, managed services)
-  - Cost comparison views showing architectural change impacts
-
-### Enhanced Multi-Tenant Architecture Design
-
-The platform implements a hybrid multi-tenancy model:
-
-- **Shared Infrastructure**: All tenants share the same application instances and infrastructure
-- **Data Isolation**: Each tenant's data is logically separated using tenant IDs and access controls
-- **Resource Quotas**: Per-tenant limits on workspaces, simulations, and storage
-- **Customization**: Tenant-specific branding and feature configurations
-
-### Scalability Architecture
-
-The system is designed to handle thousands of concurrent users with auto-scaling capabilities:
-
-- **Horizontal Scaling**: Microservices can scale independently based on demand
-- **Simulation Scaling**: Dedicated simulation clusters for compute-intensive operations
-- **Database Sharding**: User and workspace data partitioned across multiple database instances
-- **Caching Strategy**: Multi-layer caching for frequently accessed data and simulation results
+**Maintainability (NFR-15, NFR-16, NFR-17)**:
+- **Modular Design**: Microservices architecture with clear API boundaries
+- **Extensible Components**: Plugin architecture for new component types
+- **Deterministic Logic**: Reproducible simulation results for testing and validation
 
 ## Components and Interfaces
 
-### Frontend Components
+### Frontend Components (SRS FR-2 Implementation)
 
-### Enhanced Frontend Components
-
-#### Authentication Components
-- **Purpose**: Handle comprehensive user authentication and account management for all user classes
-- **Technology**: React with Auth0 or Firebase Auth integration supporting multiple providers
-- **Key Features**:
-  - **Multi-Provider Authentication**: Email/password, Google OAuth, GitHub OAuth with seamless switching
-  - **User Class Onboarding**: Tailored registration flows for Learners, Engineers, Instructors, Interview Candidates
-  - **Account Management**: Password reset, email verification, profile management with learning preferences
-  - **Session Management**: Secure JWT tokens with automatic refresh and cross-device synchronization
-  - **Tenant Integration**: Automatic tenant assignment and organization invitation handling
-
-#### Visual System Builder
-- **Purpose**: Enhanced drag-and-drop interface implementing SRS FR-2 (Visual System Design Canvas)
+#### Visual System Design Canvas
+- **Purpose**: Implements SRS FR-2 (Visual System Design Canvas) with drag-and-drop interface
 - **Technology**: React with React DnD and custom canvas rendering optimized for performance
 - **Key Features**:
-  - **Component Library**: Exactly 10 specific components (Client, Load Balancer, API Gateway, Service, Cache, Queue, Database, CDN, Search Index, Object Storage) per SRS FR-3
-  - **Visual Canvas**: Grid snapping, zoom, pan, component-specific icons with capacity indicators
-  - **Connection System**: Enhanced wiring with latency, bandwidth, retry policies per SRS requirements
-  - **Parameter Configuration**: Component-specific configuration panels with validation and presets
-  - **Invalid Connection Prevention**: Smart validation preventing incompatible component connections
+  - **Drag-and-Drop Interface**: Users can drag components onto canvas and connect them with edges
+  - **Component Positioning**: Components placed at drop location and made selectable
+  - **Connection Validation**: System prevents invalid connections and provides clear feedback
   - **Component Grouping**: Visual grouping and labeling for complex architectures
+  - **Parameter Configuration**: Component-specific configuration panels with validation
 
-#### Traffic & Scale Simulator
-- **Purpose**: Implements SRS FR-5 (Scale Control) with single slider from 1 user to 1 billion users
+#### Component Library Interface (SRS FR-3)
+- **Purpose**: Implements SRS FR-3 (Component Library) with standard distributed system components
+- **Technology**: React component library with standardized component models
+- **Key Features**:
+  - **Standard Components**: Load Balancer, Database, Cache, Queue, CDN, Service per SRS FR-3.1
+  - **Capacity Limits**: Each component exposes realistic capacity limits per SRS FR-3.2
+  - **Scaling Strategies**: Components expose vertical/horizontal scaling options per SRS FR-3.3
+  - **Consistency Options**: Database and cache components provide consistency/replication settings per SRS FR-3.4
+  - **Configurable Parameters**: Component-specific parameters exposed through UI
+
+#### Traffic & Load Simulation Interface (SRS FR-4, FR-5)
+- **Purpose**: Implements SRS FR-4 (Traffic Simulation) and FR-5 (Scale Control)
 - **Technology**: React with D3.js for real-time visualizations and WebSocket for sub-100ms updates
 - **Key Features**:
-  - **Logarithmic Scale Control**: Precise control points at 1, 1K, 1M, 1B users with smooth interpolation
-  - **Real-Time Metrics**: QPS, concurrent connections, data volume, cache hit ratios, queue depth, disk IOPS, network saturation
-  - **Performance Visualization**: Sub-100ms update guarantee with optimized rendering pipeline
-  - **Bottleneck Detection**: Automatic identification and highlighting of system bottlenecks
-  - **System Collapse Detection**: Early warning system for impending system failures
+  - **User Count/QPS Control**: Users can set traffic parameters per SRS FR-4.1
+  - **Dynamic Scale Control**: Real-time scaling from 1 user to 1 billion users per SRS FR-5.1
+  - **Real-Time Metrics**: System metrics update in real-time per SRS FR-5.2
+  - **Bottleneck Visualization**: Visual highlighting of bottlenecks per SRS FR-5.3
+  - **System Collapse Detection**: Detection and display of system failures per SRS FR-5.4
 
-#### Bottleneck Visualizer
-- **Purpose**: Implements SRS FR-7 (Metrics & Observability Dashboard) with real-time visual feedback
-- **Technology**: React with Canvas API for high-performance rendering and WebGL acceleration
+#### Failure Injection Interface (SRS FR-6)
+- **Purpose**: Implements SRS FR-6 (Failure & Constraint Injection)
+- **Technology**: React with real-time control panels and failure configuration
 - **Key Features**:
-  - **Color-Coded States**: Green (healthy), yellow (stressed), red (bottleneck), black (failed) with smooth transitions
-  - **Detailed Metrics**: Latency percentiles (p50/p95/p99), error rates, throughput, resource saturation
-  - **Node-Specific Metrics**: CPU %, memory %, network %, disk I/O % with drill-down capabilities
-  - **Global System View**: End-to-end performance visualization with dependency mapping
-  - **Historical Trending**: Performance trends over time with anomaly detection
+  - **Component Disabling**: Users can disable components per SRS FR-6.1
+  - **Latency Injection**: Configurable network latency injection per SRS FR-6.2
+  - **Network Partitions**: Simulation of network partition scenarios per SRS FR-6.3
+  - **Regional Outages**: Multi-component regional failure simulation per SRS FR-6.4
+  - **Recovery Observation**: Visual feedback on recovery behavior per SRS FR-6.5
 
-#### Constraint Injector Interface
-- **Purpose**: Implements SRS FR-6 (Failure & Constraint Injection) for realistic failure scenarios
-- **Technology**: React with real-time control panels and constraint configuration
+#### Metrics & Observability Dashboard (SRS FR-7)
+- **Purpose**: Implements SRS FR-7 (Metrics & Observability Dashboard)
+- **Technology**: React with Canvas API for high-performance rendering and real-time charts
 - **Key Features**:
-  - **Failure Types**: Component failures, latency injection, network partitions, regional outages per SRS
-  - **Configurable Parameters**: Severity levels, duration controls, recovery behavior modeling
-  - **Observable Recovery**: Visual feedback on system recovery and adaptation mechanisms
-  - **Chaos Engineering**: Random failure injection with configurable chaos parameters
-  - **Failure Scenarios**: Predefined failure patterns based on real-world incidents
+  - **Latency Metrics**: Display of p50, p95, p99 latency percentiles per SRS FR-7.1
+  - **Error Rates**: Real-time error rate monitoring per SRS FR-7.2
+  - **Throughput Metrics**: System throughput visualization per SRS FR-7.3
+  - **Resource Saturation**: Component resource utilization display per SRS FR-7.4
+  - **Node-Specific & Global Views**: Both component-level and system-wide metrics per SRS FR-7.5
 
-#### Learning Modes Interface
-- **Purpose**: Implements SRS FR-9 (Learning & Scenario Mode) with comprehensive educational features
-- **Technology**: React with mode-specific UI components and adaptive content delivery
-- **Key Features**:
-  - **Free Play Mode**: Unlimited component access with no constraints for experimentation
-  - **Guided Scenarios**: Predefined scenarios with progressive constraints and hints per SRS
-  - **Interview Mode**: Timed challenges with hidden constraints and performance evaluation
-  - **Instructor Mode**: Live teaching interface with student attention management and control
-  - **Progress Tracking**: Completion tracking, skill assessment, and achievement systems
-  - **Hint System**: Contextual explanations and progressive disclosure of complexity
-
-#### Cost Modeling Dashboard
-- **Purpose**: Implements SRS FR-8 (Cost Modeling Engine) with real-time cost visualization
+#### Cost Modeling Dashboard (SRS FR-8)
+- **Purpose**: Implements SRS FR-8 (Cost Modeling Engine)
 - **Technology**: React with real-time charts integrated with cloud pricing APIs
 - **Key Features**:
-  - **Live Cost Tracking**: Real-time cost calculation with compute, storage, network breakdown
-  - **Scale-Based Costing**: Cost implications at different user scales with optimization suggestions
-  - **Performance Tradeoffs**: Interactive cost vs performance analysis with recommendation engine
-  - **Budget Alerts**: Configurable cost thresholds with bankruptcy warnings and mitigation strategies
-  - **Cloud Provider Integration**: Realistic pricing models from AWS, GCP, Azure with regular updates
+  - **Compute Cost Estimation**: Real-time compute cost calculation per SRS FR-8.1
+  - **Storage Cost Tracking**: Storage cost estimation per SRS FR-8.2
+  - **Network Cost Analysis**: Network transfer cost modeling per SRS FR-8.3
+  - **Scale-Based Costing**: Cost scaling with traffic per SRS FR-8.4
+  - **Performance Tradeoffs**: Cost vs performance analysis per SRS FR-8.5
 
-#### Multiplayer Canvas
-- **Purpose**: Implements SRS FR-10 (Collaboration) with Figma-like real-time collaboration
-- **Technology**: React with Operational Transformation, WebSocket, and conflict resolution
-- **Key Features**:
-  - **Real-Time Editing**: Multi-user simultaneous editing with sub-100ms synchronization
-  - **Collaborative Cursors**: User presence indicators with names, colors, and selection states
-  - **Conflict Resolution**: Operational transformation for concurrent edits without data loss
-  - **Version History**: Complete edit history with rollback capabilities and branch management
-  - **Instructor Controls**: Attention guidance, screen sharing, and session management for teaching
-  - **Permission Management**: Granular sharing controls with viewer/editor/admin roles
+### Backend Microservices (SRS Implementation)
 
-### Enhanced Backend Microservices
-
-#### User Service
-- **Purpose**: Implements SRS FR-1 (User Authentication & Account Management) with comprehensive multi-tenant support
+#### User Authentication Service (SRS FR-1)
+- **Purpose**: Implements SRS FR-1 (User Authentication & Account Management)
 - **Technology**: Node.js with Express, JWT, and multi-provider OAuth integration
 - **Key Responsibilities**:
-  - **User Registration**: Email verification, OAuth provider integration, user class identification
-  - **Authentication**: Multi-provider login (email, Google, GitHub), session management, token refresh
-  - **Account Management**: Profile updates, password reset, account deletion with data cleanup
-  - **Tenant Integration**: Automatic tenant assignment, organization invitations, role management
-  - **Subscription Management**: Free/paid tier handling, billing integration, usage tracking
-  - **User Preferences**: Learning pace, difficulty preferences, notification settings, theme management
+  - **Account Creation**: Email and OAuth-based registration per SRS FR-1.1
+  - **Authentication**: Login/logout functionality per SRS FR-1.2
+  - **Design Management**: Save, load, delete user designs per SRS FR-1.3
+  - **Tier Management**: Free and paid tier support per SRS FR-1.4
+  - **Session Management**: Secure session handling and token management
 
-#### Workspace Service
-- **Purpose**: Implements workspace management with enhanced collaboration per SRS FR-10
-- **Technology**: Node.js with Express, MongoDB, and real-time synchronization
+#### Canvas Service (SRS FR-2)
+- **Purpose**: Implements SRS FR-2 (Visual System Design Canvas) backend functionality
+- **Technology**: Node.js with Express and real-time synchronization
 - **Key Responsibilities**:
-  - **Workspace CRUD**: Create, read, update, delete with strict tenant isolation and access controls
-  - **Version Control**: Complete edit history, branching, merging, rollback capabilities
-  - **Collaboration**: Real-time multi-user editing with operational transformation and conflict resolution
-  - **Template Management**: Public/private templates, community gallery, rating and review system
-  - **Sharing Controls**: Granular permissions (viewer/editor/admin), team workspace management
-  - **Import/Export**: Full workspace serialization with configuration preservation
+  - **Canvas State Management**: Persist and retrieve canvas configurations
+  - **Component Placement**: Handle drag-and-drop component positioning
+  - **Connection Management**: Manage component connections and validation
+  - **Grouping & Labeling**: Support for component organization features
+  - **Real-time Sync**: Synchronize canvas changes across collaborative sessions
 
-#### Enhanced Simulation Service
-- **Purpose**: Orchestrates all Core Backend Engines implementing SRS FR-4 (Traffic & Load Simulation)
-- **Technology**: Node.js with worker processes and dedicated compute clusters for simulation workloads
+#### Component Service (SRS FR-3)
+- **Purpose**: Implements SRS FR-3 (Component Library) with standard component models
+- **Technology**: Node.js with pluggable component architecture
 - **Key Responsibilities**:
-  - **Engine Orchestration**: Coordinates System Graph Engine, Load Simulation Engine, DSBL, and Cost Modeling Engine
-  - **Simulation Lifecycle**: Start, pause, resume, stop with checkpoint-based state management
-  - **Resource Management**: Simulation queuing, resource allocation, concurrent simulation limits
-  - **Results Processing**: Real-time metrics aggregation, bottleneck analysis, performance reporting
-  - **Scale Simulation**: Handles 1 user to 1 billion user simulations with realistic performance modeling
-  - **Failure Injection**: Coordinates constraint injection across all engines with recovery monitoring
+  - **Component Catalog**: Manage standard component library (LB, DB, Cache, Queue, CDN, Service)
+  - **Parameter Management**: Handle component-specific configuration parameters
+  - **Capacity Modeling**: Enforce realistic capacity limits for each component type
+  - **Scaling Configuration**: Manage vertical/horizontal scaling strategies
+  - **Consistency Settings**: Handle replication and consistency options for applicable components
 
-#### Curriculum Service
-- **Purpose**: Implements SRS FR-9 (Learning & Scenario Mode) with adaptive learning capabilities
-- **Technology**: Node.js with machine learning integration (TensorFlow.js) and content management
+#### Simulation Service (SRS FR-4, FR-5)
+- **Purpose**: Implements SRS FR-4 (Traffic Simulation) and FR-5 (Scale Control)
+- **Technology**: Node.js with worker processes for compute-intensive simulation
 - **Key Responsibilities**:
-  - **Learning Path Management**: Structured progression from beginner to advanced system design
-  - **Scenario Orchestration**: Predefined scenarios (Twitter, WhatsApp, Netflix, UPI) with progressive complexity
-  - **Adaptive Learning**: Personalized content recommendations based on user performance and learning patterns
-  - **Skill Assessment**: Competency evaluation focusing on causality understanding and tradeoff analysis
-  - **Progress Tracking**: Achievement systems, milestone management, streak tracking, completion analytics
-  - **Content Delivery**: Contextual hints, explanations, and progressive disclosure of complexity
+  - **Traffic Generation**: Generate load based on user count or QPS settings
+  - **Load Propagation**: Propagate traffic through system graph
+  - **Queueing Simulation**: Model queueing and backpressure behavior
+  - **Retry/Timeout Handling**: Simulate retry mechanisms and timeout behaviors
+  - **Scale Management**: Handle dynamic scaling from 1 to 1 billion users
+  - **Real-time Updates**: Provide sub-100ms metric updates
+  - **Bottleneck Detection**: Identify and report system bottlenecks
 
-#### Enhanced Analytics Service
-- **Purpose**: Comprehensive learning and platform analytics per SRS requirements
-- **Technology**: Node.js with Apache Kafka for event streaming and ML analytics pipeline
+#### Failure Injection Service (SRS FR-6)
+- **Purpose**: Implements SRS FR-6 (Failure & Constraint Injection)
+- **Technology**: Node.js with event-driven failure injection
 - **Key Responsibilities**:
-  - **Learning Analytics**: Detailed tracking of user decision-making patterns and engineering intuition development
-  - **Performance Metrics**: Platform usage, simulation performance, user engagement, learning effectiveness
-  - **Personalization Data**: ML model training data for adaptive content and recommendation systems
-  - **Instructor Dashboards**: Student progress monitoring, engagement analytics, learning outcome tracking
-  - **Platform Analytics**: Multi-tenant usage patterns, resource utilization, cost optimization insights
-  - **A/B Testing**: Learning effectiveness experiments and feature rollout analytics
+  - **Component Failures**: Simulate component outages and failures
+  - **Latency Injection**: Introduce configurable network latency
+  - **Partition Simulation**: Model network partition scenarios
+  - **Regional Outages**: Coordinate multi-component regional failures
+  - **Recovery Monitoring**: Track and report system recovery behavior
 
-#### Enhanced Collaboration Service
-- **Purpose**: Implements SRS FR-10 (Collaboration) with comprehensive real-time features
-- **Technology**: Node.js with Socket.IO, Redis, Operational Transformation, and WebRTC integration
+#### Learning Service (SRS FR-9)
+- **Purpose**: Implements SRS FR-9 (Learning & Scenario Mode)
+- **Technology**: Node.js with scenario management and progress tracking
 - **Key Responsibilities**:
-  - **Real-Time Editing**: Multi-user simultaneous editing with sub-100ms synchronization and conflict resolution
-  - **Presence Management**: User cursors, selection states, active participant tracking, session management
-  - **Instructor Features**: Attention guidance, screen sharing, session control, student progress monitoring
-  - **Communication**: Integrated voice/video calls, text chat, annotation system, discussion threads
-  - **Community Features**: Public template gallery, rating system, discussion forums, knowledge sharing
-  - **Notification System**: Real-time updates, collaboration invites, achievement notifications
+  - **Scenario Management**: Provide and manage predefined learning scenarios
+  - **Progressive Constraints**: Introduce constraints progressively during scenarios
+  - **Hint System**: Provide contextual hints and explanations
+  - **Progress Tracking**: Track scenario completion and learning progress
+  - **Difficulty Management**: Manage multiple difficulty levels and learning paths
 
-#### Tenant Service
-- **Purpose**: Multi-tenant architecture management implementing comprehensive SaaS requirements
-- **Technology**: Node.js with Express and tenant-scoped database operations
+#### Collaboration Service (SRS FR-10)
+- **Purpose**: Implements SRS FR-10 (Collaboration) with real-time multi-user features
+- **Technology**: Node.js with Socket.IO and operational transformation
 - **Key Responsibilities**:
-  - **Tenant Management**: Organization creation, member management, role-based access control
-  - **Resource Quotas**: Workspace limits, simulation quotas, storage limits, compute time tracking
-  - **Billing Integration**: Subscription management, usage tracking, billing cycle management
-  - **Data Isolation**: Strict tenant boundaries, encrypted data separation, access audit logging
-  - **Organization Features**: Team workspaces, shared resources, collaborative learning environments
-
-### Enhanced Component Library with SRS Compliance
-
-The platform provides exactly 10 specific system design components per SRS FR-3, each with realistic behavior modeling and scale-aware characteristics:
-
-#### Component Specifications
-
-**Client Component**:
-- **Purpose**: User interface and client-side logic with session management
-- **Capacity Limits**: Concurrent sessions, bandwidth consumption, local storage
-- **Scaling Characteristics**: Horizontal scaling through load distribution
-- **Configuration Options**: Session timeout, caching strategy, connection pooling
-- **Failure Modes**: Network connectivity issues, session expiration, local storage limits
-
-**Load Balancer Component**:
-- **Purpose**: Layer 4/7 load balancing with multiple algorithms
-- **Algorithms**: Round-robin, least connections, weighted, consistent hashing, IP hash
-- **Capacity Limits**: Connections per second, bandwidth throughput, health check frequency
-- **Scaling Characteristics**: Active-passive or active-active configurations
-- **Configuration Options**: Health check parameters, sticky sessions, SSL termination
-- **Failure Modes**: Backend server failures, health check timeouts, capacity overload
-
-**API Gateway Component**:
-- **Purpose**: Rate limiting, authentication, request routing, protocol translation
-- **Capacity Limits**: Requests per second, concurrent connections, transformation overhead
-- **Scaling Characteristics**: Horizontal scaling with shared configuration
-- **Configuration Options**: Rate limiting rules, authentication methods, routing policies
-- **Failure Modes**: Rate limit exceeded, authentication failures, backend timeouts
-
-**Service Component**:
-- **Purpose**: Application logic with CPU, memory, and concurrent request handling
-- **Capacity Limits**: CPU utilization, memory consumption, concurrent request limits
-- **Scaling Characteristics**: Horizontal and vertical scaling options
-- **Configuration Options**: Instance size, auto-scaling policies, resource limits
-- **Failure Modes**: CPU exhaustion, memory leaks, request queue overflow
-
-**Cache Component**:
-- **Purpose**: In-memory caching with configurable eviction policies
-- **Eviction Policies**: LRU (Least Recently Used), LFU (Least Frequently Used), TTL (Time To Live)
-- **Capacity Limits**: Memory size, key count, network bandwidth
-- **Scaling Characteristics**: Distributed caching with sharding and replication
-- **Configuration Options**: Cache size, eviction policy, TTL settings, hit ratio targets
-- **Failure Modes**: Memory exhaustion, cache misses, network partitions
-
-**Queue Component**:
-- **Purpose**: Message queuing with different patterns and durability guarantees
-- **Messaging Patterns**: FIFO, priority queues, pub/sub, dead letter queues
-- **Capacity Limits**: Message throughput, queue depth, message size limits
-- **Scaling Characteristics**: Partitioned queues with consumer groups
-- **Configuration Options**: Durability settings, retention policies, consumer configurations
-- **Failure Modes**: Queue overflow, consumer lag, message loss, poison messages
-
-**Database Component**:
-- **Purpose**: Data persistence with ACID properties and query processing
-- **Database Types**: Relational (ACID), NoSQL (eventual consistency), time-series
-- **Capacity Limits**: Connections, IOPS, storage capacity, query complexity
-- **Scaling Characteristics**: Read replicas, sharding, clustering
-- **Configuration Options**: Consistency levels, replication factor, indexing strategies
-- **Failure Modes**: Connection exhaustion, disk space, replication lag, deadlocks
-
-**CDN Component**:
-- **Purpose**: Content delivery with geographic distribution and edge caching
-- **Geographic Distribution**: Multiple edge locations with cache hierarchies
-- **Capacity Limits**: Bandwidth per edge, cache storage, origin pull capacity
-- **Scaling Characteristics**: Automatic edge scaling based on demand
-- **Configuration Options**: Cache policies, TTL settings, origin configuration
-- **Failure Modes**: Origin server failures, cache misses, edge server overload
-
-**Search Index Component**:
-- **Purpose**: Full-text search with indexing and relevance scoring
-- **Index Types**: Full-text, faceted search, geospatial, time-based
-- **Capacity Limits**: Index size, query throughput, indexing latency
-- **Scaling Characteristics**: Distributed indexing with sharding and replication
-- **Configuration Options**: Indexing strategies, relevance scoring, query optimization
-- **Failure Modes**: Index corruption, query timeouts, relevance degradation
-
-**Object Storage Component**:
-- **Purpose**: Scalable object storage with consistency models and multi-part uploads
-- **Consistency Models**: Strong consistency, eventual consistency, read-after-write
-- **Capacity Limits**: Storage capacity, bandwidth, request rate limits
-- **Scaling Characteristics**: Automatic scaling with geographic replication
-- **Configuration Options**: Consistency level, replication settings, lifecycle policies
-- **Failure Modes**: Storage exhaustion, network partitions, consistency conflicts
-
-#### Component Interaction Matrix
-
-Each component type has defined compatibility rules for connections:
-
-```typescript
-interface ComponentCompatibility {
-  validConnections: {
-    [sourceType: string]: {
-      [targetType: string]: {
-        connectionTypes: ConnectionType[];
-        latencyRange: [number, number]; // ms
-        bandwidthRange: [number, number]; // Mbps
+  - **Design Sharing**: Enable sharing of designs between users
+  - **Multi-user Editing**: Support simultaneous editing by multiple users
+  - **Real-time Sync**: Synchronize changes in real-time across all participants
+  - **Version History**: Maintain complete version history for collaborative designs
+  - **Access Control**: Manage permissions and access controls for shared designser, number]; // Mbps
         retryPolicies: RetryPolicy[];
       }
     }
@@ -1337,140 +1182,88 @@ interface ErrorResponse {
 
 ## Testing Strategy
 
-### Dual Testing Approach
+### SRS-Compliant Testing Approach
 
-The system requires both unit testing and property-based testing to ensure comprehensive coverage across all SaaS features:
+The testing strategy directly addresses SRS non-functional requirements, particularly NFR-17 (deterministic and testable simulation logic):
 
-**Unit Tests**: Focus on specific examples, edge cases, and integration points
-- Authentication flows and session management
-- Multi-tenant data isolation and access controls
-- Component rendering and interaction
-- API endpoint functionality with tenant context
-- Database operations with proper isolation
-- WebSocket message handling for collaboration
-- Error condition handling and recovery
-- Learning progression and curriculum logic
+**Dual Testing Approach**:
+- **Unit Tests**: Focus on specific SRS functional requirements and edge cases
+- **Property Tests**: Verify universal properties across all inputs using fast-check library
+- Both approaches ensure comprehensive coverage of SRS FR-1 through FR-10
 
-**Property Tests**: Verify universal properties across all inputs using fast-check library
-- Authentication and account management across all valid inputs
-- Multi-tenant data isolation for all user/tenant combinations
-- Drag-and-drop behavior across all component types
-- Scale simulation consistency across all workspace configurations
-- Learning progression accuracy for all user paths
-- Collaboration features across all sharing scenarios
-- Workspace persistence across all possible states
+**Unit Testing Focus Areas**:
+- **SRS FR-1**: Authentication flows and session management across all providers
+- **SRS FR-2**: Canvas drag-and-drop behavior and component placement validation
+- **SRS FR-3**: Component library functionality and parameter configuration
+- **SRS FR-4**: Traffic simulation accuracy and load propagation
+- **SRS FR-5**: Scale control from 1 user to 1 billion users
+- **SRS FR-6**: Failure injection and recovery behavior
+- **SRS FR-7**: Metrics collection and observability accuracy
+- **SRS FR-8**: Cost modeling calculations and optimization suggestions
+- **SRS FR-9**: Learning scenario progression and hint delivery
+- **SRS FR-10**: Real-time collaboration and conflict resolution
 
-### Property-Based Testing Configuration
+**Property-Based Testing Configuration**:
+- **Framework**: fast-check for TypeScript/JavaScript property-based testing
+- **Test Configuration**: Minimum 100 iterations per property test per SRS NFR-17
+- **Deterministic Results**: Seeded random generation for reproducible test results
+- **Test Tagging**: Each property test references its SRS functional requirement
 
-**Framework**: fast-check for TypeScript/JavaScript property-based testing
-**Test Configuration**: Minimum 100 iterations per property test
-**Test Tagging**: Each property test must reference its design document property
+### SRS Performance Testing (NFR-1, NFR-2, NFR-3)
 
-Example test structures:
+**Real-time Performance Validation**:
 ```typescript
-// Feature: system-design-simulator, Property 16: User Authentication and Account Management
-fc.assert(fc.property(
-  fc.record({
-    email: fc.emailAddress(),
-    password: fc.string({ minLength: 8 }),
-    displayName: fc.string({ minLength: 1, maxLength: 50 })
-  }),
-  (userData) => {
-    // Test registration, login, and profile management
-    const account = registerUser(userData);
-    expect(account.email).toBe(userData.email);
-    expect(account.verified).toBe(false);
-    
-    const session = loginUser(userData.email, userData.password);
-    expect(session.userId).toBe(account.id);
-    expect(session.authenticated).toBe(true);
-  }
-), { numRuns: 100 });
+// SRS NFR-1: Simulation updates within 100ms
+describe('SRS NFR-1: Simulation Performance', () => {
+  test('simulation updates complete within 100ms', async () => {
+    const startTime = performance.now();
+    await simulationEngine.updateMetrics();
+    const endTime = performance.now();
+    expect(endTime - startTime).toBeLessThan(100);
+  });
+});
 
-// Feature: system-design-simulator, Property 18: Multi-Tenant Data Isolation
-fc.assert(fc.property(
-  fc.array(fc.record({
-    tenantId: fc.uuid(),
-    userId: fc.uuid(),
-    workspaceData: fc.object()
-  }), { minLength: 2, maxLength: 10 }),
-  (tenantData) => {
-    // Test that users can only access their own tenant's data
-    tenantData.forEach(tenant => {
-      const workspace = createWorkspace(tenant.workspaceData, tenant.tenantId, tenant.userId);
-      
-      // Verify user can access their own workspace
-      const accessResult = accessWorkspace(workspace.id, tenant.userId, tenant.tenantId);
-      expect(accessResult.success).toBe(true);
-      
-      // Verify users from other tenants cannot access this workspace
-      const otherTenants = tenantData.filter(t => t.tenantId !== tenant.tenantId);
-      otherTenants.forEach(otherTenant => {
-        const unauthorizedAccess = accessWorkspace(workspace.id, otherTenant.userId, otherTenant.tenantId);
-        expect(unauthorizedAccess.success).toBe(false);
-      });
-    });
-  }
-), { numRuns: 100 });
+// SRS NFR-2: Real-time UI responsiveness
+describe('SRS NFR-2: UI Responsiveness', () => {
+  test('canvas interactions feel real-time', async () => {
+    const response = await canvasService.addComponent(componentData);
+    expect(response.latency).toBeLessThan(50); // Sub-50ms for UI interactions
+  });
+});
 
-// Feature: system-design-simulator, Property 24: Scale Simulation Range and Performance
-fc.assert(fc.property(
-  fc.record({
-    workspace: fc.object(),
-    scalePoints: fc.array(fc.integer({ min: 1, max: 1000000000 }), { minLength: 3, maxLength: 10 })
-  }),
-  (testData) => {
-    // Test scale simulation across different user loads
-    const simulation = runScaleSimulation(testData.workspace, testData.scalePoints);
+// SRS NFR-3: User isolation
+describe('SRS NFR-3: User Isolation', () => {
+  test('concurrent simulations do not interfere', async () => {
+    const sim1 = await startSimulation(user1, config1);
+    const sim2 = await startSimulation(user2, config2);
     
-    // Verify simulation covers all requested scale points
-    expect(simulation.results.length).toBe(testData.scalePoints.length);
-    
-    // Verify performance metrics change appropriately with scale
-    for (let i = 1; i < simulation.results.length; i++) {
-      const current = simulation.results[i];
-      const previous = simulation.results[i-1];
-      
-      // Performance should generally degrade or require more resources at higher scales
-      expect(current.userCount).toBeGreaterThan(previous.userCount);
-      expect(current.estimatedCost).toBeGreaterThanOrEqual(previous.estimatedCost);
-    }
-  }
-), { numRuns: 100 });
+    expect(sim1.metrics).not.toEqual(sim2.metrics);
+    expect(sim1.resources).not.toAffect(sim2.resources);
+  });
+});
 ```
 
-### Integration Testing
+### Integration Testing (SRS Compliance)
 
-**End-to-End SaaS Scenarios**:
-- Complete user registration, onboarding, and learning journey
-- Multi-user collaboration scenarios with real-time editing
-- Scale simulation workflows from simple to complex architectures
-- Cross-tenant isolation and security validation
-- Learning progression and curriculum advancement
-- Performance under realistic concurrent user loads
+**End-to-End SRS Scenarios**:
+- **Complete User Journey**: Registration → Canvas → Build → Scale → Break → Fix (Workflow compliance)
+- **Multi-User Collaboration**: Real-time editing scenarios per SRS FR-10
+- **Scale Simulation Workflows**: 1 user to 1 billion user scenarios per SRS FR-5
+- **Cross-Functional Integration**: All 10 SRS functional requirements working together
 
-**Multi-Tenant Testing**:
-- Tenant isolation validation across all data operations
-- Resource quota enforcement and billing integration
-- Organization-level collaboration and permissions
-- Cross-tenant security boundary testing
-
-**Scale and Performance Testing**:
-- Canvas performance with large numbers of components
-- Simulation engine scalability with concurrent simulations
-- Real-time collaboration performance under load
-- Database performance with multi-tenant data patterns
-- Memory usage optimization for scale simulations
-
-**Learning Platform Testing**:
-- Curriculum progression accuracy across different user paths
-- Personalization algorithm effectiveness
-- Analytics collection and reporting accuracy
-- Achievement and badge system reliability
+**SRS Non-Functional Requirements Testing**:
+- **Scalability (NFR-4, NFR-5)**: Load testing with thousands of concurrent users
+- **Reliability (NFR-6, NFR-7, NFR-8)**: Failure injection and recovery validation
+- **Security (NFR-9, NFR-10, NFR-11)**: Authentication, authorization, and data isolation testing
+- **Usability (NFR-12, NFR-13, NFR-14)**: User experience and accessibility validation
+- **Maintainability (NFR-15, NFR-16, NFR-17)**: Code modularity and extensibility testing
 
 ### Testing Coverage Requirements
 
-**Unit Test Coverage**: Minimum 80% code coverage for all modules
+**SRS Functional Requirements Coverage**: Minimum 90% test coverage for each FR-1 through FR-10
+**SRS Non-Functional Requirements Validation**: Automated testing for all NFR-1 through NFR-17
+**Property Test Coverage**: Universal properties for all core system behaviors
+**Integration Test Coverage**: End-to-end workflows covering complete user journeysverage for all modules
 **Property Test Coverage**: All 30 correctness properties must have corresponding property tests
 **Integration Test Coverage**: All major user workflows and SaaS features covered
 **Security Test Coverage**: All multi-tenant isolation and authentication flows validated

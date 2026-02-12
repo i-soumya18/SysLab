@@ -5,6 +5,34 @@
 
 import type { Component, ComponentType, ComponentConfig, ComponentMetadata } from '../types';
 
+// Client component configurations
+export const ClientConfigs = {
+  web: {
+    capacity: 1000,
+    latency: 50,
+    failureRate: 0.001,
+    connectionPool: 50,
+    requestRate: 100,
+    userAgent: 'WebClient/1.0'
+  },
+  mobile: {
+    capacity: 500,
+    latency: 100,
+    failureRate: 0.002,
+    connectionPool: 20,
+    requestRate: 50,
+    userAgent: 'MobileClient/1.0'
+  },
+  api: {
+    capacity: 2000,
+    latency: 20,
+    failureRate: 0.0005,
+    connectionPool: 100,
+    requestRate: 200,
+    userAgent: 'APIClient/1.0'
+  }
+};
+
 // Database component configurations
 export const DatabaseConfigs = {
   mysql: {
@@ -233,6 +261,23 @@ export const ProxyConfigs = {
 
 // Component metadata definitions
 export const ComponentMetadataLibrary: Record<string, ComponentMetadata> = {
+  // Client metadata
+  'web-client': {
+    name: 'Web Client',
+    description: 'Web browser client making HTTP requests',
+    version: '1.0'
+  },
+  'mobile-client': {
+    name: 'Mobile Client',
+    description: 'Mobile application client with network constraints',
+    version: '1.0'
+  },
+  'api-client': {
+    name: 'API Client',
+    description: 'High-performance API client for service-to-service communication',
+    version: '1.0'
+  },
+
   // Database metadata
   'mysql-db': {
     name: 'MySQL Database',
@@ -378,6 +423,11 @@ export class ComponentLibrary {
   }
 
   private initializeLibrary(): void {
+    // Initialize client configs
+    Object.entries(ClientConfigs).forEach(([key, config]) => {
+      this.componentConfigs.set(`client-${key}`, config);
+    });
+
     // Initialize database configs
     Object.entries(DatabaseConfigs).forEach(([key, config]) => {
       this.componentConfigs.set(`database-${key}`, config);
@@ -429,7 +479,10 @@ export class ComponentLibrary {
     let componentType = '';
     let componentName = '';
     
-    if (componentKey.startsWith('load-balancer-')) {
+    if (componentKey.startsWith('client-')) {
+      componentType = 'client';
+      componentName = componentKey.substring('client-'.length);
+    } else if (componentKey.startsWith('load-balancer-')) {
       componentType = 'load-balancer';
       componentName = componentKey.substring('load-balancer-'.length);
     } else if (componentKey.startsWith('web-server-')) {
@@ -450,7 +503,9 @@ export class ComponentLibrary {
     if (componentType && componentName) {
       // Create a specific metadata key based on type and name
       let metadataKey = componentName;
-      if (componentType === 'load-balancer') {
+      if (componentType === 'client') {
+        metadataKey = `${componentName}-client`;
+      } else if (componentType === 'load-balancer') {
         metadataKey = `${componentName}-lb`;
       } else if (componentType === 'web-server') {
         metadataKey = `${componentName}-web`;
@@ -508,6 +563,9 @@ export class ComponentLibrary {
     const presets: Record<string, ComponentConfig> = {};
     
     switch (type) {
+      case 'client':
+        Object.assign(presets, ClientConfigs);
+        break;
       case 'database':
         Object.assign(presets, DatabaseConfigs);
         break;

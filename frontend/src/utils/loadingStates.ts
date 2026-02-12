@@ -3,12 +3,14 @@
  * Utilities for managing loading states and user feedback
  */
 
-export enum LoadingState {
-  IDLE = 'IDLE',
-  LOADING = 'LOADING',
-  SUCCESS = 'SUCCESS',
-  ERROR = 'ERROR'
-}
+export const LoadingState = {
+  IDLE: 'IDLE',
+  LOADING: 'LOADING',
+  SUCCESS: 'SUCCESS',
+  ERROR: 'ERROR'
+} as const;
+
+export type LoadingState = typeof LoadingState[keyof typeof LoadingState];
 
 export interface LoadingOperation {
   id: string;

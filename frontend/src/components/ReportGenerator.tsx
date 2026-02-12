@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { PerformanceReport, WorkspaceVersion } from '../types';
+import type { PerformanceReport, WorkspaceVersion } from '../types';
 import './ReportGenerator.css';
 
 interface ReportGeneratorProps {
@@ -380,7 +380,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                     Generated: {formatDate(report.generatedAt)}
                   </span>
                   <span className="report-sections">
-                    {report.sections.length} sections
+                    {Array.isArray(report.sections) ? report.sections.length : 0} sections
                   </span>
                 </div>
 
@@ -389,8 +389,8 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                     <strong>{report.recommendations.length} recommendations</strong>
                     <ul>
                       {report.recommendations.slice(0, 2).map((rec, index) => (
-                        <li key={index} className={`priority-${rec.priority}`}>
-                          {rec.title}
+                        <li key={index}>
+                          {rec}
                         </li>
                       ))}
                       {report.recommendations.length > 2 && (

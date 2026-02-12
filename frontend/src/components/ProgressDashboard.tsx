@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Scenario } from '../types';
+import type { Scenario } from '../types';
 import './ProgressDashboard.css';
 
 interface Achievement {

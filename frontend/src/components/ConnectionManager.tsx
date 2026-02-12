@@ -33,10 +33,10 @@ export const useConnectionManager = ({
   const [isConnecting, setIsConnecting] = useState(false);
 
   // Validate if two components can be connected
-  const validateConnection = useCallback((sourceComponent: Component, targetComponent: Component): boolean => {
+  const validateConnection = useCallback((sourceComponent: Component, targetComponent: Component): { valid: boolean; reason?: string } => {
     // Prevent self-connections
     if (sourceComponent.id === targetComponent.id) {
-      return false;
+      return { valid: false, reason: 'Cannot connect component to itself' };
     }
 
     // Check if connection already exists
@@ -46,22 +46,64 @@ export const useConnectionManager = ({
     );
     
     if (existingConnection) {
-      return false;
+      return { valid: false, reason: 'Connection already exists between these components' };
     }
 
-    // Define compatible connection types
-    const compatibilityMatrix: Record<string, string[]> = {
-      'web-server': ['database', 'cache', 'load-balancer', 'message-queue'],
-      'load-balancer': ['web-server', 'proxy'],
-      'database': ['web-server', 'cache'],
-      'cache': ['web-server', 'database'],
-      'message-queue': ['web-server', 'proxy'],
-      'cdn': ['web-server', 'proxy'],
-      'proxy': ['web-server', 'load-balancer', 'cdn', 'message-queue']
+    // Define compatible connection types with detailed rules
+    const compatibilityMatrix: Record<string, { allowed: string[]; description: string }> = {
+      'client': { 
+        allowed: ['load-balancer', 'web-server', 'cdn', 'proxy'], 
+        description: 'Clients can connect to load balancers, web servers, CDNs, or proxies' 
+      },
+      'web-server': { 
+        allowed: ['database', 'cache', 'load-balancer', 'message-queue', 'client'], 
+        description: 'Web servers can connect to databases, caches, load balancers, message queues, or serve clients' 
+      },
+      'load-balancer': { 
+        allowed: ['web-server', 'proxy', 'client'], 
+        description: 'Load balancers distribute traffic to web servers or proxies, and serve clients' 
+      },
+      'database': { 
+        allowed: ['web-server', 'cache'], 
+        description: 'Databases can be accessed by web servers or cached' 
+      },
+      'cache': { 
+        allowed: ['web-server', 'database'], 
+        description: 'Caches can serve web servers or cache database data' 
+      },
+      'message-queue': { 
+        allowed: ['web-server', 'proxy'], 
+        description: 'Message queues can be accessed by web servers or proxies' 
+      },
+      'cdn': { 
+        allowed: ['web-server', 'proxy', 'client'], 
+        description: 'CDNs can cache content from web servers/proxies and serve clients' 
+      },
+      'proxy': { 
+        allowed: ['web-server', 'load-balancer', 'cdn', 'message-queue', 'client'], 
+        description: 'Proxies can forward requests to various backend services and serve clients' 
+      }
     };
 
-    const sourceCompatible = compatibilityMatrix[sourceComponent.type] || [];
-    return sourceCompatible.includes(targetComponent.type);
+    const sourceRules = compatibilityMatrix[sourceComponent.type];
+    const targetRules = compatibilityMatrix[targetComponent.type];
+    
+    if (!sourceRules || !targetRules) {
+      return { valid: false, reason: `Unknown component type: ${!sourceRules ? sourceComponent.type : targetComponent.type}` };
+    }
+
+    // Check if source can connect to target OR target can connect to source (bidirectional)
+    const sourceCanConnectToTarget = sourceRules.allowed.includes(targetComponent.type);
+    const targetCanConnectToSource = targetRules.allowed.includes(sourceComponent.type);
+    
+    if (!sourceCanConnectToTarget && !targetCanConnectToSource) {
+      return { 
+        valid: false, 
+        reason: `${sourceComponent.type} and ${targetComponent.type} are not compatible. ${sourceRules.description}` 
+      };
+    }
+
+    return { valid: true };
   }, [connections]);
 
   // Start connection creation
@@ -95,8 +137,10 @@ export const useConnectionManager = ({
     }
 
     // Validate connection
-    if (!validateConnection(sourceComponent, targetComponent)) {
-      console.warn('Invalid connection attempt');
+    const validation = validateConnection(sourceComponent, targetComponent);
+    if (!validation.valid) {
+      console.warn('Invalid connection attempt:', validation.reason);
+      // TODO: Show user-friendly error message
       setWireInProgress(null);
       setIsConnecting(false);
       return;

@@ -1,0 +1,406 @@
+/**
+ * Scale Control Component Styles
+ * Implements visual design for logarithmic scale slider with key points
+ */
+
+.scale-control {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.scale-control-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.scale-control-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.current-scale {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.scale-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #007bff;
+}
+
+.scale-label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.scale-slider-container {
+  position: relative;
+  margin: 32px 0;
+  padding: 0 16px;
+}
+
+.scale-points {
+  position: relative;
+  height: 60px;
+  margin-bottom: 16px;
+}
+
+.scale-point {
+  position: absolute;
+  transform: translateX(-50%);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scale-point:hover {
+  transform: translateX(-50%) scale(1.1);
+}
+
+.scale-point.active .scale-point-marker {
+  background: #007bff;
+  border-color: #007bff;
+  transform: scale(1.2);
+}
+
+.scale-point.active .scale-point-label {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.scale-point-marker {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  background: #fff;
+  margin: 0 auto 8px;
+  transition: all 0.2s ease;
+}
+
+.scale-point-label {
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.slider-wrapper {
+  position: relative;
+  height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.scale-slider {
+  width: 100%;
+  height: 6px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.scale-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #007bff;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scale-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 8px rgba(0, 123, 255, 0.4);
+}
+
+.scale-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #007bff;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scale-slider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 8px rgba(0, 123, 255, 0.4);
+}
+
+.scale-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.scale-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+  background: #ccc;
+}
+
+.slider-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.slider-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745 0%, #ffc107 50%, #dc3545 100%);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+.scale-tooltip {
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.tooltip-content {
+  text-align: center;
+}
+
+.tooltip-value {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.tooltip-exact {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.simulation-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 24px 0;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.simulation-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.status-indicator.running {
+  background: #28a745;
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.stopped {
+  background: #6c757d;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.start-button,
+.stop-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.start-button {
+  background: #28a745;
+  color: white;
+}
+
+.start-button:hover:not(:disabled) {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.stop-button {
+  background: #dc3545;
+  color: white;
+}
+
+.stop-button:hover:not(:disabled) {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.start-button:disabled,
+.stop-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.button-icon {
+  font-size: 12px;
+}
+
+.scale-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .scale-control {
+    padding: 16px;
+  }
+  
+  .scale-control-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .scale-points {
+    height: 80px;
+  }
+  
+  .scale-point-label {
+    font-size: 10px;
+  }
+  
+  .simulation-controls {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .control-buttons {
+    justify-content: center;
+  }
+  
+  .scale-info {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .scale-control {
+    border: 2px solid #000;
+  }
+  
+  .scale-point-marker {
+    border-width: 3px;
+  }
+  
+  .slider-track {
+    background: #000;
+  }
+  
+  .slider-fill {
+    background: #007bff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .scale-point,
+  .scale-point-marker,
+  .scale-point-label,
+  .scale-slider::-webkit-slider-thumb,
+  .scale-slider::-moz-range-thumb,
+  .slider-fill,
+  .status-indicator,
+  .start-button,
+  .stop-button {
+    transition: none;
+  }
+  
+  .status-indicator.running {
+    animation: none;
+  }
+}

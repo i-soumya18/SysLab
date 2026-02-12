@@ -1,0 +1,361 @@
+.progressive-constraints-panel {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin: 10px 0;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.progressive-constraints-panel.loading,
+.progressive-constraints-panel.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.loading-spinner {
+  font-size: 16px;
+  color: #666;
+}
+
+.error-message {
+  text-align: center;
+  color: #d32f2f;
+}
+
+.error-message h4 {
+  margin-bottom: 8px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.scenario-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scenario-name {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.adaptive-badge {
+  background-color: #4CAF50;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.active-constraints-section,
+.next-constraint-section,
+.performance-section,
+.constraint-history-section,
+.sequence-overview {
+  margin-bottom: 20px;
+}
+
+.active-constraints-section h4,
+.next-constraint-section h4,
+.performance-section h4,
+.constraint-history-section h4,
+.sequence-overview h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.constraints-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.constraint-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  border-left-width: 4px;
+  transition: all 0.2s ease;
+}
+
+.constraint-card.active {
+  background-color: #fff3e0;
+  border-color: #ff9800;
+  animation: pulse 2s infinite;
+}
+
+.constraint-card.upcoming {
+  background-color: #f3f8ff;
+  border-color: #1976d2;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
+}
+
+.constraint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.constraint-icon {
+  font-size: 18px;
+}
+
+.constraint-type {
+  font-weight: 600;
+  color: #333;
+  text-transform: capitalize;
+  flex: 1;
+}
+
+.severity-badge {
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.constraint-description {
+  margin: 8px 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.learning-objective {
+  background-color: #e8f5e8;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: #2e7d32;
+  border-left: 3px solid #4caf50;
+}
+
+.learning-objective strong {
+  color: #1b5e20;
+}
+
+.constraint-timing {
+  font-size: 12px;
+  color: #999;
+  font-weight: 500;
+  text-align: right;
+}
+
+.performance-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.stat {
+  text-align: center;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+}
+
+.stat-label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.decision-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.decision-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.decision-button.correct {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.decision-button.correct:hover {
+  background-color: #45a049;
+}
+
+.decision-button.incorrect {
+  background-color: #f44336;
+  color: white;
+}
+
+.decision-button.incorrect:hover {
+  background-color: #da190b;
+}
+
+.history-list {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+}
+
+.history-description {
+  flex: 1;
+  font-size: 13px;
+  color: #666;
+}
+
+.history-time {
+  font-size: 12px;
+  color: #999;
+  font-weight: 500;
+}
+
+.sequence-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.sequence-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.sequence-stat span:first-child {
+  color: #666;
+}
+
+.sequence-stat span:last-child {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .progressive-constraints-panel {
+    padding: 15px;
+    margin: 5px 0;
+  }
+  
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .performance-stats,
+  .sequence-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .decision-buttons {
+    flex-direction: column;
+  }
+  
+  .constraint-header {
+    flex-wrap: wrap;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .progressive-constraints-panel {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+  }
+  
+  .panel-header {
+    border-bottom-color: #444;
+  }
+  
+  .panel-header h3,
+  .active-constraints-section h4,
+  .next-constraint-section h4,
+  .performance-section h4,
+  .constraint-history-section h4,
+  .sequence-overview h4 {
+    color: #e0e0e0;
+  }
+  
+  .constraint-card {
+    background-color: #3d3d3d;
+    border-color: #555;
+  }
+  
+  .constraint-card.active {
+    background-color: #4a3d2a;
+  }
+  
+  .constraint-card.upcoming {
+    background-color: #2a3d4a;
+  }
+  
+  .stat,
+  .sequence-stat {
+    background-color: #3d3d3d;
+  }
+}

@@ -8,12 +8,16 @@ import { z } from 'zod';
 // Component type validation
 export const ComponentTypeSchema = z.enum([
   'database',
-  'load-balancer', 
+  'load-balancer',
   'web-server',
   'cache',
   'message-queue',
   'cdn',
-  'proxy'
+  'proxy',
+  // Frontend-only visual components that still participate in the graph
+  // are mapped to valid backend types. Allow "client" so workspaces
+  // containing client nodes can be persisted and simulated.
+  'client'
 ]);
 
 // Position validation

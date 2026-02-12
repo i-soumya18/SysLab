@@ -56,15 +56,32 @@
 
 .scenario-filters {
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.category-filter {
+.category-filter,
+.difficulty-filter {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background-color: white;
   font-size: 14px;
+  min-width: 120px;
+}
+
+.availability-filter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+}
+
+.availability-filter input[type="checkbox"] {
+  margin: 0;
 }
 
 .recommendations-section,
@@ -110,6 +127,101 @@
 
 .scenario-card.recommended {
   border-color: #4caf50;
+}
+
+.scenario-card.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
+}
+
+.scenario-card.locked:hover {
+  transform: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.scenario-card.completed {
+  border-color: #4caf50;
+  background-color: #f1f8e9;
+}
+
+.locked-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.completed-badge {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  background-color: #4caf50;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.scenario-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.scenario-category {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.scenario-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 0;
+}
+
+.tag {
+  background-color: #f0f0f0;
+  color: #666;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.tag.more {
+  background-color: #e0e0e0;
+  color: #999;
+}
+
+.prerequisites {
+  margin-top: 10px;
+  padding: 8px;
+  background-color: #fff3e0;
+  border-radius: 4px;
+  border-left: 3px solid #ff9800;
+}
+
+.prerequisites small {
+  color: #e65100;
+  font-weight: 500;
 }
 
 .scenario-badge {
@@ -202,36 +314,121 @@
   background-color: white;
   padding: 30px;
   border-radius: 8px;
-  max-width: 600px;
+  max-width: 700px;
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-.scenario-details-content h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-}
-
-.scenario-details-content p {
-  color: #666;
-  line-height: 1.5;
+.scenario-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
-.objectives-section h4 {
-  margin: 20px 0 10px 0;
+.scenario-meta-details {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.difficulty-badge,
+.time-badge,
+.category-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+}
+
+.time-badge {
+  background-color: #7b1fa2;
+}
+
+.category-badge {
+  background-color: #1976d2;
+}
+
+.scenario-description-full {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 25px;
+  font-size: 15px;
+}
+
+.learning-outcomes-section,
+.objectives-section,
+.prerequisites-section,
+.tags-section {
+  margin-bottom: 25px;
+}
+
+.learning-outcomes-section h4,
+.objectives-section h4,
+.prerequisites-section h4,
+.tags-section h4 {
+  margin: 0 0 12px 0;
   color: #333;
+  font-size: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 5px;
 }
 
-.objectives-section ul {
+.learning-outcomes-section ul,
+.objectives-section ul,
+.prerequisites-section ul {
   padding-left: 20px;
   color: #666;
+  line-height: 1.5;
 }
 
+.learning-outcomes-section li,
 .objectives-section li {
   margin-bottom: 8px;
-  line-height: 1.4;
+}
+
+.prerequisites-section li {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prerequisites-section li.completed {
+  color: #4caf50;
+}
+
+.prerequisites-section li.incomplete {
+  color: #f44336;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tags-list .tag {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.load-scenario-button:disabled {
+  background-color: #ccc;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.load-scenario-button:disabled:hover {
+  background-color: #ccc;
 }
 
 .scenario-actions {
