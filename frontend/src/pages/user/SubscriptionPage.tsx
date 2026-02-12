@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
+import { SubscriptionStatus } from '../../components/SubscriptionStatus';
 
 interface PricingTier {
   name: string;
@@ -178,8 +179,17 @@ export function SubscriptionPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Subscription & Billing</h1>
           <p className="mt-2 text-gray-600">
-            Manage your subscription, view usage, and billing information
+            Manage your subscription, view usage, and billing information.
           </p>
+          <p className="mt-1 text-xs text-gray-500">
+            For now, upgrades use a simulated workflow backed by your account in Firebase auth and the
+            app database. Stripe or other payment providers can be wired in later without changing this page.
+          </p>
+        </div>
+
+        {/* Live subscription tier + usage powered by backend */}
+        <div className="mb-10 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <SubscriptionStatus />
         </div>
 
         {/* Current Plan Card */}

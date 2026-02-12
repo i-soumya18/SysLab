@@ -3,10 +3,10 @@
  * Combines the component palette and canvas with drag-and-drop functionality
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Canvas } from './Canvas';
 import CollaborationPresence from './CollaborationPresence';
 import { ComponentPalette } from './ComponentPalette';
@@ -28,7 +28,15 @@ import { WorkspaceApiService } from '../services/workspaceApi';
 import { scenarioApi } from '../services/scenarioApi';
 import { CostDashboard } from './CostDashboard';
 import { ScalabilityDashboard } from './ScalabilityDashboard';
-import type { BottleneckInfo, Component, ComponentMetrics, SystemMetrics, Workspace as WorkspaceModel } from '../types';
+import type {
+  BottleneckInfo,
+  Component,
+  ComponentMetrics,
+  Connection,
+  SimulationConfig,
+  SystemMetrics,
+  Workspace as WorkspaceModel
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
@@ -39,6 +47,7 @@ export const Workspace: React.FC = () => {
   const { id: routeWorkspaceId } = useParams<{ id?: string }>();
   const { user } = useFirebaseAuthContext();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('demo-workspace-id');
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [componentCount, setComponentCount] = useState<number>(0);
@@ -49,7 +58,8 @@ export const Workspace: React.FC = () => {
 
   // Workspace data - track components and connections
   const [workspaceComponents, setWorkspaceComponents] = useState<Component[]>([]);
-  const [workspaceConnections, setWorkspaceConnections] = useState<any[]>([]);
+  const [workspaceConnections, setWorkspaceConnections] = useState<Connection[]>([]);
+  const [workspaceMeta, setWorkspaceMeta] = useState<WorkspaceModel | null>(null);
 
   // Simulation state
   const [_simulationId, _setSimulationId] = useState<string | null>(null);
@@ -85,6 +95,13 @@ export const Workspace: React.FC = () => {
   const maxRightSidebarWidth = 420;
   const minInsightsHeight = 160;
   const maxInsightsHeight = 400;
+
+  // Save / autosave state
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
 
   const { collaborationState } = useCollaboration({
     workspaceId: currentWorkspaceId,
@@ -139,6 +156,7 @@ export const Workspace: React.FC = () => {
       setCurrentWorkspaceId(loadedWorkspace.id);
       setWorkspaceComponents(loadedWorkspace.components || []);
       setWorkspaceConnections(loadedWorkspace.connections || []);
+      setWorkspaceMeta(loadedWorkspace);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to load workspace from route:', error);
@@ -254,7 +272,7 @@ export const Workspace: React.FC = () => {
 
   const handleConnectionCreate = (connection: any) => {
     console.log('Connection created:', connection);
-    setWorkspaceConnections(prev => [...prev, connection]);
+    setWorkspaceConnections(prev => [...prev, connection as Connection]);
   };
 
   const handleConnectionDelete = (connectionId: string) => {
@@ -300,10 +318,11 @@ export const Workspace: React.FC = () => {
   const handleScenarioLoad = async (scenarioId: string) => {
     try {
       const result = await scenarioApi.loadScenario(scenarioId, currentUserId);
-      const loadedWorkspace = result.workspace;
+      const loadedWorkspace = result.workspace as WorkspaceModel;
       setCurrentWorkspaceId(loadedWorkspace.id);
       setWorkspaceComponents(loadedWorkspace.components || []);
       setWorkspaceConnections(loadedWorkspace.connections || []);
+      setWorkspaceMeta(loadedWorkspace);
     } catch (error) {
       console.error('Failed to load scenario into workspace:', error);
       alert('Failed to load scenario. Please try again.');
@@ -314,6 +333,20 @@ export const Workspace: React.FC = () => {
     setCurrentScale(userCount);
     console.log('Scale changed to:', userCount, 'users');
   };
+
+  const buildSimulationConfig = useCallback((): SimulationConfig => ({
+    duration: 60,
+    loadPattern: {
+      type: 'constant',
+      baseLoad: currentScale * 2
+    },
+    failureScenarios: [],
+    metricsCollection: {
+      collectionInterval: 1000,
+      retentionPeriod: 300,
+      enabledMetrics: ['latency', 'throughput', 'errorRate', 'resourceUtilization']
+    }
+  }), [currentScale]);
 
   const handleStartSimulation = async () => {
     try {
@@ -327,24 +360,12 @@ export const Workspace: React.FC = () => {
 
       const workspace = {
         id: currentWorkspaceId,
-        name: 'Demo Workspace',
-        description: 'System design simulation workspace',
+        name: workspaceMeta?.name ?? 'Demo Workspace',
+        description: workspaceMeta?.description ?? 'System design simulation workspace',
         userId: currentUserId,
         components: workspaceComponents,
         connections: workspaceConnections,
-        configuration: {
-          duration: 60, // 60 seconds simulation
-          loadPattern: {
-            type: 'constant' as const,
-            baseLoad: currentScale * 2 // Approximate requests per second (2 req/sec per user)
-          },
-          failureScenarios: [],
-          metricsCollection: {
-            collectionInterval: 1000, // Collect metrics every second
-            retentionPeriod: 300, // Keep metrics for 5 minutes
-            enabledMetrics: ['latency', 'throughput', 'errorRate', 'resourceUtilization']
-          }
-        },
+        configuration: workspaceMeta?.configuration ?? buildSimulationConfig(),
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -524,6 +545,131 @@ export const Workspace: React.FC = () => {
     }
   };
 
+  const saveWorkspace = useCallback(async (options?: { silent?: boolean }) => {
+    if (!currentUserId) {
+      return;
+    }
+
+    if (workspaceComponents.length === 0 && workspaceConnections.length === 0) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+
+      const payload = {
+        name: workspaceMeta?.name ?? 'New Workspace',
+        description: workspaceMeta?.description ?? 'A system design workspace',
+        userId: currentUserId,
+        components: workspaceComponents,
+        connections: workspaceConnections,
+        configuration: workspaceMeta?.configuration ?? buildSimulationConfig()
+      };
+
+      let nextWorkspaceId = currentWorkspaceId;
+      let response: Response;
+
+      if (currentWorkspaceId === 'demo-workspace-id' && !routeWorkspaceId) {
+        // Create a new workspace on first save
+        response = await fetch(`${API_BASE_URL}/workspaces`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        // Update existing workspace
+        response = await fetch(`${API_BASE_URL}/workspaces/${encodeURIComponent(currentWorkspaceId)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const message =
+          (errorBody && errorBody.error && errorBody.error.message) ||
+          'Failed to save workspace. Please try again or check your connection.';
+        throw new Error(message);
+      }
+
+      const body = await response.json().catch(() => null);
+      const savedWorkspace: WorkspaceModel | null = body?.data ?? null;
+
+      if (savedWorkspace) {
+        nextWorkspaceId = savedWorkspace.id;
+        setWorkspaceMeta(savedWorkspace);
+        setWorkspaceComponents(savedWorkspace.components || []);
+        setWorkspaceConnections(savedWorkspace.connections || []);
+      }
+
+      setCurrentWorkspaceId(nextWorkspaceId);
+      setHasUnsavedChanges(false);
+      setLastSavedAt(new Date());
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to save workspace:', error);
+      if (error instanceof Error) {
+        setSaveError(error.message);
+        if (!options?.silent) {
+          alert(
+            `Unable to save your workspace. Your changes are still on this page, but may be lost if you close it. Details: ${error.message}`
+          );
+        }
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    currentUserId,
+    currentWorkspaceId,
+    routeWorkspaceId,
+    workspaceComponents,
+    workspaceConnections,
+    workspaceMeta,
+    buildSimulationConfig
+  ]);
+
+  // Track unsaved changes and trigger autosave
+  useEffect(() => {
+    if (workspaceComponents.length === 0 && workspaceConnections.length === 0) {
+      return;
+    }
+    setHasUnsavedChanges(true);
+
+    if (!autoSaveEnabled) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      void saveWorkspace({ silent: true });
+    }, 4000);
+
+    return () => clearTimeout(timeout);
+  }, [workspaceComponents, workspaceConnections, autoSaveEnabled, saveWorkspace]);
+
+  // Warn user before leaving if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
   const handleHorizontalDrag = (
     event: React.MouseEvent<HTMLDivElement, MouseEvent>,
     side: 'left' | 'right'
@@ -670,11 +816,43 @@ export const Workspace: React.FC = () => {
                   Export
                 </button>
                 <button
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+                  onClick={() => {
+                    void saveWorkspace();
+                  }}
+                  disabled={isSaving || !hasUnsavedChanges}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isSaving
+                      ? 'bg-blue-300 text-white cursor-wait'
+                      : hasUnsavedChanges
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-gray-200 text-gray-600 cursor-default'
+                  }`}
                   type="button"
                 >
-                  Save
+                  {isSaving ? 'Saving…' : hasUnsavedChanges ? 'Save' : 'Saved'}
                 </button>
+              </div>
+
+              <div className="flex flex-col items-end gap-1">
+                <label className="flex items-center gap-1 text-[11px] text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={autoSaveEnabled}
+                    onChange={(event) => setAutoSaveEnabled(event.target.checked)}
+                    className="h-3 w-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Auto-save
+                </label>
+                {lastSavedAt && (
+                  <span className="text-[10px] text-gray-400">
+                    Last saved at {lastSavedAt.toLocaleTimeString()}
+                  </span>
+                )}
+                {saveError && (
+                  <span className="text-[10px] text-red-500 max-w-[180px] truncate" title={saveError}>
+                    {saveError}
+                  </span>
+                )}
               </div>
 
               <div className="h-6 w-px bg-gray-200" />
@@ -797,6 +975,8 @@ export const Workspace: React.FC = () => {
                 <Canvas
                   width={1000}
                   height={600}
+                  initialComponents={workspaceComponents}
+                  initialConnections={workspaceConnections}
                   onComponentAdd={handleComponentAdd}
                   onComponentSelect={handleComponentSelect}
                   onComponentUpdate={handleComponentUpdate}

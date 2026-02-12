@@ -18,6 +18,7 @@ export interface User {
   oauthId?: string;
   emailVerified: boolean;
   subscriptionTier: string;
+  isAdmin?: boolean;
   createdAt: Date;
   updatedAt: Date;
   lastLogin?: Date;
@@ -161,7 +162,7 @@ export class AuthService {
       // Find user by email
       const userQuery = `
         SELECT id, email, password_hash, first_name, last_name, oauth_provider, oauth_id,
-               email_verified, subscription_tier, created_at, updated_at, last_login
+               email_verified, subscription_tier, is_admin, created_at, updated_at, last_login
         FROM users 
         WHERE email = $1 AND password_hash IS NOT NULL
       `;
@@ -217,6 +218,7 @@ export class AuthService {
         oauthId: userData.oauth_id,
         emailVerified: userData.email_verified,
         subscriptionTier: userData.subscription_tier,
+        isAdmin: userData.is_admin || false,
         createdAt: userData.created_at,
         updatedAt: userData.updated_at,
         lastLogin: new Date()
@@ -279,7 +281,7 @@ export class AuthService {
       // Just verify the JWT signature and get user from database
       const userQuery = `
         SELECT id, email, first_name, last_name, oauth_provider, oauth_id,
-               email_verified, subscription_tier, created_at, updated_at, last_login
+               email_verified, subscription_tier, is_admin, created_at, updated_at, last_login
         FROM users 
         WHERE id = $1
       `;
@@ -303,6 +305,7 @@ export class AuthService {
         oauthId: userData.oauth_id,
         emailVerified: userData.email_verified,
         subscriptionTier: userData.subscription_tier,
+        isAdmin: userData.is_admin || false,
         createdAt: userData.created_at,
         updatedAt: userData.updated_at,
         lastLogin: userData.last_login

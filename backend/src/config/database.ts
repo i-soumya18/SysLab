@@ -56,6 +56,7 @@ async function initializeSchema(): Promise<void> {
         password_reset_token VARCHAR(255),
         password_reset_expires TIMESTAMP WITH TIME ZONE,
         subscription_tier VARCHAR(50) DEFAULT 'free',
+        is_admin BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         last_login TIMESTAMP WITH TIME ZONE
@@ -333,6 +334,34 @@ async function initializeSchema(): Promise<void> {
       );
     `);
 
+    // Create system_settings table for admin controls
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        key VARCHAR(100) UNIQUE NOT NULL,
+        value JSONB NOT NULL DEFAULT '{}',
+        description TEXT,
+        updated_by UUID REFERENCES users(id),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Create api_metrics table for monitoring API endpoints
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS api_metrics (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        endpoint VARCHAR(255) NOT NULL,
+        method VARCHAR(10) NOT NULL,
+        status_code INTEGER NOT NULL,
+        response_time_ms INTEGER NOT NULL,
+        user_id UUID REFERENCES users(id),
+        ip_address INET,
+        user_agent TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     // Create indexes for better performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -340,6 +369,7 @@ async function initializeSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token);
       CREATE INDEX IF NOT EXISTS idx_users_password_reset_token ON users(password_reset_token);
       CREATE INDEX IF NOT EXISTS idx_users_subscription_tier ON users(subscription_tier);
+      CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
@@ -382,6 +412,10 @@ async function initializeSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_id ON audit_logs(tenant_id);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
+      CREATE INDEX IF NOT EXISTS idx_api_metrics_endpoint ON api_metrics(endpoint);
+      CREATE INDEX IF NOT EXISTS idx_api_metrics_created_at ON api_metrics(created_at);
+      CREATE INDEX IF NOT EXISTS idx_api_metrics_status_code ON api_metrics(status_code);
     `);
 
     console.log('✅ Database schema initialized');

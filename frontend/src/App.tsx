@@ -11,6 +11,7 @@ import { GettingStartedPage } from './pages/GettingStartedPage';
 import { ProfilePage } from './pages/user/ProfilePage';
 import { SettingsPage } from './pages/user/SettingsPage';
 import { SubscriptionPage } from './pages/user/SubscriptionPage';
+import { AdminPanel } from './pages/admin/AdminPanel';
 import { AppShell } from './components/AppShell';
 import './App.css';
 
@@ -152,6 +153,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppShell>
               <SubscriptionPage />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <AdminPanel />
             </AppShell>
           </ProtectedRoute>
         )}

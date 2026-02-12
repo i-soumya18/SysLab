@@ -20,6 +20,7 @@ export function setupRoutes(app: Express): void {
   const progressiveConstraintsRoutes = require('./progressiveConstraints').default;
   const hintsRoutes = require('./hints').default;
   const { scalabilityRoutes } = require('./scalabilityRoutes');
+  const adminRoutes = require('./admin').default;
 
   // Authentication routes
   app.use(`${apiPrefix}/auth`, authRoutes);
@@ -42,6 +43,7 @@ export function setupRoutes(app: Express): void {
   app.use(`${apiPrefix}/progressive-constraints`, progressiveConstraintsRoutes); // SRS FR-9.2
   app.use(`${apiPrefix}/hints`, hintsRoutes); // SRS FR-9.3
   app.use(`${apiPrefix}/scalability`, scalabilityRoutes); // SRS NFR-4: Horizontal scaling and load balancing
+  app.use(`${apiPrefix}/admin`, adminRoutes); // Admin routes
 
   // Version routes - mounted last to avoid /:id catching everything
   app.use(`${apiPrefix}/versions`, versionRoutes);
@@ -67,7 +69,8 @@ export function setupRoutes(app: Express): void {
         failureInjection: `${apiPrefix}/failure-injection`,
         progressiveConstraints: `${apiPrefix}/progressive-constraints`,
         hints: `${apiPrefix}/hints`,
-        scalability: `${apiPrefix}/scalability`
+        scalability: `${apiPrefix}/scalability`,
+        admin: `${apiPrefix}/admin`
       }
     });
   });

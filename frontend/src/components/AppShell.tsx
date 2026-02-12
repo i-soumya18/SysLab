@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../hooks/useFirebaseAuth';
+import { useAdmin } from '../hooks/useAdmin';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -22,6 +23,7 @@ const getInitials = (name: string | null): string => {
 
 export const AppShell: React.FC<AppShellProps> = ({ children, variant = 'default' }) => {
   const { user, logoutUser } = useFirebaseAuthContext();
+  const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -192,6 +194,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, variant = 'default
                     >
                       Subscription
                     </button>
+                    {isAdmin && (
+                      <>
+                        <hr className="my-1" />
+                        <button
+                          type="button"
+                          onClick={() => navigate('/admin')}
+                          className="block w-full px-4 py-2 text-left text-sm text-purple-600 hover:bg-purple-50"
+                        >
+                          Admin Panel
+                        </button>
+                      </>
+                    )}
                     <hr className="my-1" />
                     <button
                       type="button"

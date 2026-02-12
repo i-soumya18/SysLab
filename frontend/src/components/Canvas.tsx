@@ -37,6 +37,8 @@ interface ComponentGroup {
 interface CanvasProps {
   width?: number;
   height?: number;
+  initialComponents?: Component[];
+  initialConnections?: Connection[];
   onComponentAdd?: (component: Component) => void;
   onComponentSelect?: (component: Component | null) => void;
   onComponentUpdate?: (component: Component) => void;
@@ -57,6 +59,8 @@ interface CanvasProps {
 export const Canvas: React.FC<CanvasProps> = ({
   width = 1200,
   height = 800,
+  initialComponents,
+  initialConnections,
   onComponentAdd,
   onComponentSelect,
   onComponentUpdate,
@@ -128,6 +132,20 @@ export const Canvas: React.FC<CanvasProps> = ({
     },
     selectedConnection
   });
+
+  // Initialize from parent-provided workspace state when present (e.g. loaded or imported workspace)
+  useEffect(() => {
+    if (initialComponents && initialComponents.length > 0) {
+      setComponents(initialComponents);
+      onComponentCountChange?.(initialComponents.length);
+    }
+  }, [initialComponents, onComponentCountChange]);
+
+  useEffect(() => {
+    if (initialConnections && initialConnections.length > 0) {
+      setConnections(initialConnections);
+    }
+  }, [initialConnections]);
 
   // Grid snapping helper function
   const snapToGrid = useCallback((position: Position): Position => {
@@ -303,7 +321,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     drop: (item: DragItem, monitor) => {
       const offset = monitor.getClientOffset();
       const canvasRect = canvasRef.current?.getBoundingClientRect();
-      
+
       if (offset && canvasRect) {
         const canvasPosition = screenToCanvas(offset.x, offset.y);
         const snappedPosition = snapToGrid({
@@ -318,11 +336,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         );
 
         if (newComponent) {
-          setComponents(prev => {
-            const updated = [...prev, newComponent];
-            onComponentCountChange?.(updated.length);
-            return updated;
-          });
+          setComponents(prev => [...prev, newComponent]);
           onComponentAdd?.(newComponent);
         }
       }
@@ -421,17 +435,18 @@ export const Canvas: React.FC<CanvasProps> = ({
     handleComponentSelect(component);
   }, [handleComponentSelect]);
 
+  // Keep parent informed of component count without mutating it during render
+  useEffect(() => {
+    onComponentCountChange?.(components.length);
+  }, [components.length, onComponentCountChange]);
+
   // Handle component deletion
   const handleComponentDelete = useCallback((componentId: string) => {
     // Remove component
-    setComponents(prev => {
-      const updated = prev.filter(comp => comp.id !== componentId);
-      onComponentCountChange?.(updated.length);
-      return updated;
-    });
+    setComponents(prev => prev.filter(comp => comp.id !== componentId));
     
     // Remove connections involving this component
-    setConnections(prev => prev.filter(conn => 
+    setConnections(prev => prev.filter(conn =>
       conn.sourceComponentId !== componentId && conn.targetComponentId !== componentId
     ));
     
@@ -902,8 +917,39 @@ export const Canvas: React.FC<CanvasProps> = ({
         </div>
       )}
       
+      {/* Empty canvas guidance */}
+      {components.length === 0 && !connectionManager.isConnecting && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            color: 'white',
+            padding: '16px 20px',
+            borderRadius: '12px',
+            boxShadow: '0 20px 45px rgba(15, 23, 42, 0.65)',
+            maxWidth: '360px',
+            textAlign: 'left',
+            zIndex: 120
+          }}
+        >
+          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a5b4fc' }}>
+            First step
+          </div>
+          <div style={{ marginTop: '4px', fontSize: '16px', fontWeight: 600 }}>
+            Drag a Load Balancer to start.
+          </div>
+          <div style={{ marginTop: '8px', fontSize: '12px', color: '#e5e7eb' }}>
+            Then add a Web Server and Database from the left panel. Wire them together to create your
+            first production-style system.
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
-      {selectedComponents.length === 0 && !connectionManager.isConnecting && (
+      {components.length > 0 && selectedComponents.length === 0 && !connectionManager.isConnecting && (
         <div
           style={{
             position: 'absolute',
