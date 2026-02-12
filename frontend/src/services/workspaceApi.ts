@@ -1,6 +1,6 @@
 /**
  * Workspace API Service
- * Handles all workspace-related API calls including export/import functionality
+ * Handles all workspace-related API calls including export/import functionality and sharing
  */
 
 export interface WorkspaceExportFormat {
@@ -46,9 +46,141 @@ export interface WorkspaceImportResult {
   validation: WorkspaceImportValidation;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
+export interface WorkspaceShare {
+  id: string;
+  workspaceId: string;
+  sharedBy: string;
+  shareToken: string;
+  permissionLevel: 'view' | 'edit' | 'admin';
+  expiresAt?: string;
+  isPublic: boolean;
+  accessCount: number;
+  createdAt: string;
+  updatedAt: string;
+  shareUrl?: string;
+}
+
+export interface CreateShareRequest {
+  sharedBy: string;
+  permissionLevel: 'view' | 'edit' | 'admin';
+  expiresIn?: number; // seconds from now
+  isPublic?: boolean;
+}
+
+export interface WorkspaceCollaborator {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  invitedBy: string;
+  permissionLevel: 'view' | 'edit' | 'admin';
+  status: 'pending' | 'accepted' | 'declined' | 'revoked';
+  invitedAt: string;
+  acceptedAt?: string;
+  lastAccessed?: string;
+}
+
+export interface InviteCollaboratorRequest {
+  userId: string;
+  invitedBy: string;
+  permissionLevel: 'view' | 'edit' | 'admin';
+}
+
+export interface UpdateCollaboratorRequest {
+  permissionLevel?: 'view' | 'edit' | 'admin';
+  status?: 'accepted' | 'declined' | 'revoked';
+}
+
+export interface ShareAccessInfo {
+  workspace: any;
+  share: WorkspaceShare;
+}
+
+export interface WorkspaceListQuery {
+  userId?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: 'name' | 'createdAt' | 'updatedAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  description?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  components?: unknown[];
+  connections?: unknown[];
+}
+
+export interface WorkspaceListResponse {
+  success: boolean;
+  data: WorkspaceSummary[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 export class WorkspaceApiService {
+  /**
+   * List workspaces with optional search and pagination.
+   */
+  static async listWorkspaces(query: WorkspaceListQuery = {}): Promise<WorkspaceListResponse> {
+    const params = new URLSearchParams();
+    if (query.userId) params.append('userId', query.userId);
+    if (query.search) params.append('search', query.search);
+    if (typeof query.limit === 'number') params.append('limit', String(query.limit));
+    if (typeof query.offset === 'number') params.append('offset', String(query.offset));
+    if (query.sortBy) params.append('sortBy', query.sortBy);
+    if (query.sortOrder) params.append('sortOrder', query.sortOrder);
+
+    const response = await fetch(`${API_BASE_URL}/workspaces?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error?.message ?? 'Failed to fetch workspaces');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Delete a workspace by ID for a given user.
+   */
+  static async deleteWorkspace(workspaceId: string, userId?: string): Promise<void> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.append('userId', userId);
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/${encodeURIComponent(workspaceId)}?${params.toString()}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error?.message ?? 'Failed to delete workspace');
+    }
+  }
+
   /**
    * Export workspace to downloadable format
    */
@@ -192,5 +324,194 @@ export class WorkspaceApiService {
       
       reader.readAsText(file);
     });
+  }
+
+  /**
+   * Create a shareable link for a workspace
+   */
+  static async createShare(
+    workspaceId: string, 
+    request: CreateShareRequest
+  ): Promise<WorkspaceShare> {
+    const response = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/share`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to create share');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Get all shares for a workspace
+   */
+  static async getWorkspaceShares(workspaceId: string, userId: string): Promise<WorkspaceShare[]> {
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/${workspaceId}/shares?userId=${encodeURIComponent(userId)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to get workspace shares');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Revoke a workspace share
+   */
+  static async revokeShare(shareId: string, userId: string): Promise<void> {
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/shares/${shareId}?userId=${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to revoke share');
+    }
+  }
+
+  /**
+   * Access a shared workspace via share token
+   */
+  static async getSharedWorkspace(shareToken: string, userId?: string): Promise<ShareAccessInfo> {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/shared/${shareToken}?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to access shared workspace');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Invite a collaborator to a workspace
+   */
+  static async inviteCollaborator(
+    workspaceId: string, 
+    request: InviteCollaboratorRequest
+  ): Promise<WorkspaceCollaborator> {
+    const response = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/collaborators`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to invite collaborator');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Get all collaborators for a workspace
+   */
+  static async getWorkspaceCollaborators(workspaceId: string, userId: string): Promise<WorkspaceCollaborator[]> {
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/${workspaceId}/collaborators?userId=${encodeURIComponent(userId)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to get workspace collaborators');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Update collaborator permissions or status
+   */
+  static async updateCollaborator(
+    workspaceId: string, 
+    userId: string, 
+    request: UpdateCollaboratorRequest,
+    updatedBy: string
+  ): Promise<WorkspaceCollaborator> {
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/${workspaceId}/collaborators/${userId}?updatedBy=${encodeURIComponent(updatedBy)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to update collaborator');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Remove a collaborator from a workspace
+   */
+  static async removeCollaborator(workspaceId: string, userId: string, removedBy: string): Promise<void> {
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/${workspaceId}/collaborators/${userId}?removedBy=${encodeURIComponent(removedBy)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to remove collaborator');
+    }
   }
 }

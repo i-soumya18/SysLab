@@ -1,290 +1,375 @@
 /**
- * Comprehensive metrics dashboard combining all visualization components
+ * Metrics Dashboard Component
+ * Displays real-time simulation metrics with system overview and bottleneck detection
+ * Implements MVLE-6: Learn from metrics and visual feedback
  */
 
-import React, { useState, useEffect } from 'react';
-import { PerformanceDashboard } from './PerformanceDashboard';
-import { ResourceUtilizationChart } from './ResourceUtilizationChart';
-import { LatencyDistributionChart } from './LatencyDistributionChart';
-import type { 
-  Component, 
-  ComponentMetrics, 
-  AggregatedMetrics, 
-  SystemMetrics 
-} from '../types';
+import React from 'react';
+import type { SystemMetrics, BottleneckInfo, ComponentMetrics } from '../types';
 
-export interface MetricsDashboardProps {
-  components: Component[];
-  isSimulationRunning: boolean;
-  onRefreshMetrics?: () => void;
+interface MetricsDashboardProps {
+  isVisible: boolean;
+  systemMetrics?: SystemMetrics;
+  componentMetrics?: Map<string, ComponentMetrics>;
+  bottlenecks?: BottleneckInfo[];
+  simulationStatus: 'idle' | 'running' | 'paused' | 'completed';
+  elapsedTime: number;
 }
 
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
-  components,
-  isSimulationRunning,
-  onRefreshMetrics
+  isVisible,
+  systemMetrics,
+  componentMetrics = new Map(),
+  bottlenecks = [],
+  simulationStatus,
+  elapsedTime
 }) => {
-  const [rawMetrics, setRawMetrics] = useState<Map<string, ComponentMetrics[]>>(new Map());
-  const [aggregatedMetrics, setAggregatedMetrics] = useState<Map<string, AggregatedMetrics[]>>(new Map());
-  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics[]>([]);
-  const [selectedComponentId, setSelectedComponentId] = useState<string | undefined>();
-  const [activeTab, setActiveTab] = useState<'overview' | 'components' | 'resources' | 'latency'>('overview');
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  if (!isVisible) return null;
 
-  // Mock data for demonstration - in real implementation, this would come from WebSocket or API
-  useEffect(() => {
-    if (!isSimulationRunning && !autoRefresh) return;
-
-    const generateMockMetrics = () => {
-      const now = Date.now();
-      
-      // Generate mock raw metrics for each component
-      const newRawMetrics = new Map<string, ComponentMetrics[]>();
-      const newAggregatedMetrics = new Map<string, AggregatedMetrics[]>();
-      
-      components.forEach(component => {
-        // Generate raw metrics
-        const existingRaw = rawMetrics.get(component.id) || [];
-        const newRawMetric: ComponentMetrics = {
-          componentId: component.id,
-          timestamp: now,
-          requestsPerSecond: Math.random() * 100 + 10,
-          averageLatency: Math.random() * 200 + 50,
-          errorRate: Math.random() * 0.05,
-          cpuUtilization: Math.random() * 0.8 + 0.1,
-          memoryUtilization: Math.random() * 0.7 + 0.1,
-          queueDepth: Math.floor(Math.random() * 20)
-        };
-        
-        const updatedRaw = [...existingRaw, newRawMetric].slice(-50); // Keep last 50 points
-        newRawMetrics.set(component.id, updatedRaw);
-
-        // Generate aggregated metrics (every 5th update)
-        const existingAgg = aggregatedMetrics.get(component.id) || [];
-        if (existingRaw.length % 5 === 0) {
-          const newAggMetric: AggregatedMetrics = {
-            componentId: component.id,
-            timeWindow: 5000,
-            startTime: now - 5000,
-            endTime: now,
-            requestsPerSecond: {
-              min: newRawMetric.requestsPerSecond * 0.8,
-              max: newRawMetric.requestsPerSecond * 1.2,
-              avg: newRawMetric.requestsPerSecond,
-              p50: newRawMetric.requestsPerSecond * 0.95,
-              p95: newRawMetric.requestsPerSecond * 1.1,
-              p99: newRawMetric.requestsPerSecond * 1.15
-            },
-            latency: {
-              min: newRawMetric.averageLatency * 0.7,
-              max: newRawMetric.averageLatency * 1.5,
-              avg: newRawMetric.averageLatency,
-              p50: newRawMetric.averageLatency * 0.9,
-              p95: newRawMetric.averageLatency * 1.3,
-              p99: newRawMetric.averageLatency * 1.4
-            },
-            errorRate: {
-              min: 0,
-              max: newRawMetric.errorRate * 2,
-              avg: newRawMetric.errorRate
-            },
-            resourceUtilization: {
-              cpu: {
-                min: newRawMetric.cpuUtilization * 0.8,
-                max: newRawMetric.cpuUtilization * 1.1,
-                avg: newRawMetric.cpuUtilization
-              },
-              memory: {
-                min: newRawMetric.memoryUtilization * 0.9,
-                max: newRawMetric.memoryUtilization * 1.1,
-                avg: newRawMetric.memoryUtilization
-              }
-            },
-            queueDepth: {
-              min: Math.max(0, newRawMetric.queueDepth - 5),
-              max: newRawMetric.queueDepth + 5,
-              avg: newRawMetric.queueDepth
-            },
-            totalRequests: newRawMetric.requestsPerSecond * 5,
-            totalErrors: newRawMetric.requestsPerSecond * newRawMetric.errorRate * 5
-          };
-          
-          const updatedAgg = [...existingAgg, newAggMetric].slice(-20); // Keep last 20 points
-          newAggregatedMetrics.set(component.id, updatedAgg);
-        } else {
-          newAggregatedMetrics.set(component.id, existingAgg);
-        }
-      });
-
-      // Generate system metrics
-      const totalThroughput = Array.from(newRawMetrics.values())
-        .reduce((sum, metrics) => {
-          const latest = metrics[metrics.length - 1];
-          return sum + (latest?.requestsPerSecond || 0);
-        }, 0);
-
-      const avgLatency = Array.from(newRawMetrics.values())
-        .reduce((sum, metrics, _, array) => {
-          const latest = metrics[metrics.length - 1];
-          return sum + (latest?.averageLatency || 0) / array.length;
-        }, 0);
-
-      const systemErrorRate = Array.from(newRawMetrics.values())
-        .reduce((sum, metrics, _, array) => {
-          const latest = metrics[metrics.length - 1];
-          return sum + (latest?.errorRate || 0) / array.length;
-        }, 0);
-
-      const healthyComponents = Array.from(newRawMetrics.values())
-        .filter(metrics => {
-          const latest = metrics[metrics.length - 1];
-          return latest && latest.errorRate < 0.05;
-        }).length;
-
-      const totalQueueDepth = Array.from(newRawMetrics.values())
-        .reduce((sum, metrics) => {
-          const latest = metrics[metrics.length - 1];
-          return sum + (latest?.queueDepth || 0);
-        }, 0);
-
-      const newSystemMetric: SystemMetrics = {
-        timestamp: now,
-        totalThroughput,
-        averageLatency: avgLatency,
-        systemErrorRate,
-        activeComponents: components.length,
-        healthyComponents,
-        totalQueueDepth,
-        componentMetrics: new Map(
-          Array.from(newAggregatedMetrics.entries())
-            .map(([key, value]) => [key, value[value.length - 1]] as [string, AggregatedMetrics])
-            .filter(([_, value]) => value !== undefined)
-        )
-      };
-
-      setRawMetrics(newRawMetrics);
-      setAggregatedMetrics(newAggregatedMetrics);
-      setSystemMetrics(prev => [...prev, newSystemMetric].slice(-50)); // Keep last 50 points
-    };
-
-    generateMockMetrics();
-
-    const interval = setInterval(generateMockMetrics, 2000); // Update every 2 seconds
-    return () => clearInterval(interval);
-  }, [components, isSimulationRunning, autoRefresh, rawMetrics, aggregatedMetrics]);
-
-  const handleTabChange = (tab: 'overview' | 'components' | 'resources' | 'latency') => {
-    setActiveTab(tab);
+  // Format time in MM:SS format
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Get severity color for bottleneck
+  const getSeverityColor = (severity: string): string => {
+    const colors: Record<string, string> = {
+      'critical': '#dc3545',
+      'high': '#fd7e14',
+      'medium': '#ffc107',
+      'low': '#28a745'
+    };
+    return colors[severity] || '#6c757d';
+  };
+
+  // Get severity icon
+  const getSeverityIcon = (severity: string): string => {
+    const icons: Record<string, string> = {
+      'critical': '🔴',
+      'high': '🟠',
+      'medium': '🟡',
+      'low': '🟢'
+    };
+    return icons[severity] || '⚪';
+  };
+
+  const statusColor = {
+    'idle': '#6c757d',
+    'running': '#28a745',
+    'paused': '#ffc107',
+    'completed': '#17a2b8'
+  }[simulationStatus] || '#6c757d';
+
   return (
-    <div className="metrics-dashboard">
-      <div className="dashboard-header">
-        <h1>System Metrics Dashboard</h1>
-        
-        <div className="dashboard-controls">
-          <div className="status-indicator">
-            <span className={`status-dot ${isSimulationRunning ? 'running' : 'stopped'}`}></span>
-            <span>{isSimulationRunning ? 'Simulation Running' : 'Simulation Stopped'}</span>
-          </div>
-
-          <label className="auto-refresh-toggle">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
-            Auto Refresh
-          </label>
-
-          {onRefreshMetrics && (
-            <button onClick={onRefreshMetrics} className="refresh-button">
-              Refresh
-            </button>
-          )}
+    <div
+      style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        width: '450px',
+        maxHeight: '500px',
+        backgroundColor: 'white',
+        borderRadius: '8px',
+        border: '1px solid #e0e0e0',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        fontFamily: 'Arial, sans-serif',
+        zIndex: 999
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          padding: '16px',
+          borderBottom: '1px solid #e0e0e0',
+          backgroundColor: '#f8f9fa',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '18px' }}>📊</span>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
+            Metrics Dashboard
+          </h3>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            backgroundColor: statusColor,
+            color: 'white',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-block',
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              backgroundColor: 'white',
+              animation: simulationStatus === 'running' ? 'pulse 1.5s infinite' : 'none'
+            }}
+          />
+          {simulationStatus.toUpperCase()}
         </div>
       </div>
 
-      <div className="dashboard-tabs">
-        <button
-          className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => handleTabChange('overview')}
+      {/* Scrollable Content */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}
+      >
+        {/* Elapsed Time */}
+        <div
+          style={{
+            padding: '8px 12px',
+            backgroundColor: '#f0f0f0',
+            borderRadius: '4px',
+            textAlign: 'center',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            color: '#333'
+          }}
         >
-          System Overview
-        </button>
-        <button
-          className={`tab ${activeTab === 'components' ? 'active' : ''}`}
-          onClick={() => handleTabChange('components')}
-        >
-          Component Details
-        </button>
-        <button
-          className={`tab ${activeTab === 'resources' ? 'active' : ''}`}
-          onClick={() => handleTabChange('resources')}
-        >
-          Resource Utilization
-        </button>
-        <button
-          className={`tab ${activeTab === 'latency' ? 'active' : ''}`}
-          onClick={() => handleTabChange('latency')}
-        >
-          Latency Analysis
-        </button>
-      </div>
+          Elapsed Time: {formatTime(elapsedTime)}
+        </div>
 
-      <div className="dashboard-content">
-        {activeTab === 'overview' && (
-          <PerformanceDashboard
-            components={components}
-            rawMetrics={rawMetrics}
-            aggregatedMetrics={aggregatedMetrics}
-            systemMetrics={systemMetrics}
-            selectedComponentId={selectedComponentId}
-            onComponentSelect={setSelectedComponentId}
-          />
-        )}
+        {/* System Overview Cards */}
+        {systemMetrics && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase' }}>
+              System Overview
+            </h4>
 
-        {activeTab === 'components' && (
-          <PerformanceDashboard
-            components={components}
-            rawMetrics={rawMetrics}
-            aggregatedMetrics={aggregatedMetrics}
-            systemMetrics={systemMetrics}
-            selectedComponentId={selectedComponentId}
-            onComponentSelect={setSelectedComponentId}
-          />
-        )}
+            {/* Throughput Card */}
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#e3f2fd',
+                borderLeft: '4px solid #2196F3',
+                borderRadius: '4px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div style={{ fontSize: '12px', color: '#333' }}>
+                <div style={{ fontWeight: 'bold' }}>Throughput</div>
+                <div style={{ fontSize: '10px', color: '#666' }}>req/sec</div>
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2196F3' }}>
+                {systemMetrics.totalThroughput.toFixed(0)}
+              </div>
+            </div>
 
-        {activeTab === 'resources' && (
-          <div className="resources-tab">
-            <ResourceUtilizationChart
-              components={components}
-              metrics={rawMetrics}
-              height={400}
-            />
-            
-            <div className="resource-summary">
-              <h3>Resource Summary</h3>
-              <p>Monitor CPU, memory, and queue depth across all components in real-time.</p>
+            {/* Latency Card */}
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#f3e5f5',
+                borderLeft: '4px solid #9C27B0',
+                borderRadius: '4px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div style={{ fontSize: '12px', color: '#333' }}>
+                <div style={{ fontWeight: 'bold' }}>Avg Latency</div>
+                <div style={{ fontSize: '10px', color: '#666' }}>milliseconds</div>
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#9C27B0' }}>
+                {systemMetrics.averageLatency.toFixed(0)}ms
+              </div>
+            </div>
+
+            {/* Error Rate Card */}
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#ffebee',
+                borderLeft: '4px solid #F44336',
+                borderRadius: '4px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div style={{ fontSize: '12px', color: '#333' }}>
+                <div style={{ fontWeight: 'bold' }}>Error Rate</div>
+                <div style={{ fontSize: '10px', color: '#666' }}>percentage</div>
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#F44336' }}>
+                {(systemMetrics.systemErrorRate * 100).toFixed(2)}%
+              </div>
+            </div>
+
+            {/* Overloaded Components Card */}
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#fce4ec',
+                borderLeft: '4px solid #E91E63',
+                borderRadius: '4px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div style={{ fontSize: '12px', color: '#333' }}>
+                <div style={{ fontWeight: 'bold' }}>Overloaded</div>
+                <div style={{ fontSize: '10px', color: '#666' }}>components</div>
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#E91E63' }}>
+                {systemMetrics.activeComponents - systemMetrics.healthyComponents}
+              </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'latency' && (
-          <div className="latency-tab">
-            <LatencyDistributionChart
-              components={components}
-              aggregatedMetrics={aggregatedMetrics}
-              height={400}
-            />
-            
-            <div className="latency-summary">
-              <h3>Latency Analysis</h3>
-              <p>View latency percentiles (P50, P95, P99) to identify performance bottlenecks.</p>
-            </div>
+        {/* Bottlenecks Section */}
+        {bottlenecks && bottlenecks.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase' }}>
+              Bottlenecks ({bottlenecks.length})
+            </h4>
+
+            {bottlenecks.map((bottleneck, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: '#f5f5f5',
+                  borderLeft: '4px solid ' + getSeverityColor(bottleneck.severity),
+                  borderRadius: '4px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', flex: 1 }}>
+                    <span style={{ marginRight: '4px' }}>{getSeverityIcon(bottleneck.severity)}</span>
+                    {bottleneck.componentType}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      padding: '2px 6px',
+                      backgroundColor: getSeverityColor(bottleneck.severity),
+                      color: 'white',
+                      borderRadius: '3px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {bottleneck.severity.toUpperCase()}
+                  </div>
+                </div>
+                <div style={{ fontSize: '10px', color: '#666' }}>
+                  {bottleneck.type.toUpperCase()} • Impact: {bottleneck.impact}%
+                </div>
+                <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic' }}>
+                  {bottleneck.description}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Component Performance List */}
+        {componentMetrics && componentMetrics.size > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase' }}>
+              Component Performance
+            </h4>
+
+            {Array.from(componentMetrics.values()).slice(0, 5).map((metric) => (
+              <div
+                key={metric.componentId}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
+                }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333' }}>
+                  {metric.componentId}
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '4px',
+                    fontSize: '10px',
+                    color: '#666'
+                  }}
+                >
+                  <div>RPS: {metric.requestsPerSecond.toFixed(1)}</div>
+                  <div>Lat: {metric.averageLatency.toFixed(0)}ms</div>
+                  <div>Err: {(metric.errorRate * 100).toFixed(2)}%</div>
+                  <div>Queue: {metric.queueDepth}</div>
+                </div>
+              </div>
+            ))}
+
+            {componentMetrics.size > 5 && (
+              <div style={{ fontSize: '10px', color: '#999', textAlign: 'center', padding: '4px' }}>
+                +{componentMetrics.size - 5} more components
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!systemMetrics && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '200px',
+              color: '#999',
+              fontSize: '14px',
+              fontStyle: 'italic'
+            }}
+          >
+            Waiting for simulation to start...
           </div>
         )}
       </div>
+
+      {/* Styles for animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+      `}</style>
     </div>
   );
 };

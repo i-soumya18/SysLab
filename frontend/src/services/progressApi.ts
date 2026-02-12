@@ -1,6 +1,7 @@
-import { EvaluationResult } from './guidanceApi';
+import type { EvaluationResult } from './guidanceApi';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+// Use environment variable for API URL, fallback to relative path or localhost:8080
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export interface Achievement {
   id: string;

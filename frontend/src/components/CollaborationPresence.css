@@ -1,0 +1,209 @@
+/* Collaboration Presence Styles */
+
+.collaboration-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  transition: all 0.1s ease-out;
+}
+
+.collaboration-cursor-label {
+  position: absolute;
+  top: 20px;
+  left: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collaboration-presence {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  z-index: 100;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.collaboration-presence-header {
+  margin-bottom: 8px;
+}
+
+.collaboration-presence-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.collaboration-presence-avatars {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.collaboration-presence-selections {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.collaboration-selection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* Selection highlights for components */
+.component-selected-by-user {
+  position: relative;
+}
+
+.component-selected-by-user::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid;
+  border-radius: 6px;
+  pointer-events: none;
+  animation: selection-pulse 2s infinite;
+}
+
+@keyframes selection-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Connection selection highlights */
+.connection-selected-by-user {
+  stroke-width: 3;
+  stroke-dasharray: 5, 5;
+  animation: connection-dash 1s linear infinite;
+}
+
+@keyframes connection-dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .collaboration-presence {
+    top: 10px;
+    right: 10px;
+    padding: 8px;
+    min-width: 150px;
+  }
+  
+  .collaboration-presence-title {
+    font-size: 11px;
+  }
+  
+  .collaboration-cursor-label {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .collaboration-presence {
+    background: #1f2937;
+    border-color: #374151;
+    color: #f9fafb;
+  }
+  
+  .collaboration-presence-title {
+    color: #9ca3af;
+  }
+  
+  .collaboration-selection-indicator {
+    background: rgba(31, 41, 55, 0.8);
+    color: #f9fafb;
+  }
+  
+  .collaboration-cursor-label {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Accessibility */
+.collaboration-presence:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Animation for presence changes */
+.collaboration-presence-avatars > * {
+  animation: presence-enter 0.2s ease-out;
+}
+
+@keyframes presence-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Tooltip styles */
+[title] {
+  position: relative;
+}
+
+/* Loading state */
+.collaboration-presence-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.collaboration-presence-loading::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

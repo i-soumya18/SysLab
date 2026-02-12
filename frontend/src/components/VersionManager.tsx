@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { WorkspaceVersion, PerformanceComparison } from '../types';
+import type { WorkspaceVersion, PerformanceComparison } from '../types';
 import './VersionManager.css';
 
 interface VersionManagerProps {

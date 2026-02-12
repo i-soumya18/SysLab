@@ -3,15 +3,20 @@
  * These types define the structure of workspaces, components, connections, and simulation configurations
  */
 
-// Legacy Component Types (for backward compatibility)
+// Export subscription types (SRS FR-1.4)
+export * from './subscription';
+
+// Enhanced Component Types implementing SRS FR-3.1
 export type ComponentType = 
-  | 'database' 
-  | 'load-balancer' 
-  | 'web-server' 
-  | 'cache' 
-  | 'message-queue' 
-  | 'cdn' 
-  | 'proxy';
+  | 'load-balancer'  // Load Balancer component per SRS FR-3.1
+  | 'database'       // Database component with ACID properties per SRS FR-3.1
+  | 'cache'          // Cache component with eviction policies per SRS FR-3.1
+  | 'queue'          // Queue component with messaging patterns per SRS FR-3.1 (renamed from message-queue)
+  | 'cdn'            // CDN component with geographic distribution per SRS FR-3.1
+  | 'service'        // Service component with scaling options per SRS FR-3.1 (renamed from web-server)
+  | 'message-queue'  // Legacy support
+  | 'web-server'     // Legacy support
+  | 'proxy';         // Legacy support
 
 // Enhanced System Component Types (10 specific components per SRS)
 export type SystemComponentType = 
@@ -222,7 +227,17 @@ export interface ComponentMetrics {
   queueDepth: number;
 }
 
-// Scenario interface for learning exercises
+// System-wide metrics interface
+export interface SystemMetrics {
+  timestamp: number;
+  activeComponents: number;
+  healthyComponents: number;
+  totalThroughput: number;
+  averageLatency: number;
+  systemErrorRate: number;
+}
+
+// Scenario interface for learning exercises implementing SRS FR-9.1
 export interface Scenario {
   id: string;
   name: string;
@@ -231,6 +246,13 @@ export interface Scenario {
   initialWorkspace: Partial<Workspace>;
   hints: string[];
   evaluationCriteria: string[];
+  // Enhanced properties for SRS FR-9.1
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  prerequisites: string[]; // IDs of scenarios that should be completed first
+  category: string;
+  estimatedTimeMinutes: number;
+  tags: string[];
+  learningOutcomes: string[];
 }
 
 // User progress tracking interface

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Workspace, Scenario } from '../types';
-import { guidanceApi, GuidanceHint, EvaluationResult } from '../services/guidanceApi';
+import type { Workspace, Scenario } from '../types';
+import { guidanceApi, type GuidanceHint, type EvaluationResult } from '../services/guidanceApi';
 import './GuidancePanel.css';
 
 interface GuidancePanelProps {

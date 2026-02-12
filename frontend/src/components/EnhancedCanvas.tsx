@@ -13,7 +13,6 @@ import { ConnectionConfigPanel } from './ConnectionConfigPanel';
 import type { Component, Connection } from '../types';
 import { debounce, throttle, getVisibleComponents, getVisibleConnections, PerformanceMetrics } from '../utils/performance';
 import { ErrorFactory, GlobalErrorHandler } from '../utils/errorHandling';
-import { useLoadingState, LoadingOperations } from '../utils/loadingStates';
 
 interface EnhancedCanvasProps {
   width: number;
@@ -48,7 +47,6 @@ export const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
   const canvasRef = useRef<HTMLDivElement>(null);
   const performanceMetrics = useRef(new PerformanceMetrics());
   const errorHandler = GlobalErrorHandler.getInstance();
-  const renderLoadingState = useLoadingState(LoadingOperations.CANVAS_RENDER);
 
   // Performance optimizations
   const visibleComponents = useMemo(() => {
@@ -270,10 +268,14 @@ export const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
         component={component}
         isSelected={selectedComponent?.id === component.id}
         onSelect={handleComponentSelect}
-        onUpdate={handleComponentUpdate}
-        onDelete={handleComponentDelete}
-        onContextMenu={handleContextMenu}
-        zoom={viewport.zoom}
+        onMove={(_, newPosition) => {
+          const updated = { ...component, position: newPosition };
+          handleComponentUpdate(updated);
+        }}
+        onContextMenu={(comp, position) => handleContextMenu({
+          clientX: position.x,
+          clientY: position.y
+        } as React.MouseEvent, comp)}
       />
     ));
     
@@ -298,7 +300,6 @@ export const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
           targetComponent={targetComponent}
           isSelected={selectedConnection?.id === connection.id}
           onSelect={setSelectedConnection}
-          zoom={viewport.zoom}
         />
       );
     });
@@ -307,8 +308,14 @@ export const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
   return (
     <div
       ref={(node) => {
-        canvasRef.current = node;
-        drop(node);
+        if (node) {
+          Object.defineProperty(canvasRef, 'current', {
+            value: node,
+            writable: true,
+            configurable: true
+          });
+          drop(node);
+        }
       }}
       style={{
         width,
@@ -394,13 +401,37 @@ export const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
       </div>
 
       {/* Context menu */}
-      {contextMenu && (
+      {contextMenu && contextMenu.component && (
         <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
           component={contextMenu.component}
+          position={contextMenu}
           onClose={handleCloseContextMenu}
-          onDelete={contextMenu.component ? () => handleComponentDelete(contextMenu.component!.id) : undefined}
+          onDelete={() => {
+            if (contextMenu.component) {
+              handleComponentDelete(contextMenu.component.id);
+            }
+            handleCloseContextMenu();
+          }}
+          onDuplicate={() => {
+            if (contextMenu.component) {
+              const duplicated = {
+                ...contextMenu.component,
+                id: `${contextMenu.component.type}-${Date.now()}`,
+                position: {
+                  x: contextMenu.component.position.x + 20,
+                  y: contextMenu.component.position.y + 20
+                }
+              };
+              handleComponentAdd(duplicated);
+            }
+            handleCloseContextMenu();
+          }}
+          onConfigure={() => {
+            if (contextMenu.component) {
+              handleComponentSelect(contextMenu.component);
+            }
+            handleCloseContextMenu();
+          }}
         />
       )}
 
@@ -416,8 +447,9 @@ export const EnhancedCanvas: React.FC<EnhancedCanvasProps> = ({
       {selectedConnection && (
         <ConnectionConfigPanel
           connection={selectedConnection}
-          onUpdate={(updatedConnection) => {
-            setConnections(prev => 
+          onUpdate={(config: any) => {
+            const updatedConnection = { ...selectedConnection, configuration: config };
+            setConnections(prev =>
               prev.map(conn => conn.id === updatedConnection.id ? updatedConnection : conn)
             );
             setSelectedConnection(updatedConnection);

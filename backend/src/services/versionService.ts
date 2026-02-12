@@ -29,7 +29,7 @@ export interface CreateVersionRequest {
 }
 
 export interface VersionListOptions {
-  workspaceId: string;
+  workspaceId?: string;
   limit?: number;
   offset?: number;
   includeMetrics?: boolean;
@@ -180,12 +180,14 @@ export class VersionService {
         SELECT id, workspace_id, version_number, name, description, snapshot, created_at, created_by
         ${includeMetrics ? ', performance_metrics' : ''}
         FROM workspace_versions 
-        WHERE workspace_id = $1 
+        ${workspaceId ? 'WHERE workspace_id = $1' : ''}
         ORDER BY version_number DESC 
-        LIMIT $2 OFFSET $3
+        LIMIT ${workspaceId ? '$2' : '$1'} OFFSET ${workspaceId ? '$3' : '$2'}
       `;
 
-      const result = await client.query(query, [workspaceId, limit, offset]);
+      const params = workspaceId ? [workspaceId, limit, offset] : [limit, offset];
+
+      const result = await client.query(query, params);
 
       return result.rows.map(row => ({
         id: row.id,

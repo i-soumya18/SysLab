@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ABTestConfig, WorkspaceVersion, ABTestResults } from '../types';
+import type { ABTestConfig, WorkspaceVersion } from '../types';
 import './ABTestManager.css';
 
 interface ABTestManagerProps {
@@ -438,7 +438,7 @@ export const ABTestManager: React.FC<ABTestManagerProps> = ({
                 </div>
 
                 <div className="variants-summary">
-                  {test.variants.map((variant, index) => (
+                  {test.variants.map((variant) => (
                     <div key={variant.id} className="variant-summary">
                       <span className="variant-name">{variant.name}</span>
                       <span className="variant-traffic">{variant.trafficPercentage}%</span>

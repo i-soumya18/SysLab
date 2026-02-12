@@ -1,0 +1,552 @@
+/**
+ * System Collapse Monitor Component Styles
+ * Visual system collapse detection and recovery monitoring
+ */
+
+.system-collapse-monitor {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.monitor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.monitor-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.monitor-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.time-range-selector {
+  display: flex;
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.time-range-selector button {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.time-range-selector button.active {
+  background: #007bff;
+  color: white;
+}
+
+.time-range-selector button:hover:not(.active) {
+  background: #e9ecef;
+}
+
+/* System Health Overview */
+.system-health-overview {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.health-score {
+  flex-shrink: 0;
+}
+
+.score-circle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.score-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-inner {
+  width: 60px;
+  height: 60px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1;
+}
+
+.score-label {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.health-stats {
+  display: flex;
+  gap: 32px;
+  flex-grow: 1;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Collapse Sections */
+.collapse-section {
+  margin-bottom: 24px;
+}
+
+.collapse-section h4 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-section.active h4 {
+  color: #dc3545;
+}
+
+.collapse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.collapse-item {
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.collapse-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.collapse-item.selected {
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.collapse-item.critical {
+  border-left: 4px solid #dc3545;
+}
+
+.collapse-item.high {
+  border-left: 4px solid #fd7e14;
+}
+
+.collapse-item.medium {
+  border-left: 4px solid #ffc107;
+}
+
+.collapse-item.low {
+  border-left: 4px solid #17a2b8;
+}
+
+.collapse-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.collapse-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-icon {
+  font-size: 16px;
+}
+
+.type-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.collapse-severity {
+  flex-shrink: 0;
+}
+
+.severity-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+.collapse-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.elapsed-time {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.time-label {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.collapse-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #555;
+}
+
+.collapse-details > div {
+  display: flex;
+  gap: 8px;
+}
+
+.collapse-details strong {
+  min-width: 80px;
+  color: #333;
+}
+
+.recovery-progress {
+  color: #28a745;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.propagation-path {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.path-visualization {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.path-component {
+  padding: 2px 6px;
+  background: #e9ecef;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.path-arrow {
+  color: #6c757d;
+  font-weight: bold;
+}
+
+/* Recovery Timeline */
+.recovery-timeline {
+  margin-bottom: 24px;
+}
+
+.recovery-timeline h4 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeline {
+  position: relative;
+  padding-left: 32px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #e0e0e0;
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -24px;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.recovery-icon {
+  font-size: 14px;
+}
+
+.recovery-icon.automatic {
+  color: #28a745;
+}
+
+.recovery-icon.manual {
+  color: #007bff;
+}
+
+.recovery-icon.partial {
+  color: #ffc107;
+}
+
+.timeline-content {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  flex-grow: 1;
+}
+
+.recovery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.recovery-type {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.recovery-time {
+  font-size: 11px;
+  color: #666;
+}
+
+.recovery-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #555;
+}
+
+.recovery-details > div {
+  display: flex;
+  gap: 8px;
+}
+
+.recovery-details strong {
+  min-width: 80px;
+  color: #333;
+}
+
+/* No Issues State */
+.no-issues {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.no-issues-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.no-issues h4 {
+  margin: 0 0 8px 0;
+  color: #28a745;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.no-issues p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Resolved Summary */
+.resolved-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 6px;
+  margin-top: 16px;
+}
+
+.resolved-icon {
+  font-size: 24px;
+}
+
+.resolved-text {
+  font-size: 14px;
+  color: #155724;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .system-collapse-monitor {
+    padding: 16px;
+  }
+  
+  .monitor-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .system-health-overview {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+  
+  .health-stats {
+    gap: 24px;
+  }
+  
+  .collapse-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .path-visualization {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .path-arrow {
+    transform: rotate(90deg);
+  }
+  
+  .timeline {
+    padding-left: 24px;
+  }
+  
+  .timeline-marker {
+    left: -20px;
+    width: 24px;
+    height: 24px;
+  }
+  
+  .recovery-icon {
+    font-size: 12px;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .system-collapse-monitor {
+    border: 2px solid #000;
+  }
+  
+  .collapse-item {
+    border-width: 3px;
+  }
+  
+  .timeline-marker {
+    border-width: 3px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .collapse-item,
+  .time-range-selector button {
+    transition: none;
+  }
+  
+  .collapse-item:hover {
+    transform: none;
+  }
+}

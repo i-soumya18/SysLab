@@ -4,8 +4,8 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Chart, ChartConfiguration, registerables } from 'chart.js';
-import { PerformanceComparison, ComponentComparison } from '../types';
+import { Chart, type ChartConfiguration, registerables } from 'chart.js';
+import type { PerformanceComparison } from '../types';
 import './PerformanceComparisonChart.css';
 
 Chart.register(...registerables);
@@ -108,7 +108,7 @@ export const PerformanceComparisonChart: React.FC<PerformanceComparisonChartProp
           tooltip: {
             callbacks: {
               label: (context) => {
-                const value = context.parsed.y;
+                const value = context.parsed.y ?? 0;
                 const metric = context.label;
                 const direction = value > 0 ? 'increase' : 'decrease';
                 return `${metric}: ${Math.abs(value).toFixed(1)}% ${direction}`;
@@ -230,8 +230,9 @@ export const PerformanceComparisonChart: React.FC<PerformanceComparisonChartProp
             callbacks: {
               label: (context) => {
                 const label = context.label;
-                const value = context.parsed;
-                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                const value = typeof context.parsed === 'number' ? context.parsed : 0;
+                const dataArray = context.dataset.data.map(d => typeof d === 'number' ? d : 0);
+                const total = dataArray.reduce((a, b) => a + b, 0);
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
                 return `${label}: ${value} (${percentage}%)`;
               }

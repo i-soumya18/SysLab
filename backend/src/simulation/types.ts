@@ -24,6 +24,7 @@ export type SimulationEventType =
 export interface SimulationState {
   currentTime: number;
   isRunning: boolean;
+  isPaused: boolean;
   startTime: number;
   endTime: number;
   eventCount: number;

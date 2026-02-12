@@ -1,5 +1,25 @@
 import { Server, Socket } from 'socket.io';
 import { SimulationEngine } from '../simulation/SimulationEngine';
+import { AuthService } from '../services/authService';
+import { CollaborationService } from '../services/collaborationService';
+
+// Lazy-load services to avoid initialization issues
+let authService: AuthService;
+let collaborationService: CollaborationService;
+
+function getAuthService(): AuthService {
+  if (!authService) {
+    authService = new AuthService();
+  }
+  return authService;
+}
+
+function getCollaborationService(): CollaborationService {
+  if (!collaborationService) {
+    collaborationService = new CollaborationService();
+  }
+  return collaborationService;
+}
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -23,21 +43,55 @@ interface CanvasUpdateData {
   data: any;
 }
 
+interface CollaborationData {
+  workspaceId: string;
+  operation: {
+    type: 'component-add' | 'component-update' | 'component-delete' | 'connection-create' | 'connection-delete';
+    data: any;
+  };
+}
+
+interface CursorData {
+  workspaceId: string;
+  position: { x: number; y: number };
+}
+
+interface SelectionData {
+  workspaceId: string;
+  selectedIds: string[];
+}
+
 // Store active simulation engines per workspace
 const activeSimulations = new Map<string, SimulationEngine>();
 
 export function setupWebSocket(io: Server): void {
-  // Middleware for authentication (basic implementation)
-  io.use((socket: AuthenticatedSocket, next) => {
+  // Middleware for authentication
+  io.use(async (socket: AuthenticatedSocket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.headers.authorization;
     
-    // For now, we'll accept any connection but log the authentication attempt
-    // In a real implementation, you would validate the token here
     if (token) {
-      console.log(`Authentication token provided: ${token.substring(0, 10)}...`);
-      // socket.userId = extractUserIdFromToken(token);
+      try {
+        // Extract token if it's in Bearer format
+        const actualToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+        
+        // Verify token using auth service
+        const verification = await getAuthService().verifyToken(actualToken);
+        
+        if (verification.valid && verification.user) {
+          socket.userId = verification.user.id;
+          console.log(`Authenticated WebSocket connection for user: ${verification.user.email}`);
+        } else {
+          console.log('Invalid token provided for WebSocket connection');
+        }
+      } catch (error) {
+        console.log('WebSocket authentication error:', error);
+      }
+    } else {
+      console.log('No authentication token provided for WebSocket connection');
     }
     
+    // Allow connection regardless of authentication status
+    // Individual operations will check authentication as needed
     next();
   });
 
@@ -50,8 +104,8 @@ export function setupWebSocket(io: Server): void {
       timestamp: new Date().toISOString()
     });
 
-    // Join workspace room for real-time updates
-    socket.on('join-workspace', (data: WorkspaceJoinData, callback) => {
+    // Join workspace room for real-time updates and collaboration
+    socket.on('join-workspace', async (data: WorkspaceJoinData, callback) => {
       try {
         const { workspaceId, userId } = data;
         
@@ -63,6 +117,11 @@ export function setupWebSocket(io: Server): void {
         // Leave previous workspace if any
         if (socket.workspaceId) {
           socket.leave(`workspace-${socket.workspaceId}`);
+          
+          // End collaboration session for previous workspace
+          if (socket.userId) {
+            await getCollaborationService().endSession(socket.workspaceId, socket.userId);
+          }
         }
 
         // Join new workspace
@@ -71,6 +130,31 @@ export function setupWebSocket(io: Server): void {
         socket.userId = userId;
 
         console.log(`Client ${socket.id} joined workspace ${workspaceId}`);
+        
+        // Start collaboration session if user is authenticated
+        if (userId) {
+          try {
+            const session = await getCollaborationService().startSession(workspaceId, userId, socket.id);
+            
+            // Send presence info to joining user
+            const presenceInfo = getCollaborationService().getPresenceInfo(workspaceId);
+            socket.emit('collaboration:presence', {
+              participants: presenceInfo,
+              timestamp: new Date().toISOString()
+            });
+
+            // Notify other clients about new participant
+            socket.to(`workspace-${workspaceId}`).emit('collaboration:participant-joined', {
+              userId,
+              socketId: socket.id,
+              color: presenceInfo.find(p => p.userId === userId)?.color,
+              timestamp: new Date().toISOString()
+            });
+          } catch (error) {
+            console.error('Failed to start collaboration session:', error);
+            // Continue without collaboration features
+          }
+        }
         
         // Notify other clients in the workspace
         socket.to(`workspace-${workspaceId}`).emit('user:joined', {
@@ -102,14 +186,25 @@ export function setupWebSocket(io: Server): void {
     });
 
     // Leave workspace room
-    socket.on('leave-workspace', (workspaceId: string, callback) => {
+    socket.on('leave-workspace', async (workspaceId: string, callback) => {
       try {
         socket.leave(`workspace-${workspaceId}`);
+        
+        // End collaboration session
+        if (socket.userId) {
+          await getCollaborationService().endSession(workspaceId, socket.userId);
+        }
         
         // Notify other clients
         socket.to(`workspace-${workspaceId}`).emit('user:left', {
           socketId: socket.id,
           userId: socket.userId,
+          timestamp: new Date().toISOString()
+        });
+
+        socket.to(`workspace-${workspaceId}`).emit('collaboration:participant-left', {
+          userId: socket.userId,
+          socketId: socket.id,
           timestamp: new Date().toISOString()
         });
 
@@ -171,14 +266,20 @@ export function setupWebSocket(io: Server): void {
             break;
 
           case 'pause':
-            // TODO: Implement pause functionality
-            callback?.({ error: 'Pause functionality not yet implemented' });
-            return;
+            if (!simulation || !simulation.getState().isRunning) {
+              callback?.({ error: 'No running simulation to pause' });
+              return;
+            }
+            simulation.pause();
+            break;
 
           case 'resume':
-            // TODO: Implement resume functionality
-            callback?.({ error: 'Resume functionality not yet implemented' });
-            return;
+            if (!simulation || simulation.getState().isRunning) {
+              callback?.({ error: 'No paused simulation to resume' });
+              return;
+            }
+            simulation.resume();
+            break;
         }
 
         // Broadcast simulation control to all clients in workspace
@@ -222,6 +323,110 @@ export function setupWebSocket(io: Server): void {
       }
     });
 
+    // Handle collaborative operations with operational transformation
+    socket.on('collaboration:operation', async (data: CollaborationData, callback) => {
+      try {
+        console.log(`Collaboration operation: ${data.operation.type} in workspace ${data.workspaceId}`);
+        
+        // Validate workspace access
+        if (socket.workspaceId !== data.workspaceId || !socket.userId) {
+          callback?.({ error: 'Not authorized for this workspace or not authenticated' });
+          return;
+        }
+
+        // Apply operation with operational transformation
+        const transformedOperation = await getCollaborationService().applyOperation(data.workspaceId, {
+          sessionId: '', // Will be set by service
+          userId: socket.userId,
+          type: data.operation.type,
+          data: data.operation.data
+        });
+
+        // Broadcast transformed operation to all clients in workspace
+        io.to(`workspace-${data.workspaceId}`).emit('collaboration:operation-applied', {
+          operation: transformedOperation,
+          timestamp: new Date().toISOString()
+        });
+
+        callback?.({ 
+          success: true, 
+          operationId: transformedOperation.id,
+          wasTransformed: transformedOperation.transformedFrom !== undefined
+        });
+      } catch (error) {
+        console.error('Error handling collaboration operation:', error);
+        callback?.({ error: 'Failed to process collaboration operation' });
+      }
+    });
+
+    // Handle cursor movement
+    socket.on('collaboration:cursor', async (data: CursorData, callback) => {
+      try {
+        // Validate workspace access
+        if (socket.workspaceId !== data.workspaceId || !socket.userId) {
+          callback?.({ error: 'Not authorized for this workspace or not authenticated' });
+          return;
+        }
+
+        // Update cursor position
+        await getCollaborationService().updateCursor(data.workspaceId, socket.userId, data.position);
+
+        // Broadcast cursor update to other clients (not to sender)
+        socket.to(`workspace-${data.workspaceId}`).emit('collaboration:cursor-updated', {
+          userId: socket.userId,
+          position: data.position,
+          timestamp: new Date().toISOString()
+        });
+
+        callback?.({ success: true });
+      } catch (error) {
+        console.error('Error handling cursor update:', error);
+        callback?.({ error: 'Failed to update cursor' });
+      }
+    });
+
+    // Handle selection changes
+    socket.on('collaboration:selection', async (data: SelectionData, callback) => {
+      try {
+        // Validate workspace access
+        if (socket.workspaceId !== data.workspaceId || !socket.userId) {
+          callback?.({ error: 'Not authorized for this workspace or not authenticated' });
+          return;
+        }
+
+        // Update selection
+        await getCollaborationService().updateSelection(data.workspaceId, socket.userId, data.selectedIds);
+
+        // Broadcast selection update to other clients (not to sender)
+        socket.to(`workspace-${data.workspaceId}`).emit('collaboration:selection-updated', {
+          userId: socket.userId,
+          selectedIds: data.selectedIds,
+          timestamp: new Date().toISOString()
+        });
+
+        callback?.({ success: true });
+      } catch (error) {
+        console.error('Error handling selection update:', error);
+        callback?.({ error: 'Failed to update selection' });
+      }
+    });
+
+    // Handle presence requests
+    socket.on('collaboration:get-presence', (workspaceId: string, callback) => {
+      try {
+        if (socket.workspaceId !== workspaceId) {
+          callback?.({ error: 'Not authorized for this workspace' });
+          return;
+        }
+
+        const presenceInfo = getCollaborationService().getPresenceInfo(workspaceId);
+        callback?.({ success: true, participants: presenceInfo });
+      } catch (error) {
+        console.error('Error getting presence info:', error);
+        callback?.({ error: 'Failed to get presence info' });
+      }
+    });
+
     // Handle ping for connection health check
     socket.on('ping', (callback) => {
       callback?.({ 
@@ -232,8 +437,25 @@ export function setupWebSocket(io: Server): void {
     });
 
     // Handle disconnect
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
       console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
+      
+      // End collaboration session if user was in a workspace
+      if (socket.workspaceId && socket.userId) {
+        try {
+          await getCollaborationService().endSession(socket.workspaceId, socket.userId);
+          
+          // Notify workspace members
+          socket.to(`workspace-${socket.workspaceId}`).emit('collaboration:participant-left', {
+            userId: socket.userId,
+            socketId: socket.id,
+            reason,
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error('Error ending collaboration session on disconnect:', error);
+        }
+      }
       
       // Notify workspace members if user was in a workspace
       if (socket.workspaceId) {
