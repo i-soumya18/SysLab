@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useFirebaseAuthContext } from './hooks/useFirebaseAuth';
 import { AuthGate } from './components/AuthGate';
 import { LandingPage } from './pages/marketing/LandingPage';
@@ -11,6 +11,7 @@ import { GettingStartedPage } from './pages/GettingStartedPage';
 import { ProfilePage } from './pages/user/ProfilePage';
 import { SettingsPage } from './pages/user/SettingsPage';
 import { SubscriptionPage } from './pages/user/SubscriptionPage';
+import { AppShell } from './components/AppShell';
 import './App.css';
 
 // Protected route wrapper
@@ -59,18 +60,102 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public marketing pages */}
-      <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
-      <Route path="/pricing" element={<PricingPage />} />
-      <Route path="/about" element={<AboutPage />} />
-      <Route path="/components" element={<ComponentLibraryPage />} />
+      <Route
+        path="/"
+        element={(
+          <PublicRoute>
+            <AppShell variant="marketing">
+              <LandingPage />
+            </AppShell>
+          </PublicRoute>
+        )}
+      />
+      <Route
+        path="/pricing"
+        element={(
+          <AppShell>
+            <PricingPage />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/about"
+        element={(
+          <AppShell>
+            <AboutPage />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/components"
+        element={(
+          <AppShell>
+            <ComponentLibraryPage />
+          </AppShell>
+        )}
+      />
 
       {/* Protected user pages */}
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/workspace/:id?" element={<ProtectedRoute><Workspace /></ProtectedRoute>} />
-      <Route path="/getting-started" element={<ProtectedRoute><GettingStartedPage /></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-      <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-      <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
+      <Route
+        path="/dashboard"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <Dashboard />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/workspace/:id?"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <Workspace />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/getting-started"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <GettingStartedPage />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/profile"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <ProfilePage />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/settings"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <SettingsPage />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/subscription"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <SubscriptionPage />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
 
       {/* 404 fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Canvas } from './Canvas';
 import CollaborationPresence from './CollaborationPresence';
 import { ComponentPalette } from './ComponentPalette';
@@ -38,6 +38,7 @@ const DndProviderFixed = DndProvider as any;
 export const Workspace: React.FC = () => {
   const { id: routeWorkspaceId } = useParams<{ id?: string }>();
   const { user } = useFirebaseAuthContext();
+  const navigate = useNavigate();
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('demo-workspace-id');
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [componentCount, setComponentCount] = useState<number>(0);
@@ -72,6 +73,18 @@ export const Workspace: React.FC = () => {
   const [showMetricsPanel, setShowMetricsPanel] = useState<boolean>(false);
   const [showCostPanel, setShowCostPanel] = useState<boolean>(false);
   const [showScalabilityPanel, setShowScalabilityPanel] = useState<boolean>(false);
+
+  // Layout sizing state
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(256);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(320);
+  const [insightsHeight, setInsightsHeight] = useState<number>(240);
+
+  const minLeftSidebarWidth = 200;
+  const maxLeftSidebarWidth = 400;
+  const minRightSidebarWidth = 260;
+  const maxRightSidebarWidth = 420;
+  const minInsightsHeight = 160;
+  const maxInsightsHeight = 400;
 
   const { collaborationState } = useCollaboration({
     workspaceId: currentWorkspaceId,
@@ -511,11 +524,79 @@ export const Workspace: React.FC = () => {
     }
   };
 
+  const handleHorizontalDrag = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    side: 'left' | 'right'
+  ): void => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startLeftWidth = leftSidebarWidth;
+    const startRightWidth = rightSidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent): void => {
+      const deltaX = moveEvent.clientX - startX;
+
+      if (side === 'left') {
+        const nextWidth = Math.min(
+          Math.max(startLeftWidth + deltaX, minLeftSidebarWidth),
+          maxLeftSidebarWidth
+        );
+        setLeftSidebarWidth(nextWidth);
+      } else {
+        const nextWidth = Math.min(
+          Math.max(startRightWidth - deltaX, minRightSidebarWidth),
+          maxRightSidebarWidth
+        );
+        setRightSidebarWidth(nextWidth);
+      }
+    };
+
+    const handleMouseUp = (): void => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleVerticalDrag = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>
+  ): void => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startY = event.clientY;
+    const startHeight = insightsHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent): void => {
+      const deltaY = moveEvent.clientY - startY;
+      const nextHeight = Math.min(
+        Math.max(startHeight - deltaY, minInsightsHeight),
+        maxInsightsHeight
+      );
+      setInsightsHeight(nextHeight);
+    };
+
+    const handleMouseUp = (): void => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   return (
     <DndProviderFixed backend={HTML5Backend}>
       <div className="flex h-screen bg-gray-50">
         {/* Left Sidebar - Component Palette */}
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <aside
+          className="bg-white border-r border-gray-200 flex flex-col"
+          style={{ width: leftSidebarWidth }}
+        >
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-800">Components</h2>
             <p className="text-xs text-gray-500 mt-1">Drag to canvas</p>
@@ -525,90 +606,135 @@ export const Workspace: React.FC = () => {
           </div>
         </aside>
 
+        {/* Left resize handle */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize component palette"
+          className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300"
+          onMouseDown={(event) => handleHorizontalDrag(event, 'left')}
+        />
+
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top Toolbar */}
           <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-gray-800">System Design Simulator</h1>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="px-2 py-1 bg-gray-100 rounded">
-                  {componentCount} components
-                </span>
-                {isWebSocketConnected ? (
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Connected
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard')}
+                  className="font-medium text-gray-600 hover:text-blue-600"
+                >
+                  Dashboard
+                </button>
+                <span>/</span>
+                <span className="font-medium text-gray-700">Workspace</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-bold text-gray-800">System Design Workspace</h1>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="px-2 py-1 bg-gray-100 rounded">
+                    {componentCount} components
                   </span>
-                ) : (
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded flex items-center gap-1">
-                    <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
-                    Connecting...
-                  </span>
-                )}
+                  {isWebSocketConnected ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded flex items-center gap-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full" />
+                      Connected
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded flex items-center gap-1">
+                      <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                      Connecting...
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-md transition-colors"
-              >
-                Import
-              </button>
-              <button
-                onClick={handleExportWorkspace}
-                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-md transition-colors"
-              >
-                Export
-              </button>
-              <button
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
-              >
-                Save
-              </button>
+            <div className="flex items-center gap-4">
+              {/* Workspace actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-md transition-colors"
+                  type="button"
+                >
+                  Import
+                </button>
+                <button
+                  onClick={handleExportWorkspace}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-md transition-colors"
+                  type="button"
+                >
+                  Export
+                </button>
+                <button
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+                  type="button"
+                >
+                  Save
+                </button>
+              </div>
+
+              <div className="h-6 w-px bg-gray-200" />
 
               {/* Panels Menu */}
               <div className="relative group">
-                <button className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-md transition-colors">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-md transition-colors"
+                >
                   📊 Panels
                 </button>
                 <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="p-2 space-y-1">
+                  <div className="p-2 space-y-1 text-sm">
+                    <p className="px-3 py-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Dashboards
+                    </p>
                     <button
                       onClick={() => setShowMetricsPanel(!showMetricsPanel)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showMetricsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showMetricsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
                     >
                       {showMetricsPanel ? '✓' : '○'} Metrics Dashboard
                     </button>
                     <button
                       onClick={() => setShowCostPanel(!showCostPanel)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showCostPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showCostPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
                     >
                       {showCostPanel ? '✓' : '○'} Cost Dashboard
                     </button>
                     <button
                       onClick={() => setShowScalabilityPanel(!showScalabilityPanel)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showScalabilityPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showScalabilityPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
                     >
                       {showScalabilityPanel ? '✓' : '○'} Scalability
                     </button>
-                    <div className="border-t border-gray-200 my-1"></div>
+                    <div className="border-t border-gray-200 my-1" />
+                    <p className="px-3 py-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Learning tools
+                    </p>
                     <button
                       onClick={() => setShowHintsPanel(!showHintsPanel)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showHintsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showHintsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
                     >
                       {showHintsPanel ? '✓' : '○'} Hints
                     </button>
                     <button
                       onClick={() => setShowConstraintsPanel(!showConstraintsPanel)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showConstraintsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showConstraintsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
                     >
                       {showConstraintsPanel ? '✓' : '○'} Constraints
                     </button>
                     <button
                       onClick={() => setShowFailurePanel(!showFailurePanel)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showFailurePanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showFailurePanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
                     >
                       {showFailurePanel ? '✓' : '○'} Failure Injection
                     </button>
@@ -616,45 +742,56 @@ export const Workspace: React.FC = () => {
                 </div>
               </div>
 
-              <button
-                onClick={isSimulationRunning ? handleStopSimulation : handleStartSimulation}
-                disabled={workspaceComponents.length === 0 || !isWebSocketConnected}
-                className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${
-                  isSimulationRunning
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : workspaceComponents.length === 0 || !isWebSocketConnected
+              <div className="h-6 w-px bg-gray-200" />
+
+              {/* Simulation controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={isSimulationRunning ? handleStopSimulation : handleStartSimulation}
+                  disabled={workspaceComponents.length === 0 || !isWebSocketConnected}
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${
+                    isSimulationRunning
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : workspaceComponents.length === 0 || !isWebSocketConnected
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                  title={
+                    !isWebSocketConnected
+                      ? 'Waiting for real-time connection'
+                      : workspaceComponents.length === 0
+                        ? 'Add components to the canvas first'
+                        : (isSimulationRunning ? 'Stop simulation' : 'Run simulation')
+                  }
+                  type="button"
+                >
+                  {isSimulationRunning ? '⏹ Stop' : '▶ Run'}
+                </button>
+                <button
+                  onClick={
+                    isSimulationRunning
+                      ? () => wsPauseSimulation().catch(console.error)
+                      : () => wsResumeSimulation().catch(console.error)
+                  }
+                  disabled={!isWebSocketConnected || workspaceComponents.length === 0}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    !isWebSocketConnected || workspaceComponents.length === 0
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-                title={
-                  !isWebSocketConnected
-                    ? 'Waiting for real-time connection'
-                    : workspaceComponents.length === 0
-                      ? 'Add components to the canvas first'
-                      : (isSimulationRunning ? 'Stop simulation' : 'Run simulation')
-                }
-              >
-                {isSimulationRunning ? '⏹ Stop' : '▶ Run'}
-              </button>
-              <button
-                onClick={isSimulationRunning ? () => wsPauseSimulation().catch(console.error) : () => wsResumeSimulation().catch(console.error)}
-                disabled={!isWebSocketConnected || workspaceComponents.length === 0}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  !isWebSocketConnected || workspaceComponents.length === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
-                title={isSimulationRunning ? 'Pause simulation' : 'Resume simulation'}
-              >
-                {isSimulationRunning ? '⏸' : '⏯'}
-              </button>
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                  title={isSimulationRunning ? 'Pause simulation' : 'Resume simulation'}
+                  type="button"
+                >
+                  {isSimulationRunning ? '⏸' : '⏯'}
+                </button>
+              </div>
             </div>
           </header>
 
           {/* Main Workspace Area */}
-          <div className="flex-1 flex gap-4 p-4 min-h-0">
+          <div className="flex-1 flex gap-0 p-4 min-h-0">
             {/* Canvas Section */}
-            <div className="flex-1 flex flex-col gap-4 min-w-0">
+            <div className="flex-1 flex flex-col gap-4 min-w-0 pr-4">
               {/* Canvas Container */}
               <div className="flex-1 bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-center overflow-hidden">
                 <Canvas
@@ -679,8 +816,20 @@ export const Workspace: React.FC = () => {
                 />
               </div>
 
+              {/* Horizontal resize handle between canvas/status and insights */}
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Resize insights panel"
+                className="h-1 w-full cursor-row-resize bg-transparent hover:bg-blue-200 active:bg-blue-300 rounded"
+                onMouseDown={handleVerticalDrag}
+              />
+
               {/* Insights Panel with Tabs */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div
+                className="bg-white rounded-lg border border-gray-200 p-4"
+                style={{ height: insightsHeight }}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex gap-2">
                     <button
@@ -717,7 +866,7 @@ export const Workspace: React.FC = () => {
                   <p className="text-xs text-gray-500">Track progress and monitor stability</p>
                 </div>
 
-                <div className="max-h-64 overflow-y-auto">
+                <div className="h-full overflow-y-auto">
                   {activeInsightsTab === 'scenarios' && (
                     <ScenarioLibrary
                       userId={currentUserId}
@@ -762,8 +911,20 @@ export const Workspace: React.FC = () => {
               </div>
             </div>
 
+            {/* Right resize handle */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize details panel"
+              className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300"
+              onMouseDown={(event) => handleHorizontalDrag(event, 'right')}
+            />
+
             {/* Right Sidebar - Properties & Controls */}
-            <aside className="w-80 flex flex-col gap-4">
+            <aside
+              className="flex flex-col gap-4"
+              style={{ width: rightSidebarWidth }}
+            >
               {/* Component Properties */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <h3 className="text-base font-semibold text-gray-800 mb-3">Properties</h3>
@@ -841,12 +1002,178 @@ export const Workspace: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Metrics Dashboard (docked) */}
+              {showMetricsPanel && isSimulationRunning && (
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Metrics Dashboard</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowMetricsPanel(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <MetricsDashboard
+                    isVisible={true}
+                    systemMetrics={systemMetrics}
+                    componentMetrics={componentMetrics}
+                    bottlenecks={Array.from(bottlenecksMap.values())}
+                    simulationStatus={isSimulationRunning ? 'running' : 'idle'}
+                    elapsedTime={elapsedTime}
+                  />
+                </div>
+              )}
+
+              {/* Cost Dashboard (docked) */}
+              {showCostPanel && (
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Cost Dashboard</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowCostPanel(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <CostDashboard
+                    components={workspaceComponents}
+                    userCount={currentScale}
+                  />
+                </div>
+              )}
+
+              {/* Scalability Dashboard (docked) */}
+              {showScalabilityPanel && (
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Scalability Dashboard</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowScalabilityPanel(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <ScalabilityDashboard apiBaseUrl={API_BASE_URL} />
+                </div>
+              )}
+
+              {/* Learning Panels (docked) */}
+              {showHintsPanel && isSimulationRunning && (
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Hints</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowHintsPanel(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="max-h-56 overflow-auto">
+                    <HintsPanel
+                      context={{
+                        userId: currentUserId,
+                        scenarioId: 'demo-scenario',
+                        currentTime: elapsedTime,
+                        userPerformance: {
+                          latency: systemMetrics?.averageLatency || 0,
+                          throughput: systemMetrics?.totalThroughput || 0,
+                          errorRate: systemMetrics?.systemErrorRate || 0
+                        },
+                        recentActions: [],
+                        componentsAdded: workspaceComponents.map(c => c.type),
+                        connectionsCreated: workspaceConnections.length,
+                        errorsEncountered: [],
+                        timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
+                      }}
+                      currentDifficulty="beginner"
+                      isActive={true}
+                      onHintInteraction={(hintId, action) => {
+                        console.log('Hint interaction:', hintId, action);
+                      }}
+                      onExplanationRequested={(concept) => {
+                        console.log('Explanation requested:', concept);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {showConstraintsPanel && isSimulationRunning && (
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Progressive Constraints</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowConstraintsPanel(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <ProgressiveConstraintsPanel
+                    scenarioId="demo-scenario"
+                    sessionId={constraintSessionId}
+                    userId={currentUserId}
+                    currentTime={elapsedTime}
+                    isActive={true}
+                    onConstraintActivated={(constraint) => {
+                      console.log('Constraint activated:', constraint);
+                    }}
+                    onPerformanceUpdate={(metrics) => {
+                      console.log('Performance updated:', metrics);
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Failure Injection Panel (docked) */}
+              {showFailurePanel && (
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Failure Injection</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowFailurePanel(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <FailureInjectionPanel
+                    isVisible={true}
+                    components={workspaceComponents.map(c => ({
+                      id: c.id,
+                      name: c.metadata.name,
+                      type: c.type
+                    }))}
+                    activeFailures={activeFailures}
+                    onInjectFailure={handleInjectFailure}
+                    onRemoveFailure={handleRemoveFailure}
+                    simulationRunning={isSimulationRunning}
+                  />
+                </div>
+              )}
             </aside>
           </div>
         </div>
       </div>
 
-      {/* Modals and Overlays */}
+      {/* Modals and collaboration */}
       <WorkspaceImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
@@ -858,177 +1185,6 @@ export const Workspace: React.FC = () => {
         participants={collaborationState.participants}
         currentUserId={currentUserId}
       />
-
-      {/* Metrics Dashboard - Positioned top-left during simulation */}
-      {showMetricsPanel && isSimulationRunning && (
-        <div className="fixed top-20 left-72 z-40 max-w-md animate-in fade-in slide-in-from-left duration-300">
-          <div className="bg-white rounded-lg shadow-xl border border-gray-300">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800">Metrics Dashboard</h3>
-              <button
-                onClick={() => setShowMetricsPanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <MetricsDashboard
-              isVisible={true}
-              systemMetrics={systemMetrics}
-              componentMetrics={componentMetrics}
-              bottlenecks={Array.from(bottlenecksMap.values())}
-              simulationStatus={isSimulationRunning ? 'running' : 'idle'}
-              elapsedTime={elapsedTime}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Additional Dashboards - Positioned on the right */}
-      <div className="fixed top-20 right-4 z-30 w-80 flex flex-col gap-3">
-        {/* Cost Dashboard */}
-        {showCostPanel && (
-          <div className="bg-white rounded-lg shadow-xl border border-gray-300 animate-in fade-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800">Cost Dashboard</h3>
-              <button
-                onClick={() => setShowCostPanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <CostDashboard
-              components={workspaceComponents}
-              userCount={currentScale}
-            />
-          </div>
-        )}
-
-        {/* Scalability Dashboard */}
-        {showScalabilityPanel && (
-          <div className="bg-white rounded-lg shadow-xl border border-gray-300 animate-in fade-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800">Scalability Dashboard</h3>
-              <button
-                onClick={() => setShowScalabilityPanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <ScalabilityDashboard apiBaseUrl={API_BASE_URL} />
-          </div>
-        )}
-      </div>
-
-      {/* Learning Panels - Bottom right, stacked */}
-      <div className="fixed bottom-4 right-4 z-40 w-96 flex flex-col gap-3">
-        {/* Hints Panel */}
-        {showHintsPanel && isSimulationRunning && (
-          <div className="bg-white rounded-lg shadow-xl border border-gray-300 max-h-64 overflow-hidden animate-in fade-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800">Hints</h3>
-              <button
-                onClick={() => setShowHintsPanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="overflow-auto max-h-56">
-              <HintsPanel
-                context={{
-                  userId: currentUserId,
-                  scenarioId: 'demo-scenario',
-                  currentTime: elapsedTime,
-                  userPerformance: {
-                    latency: systemMetrics?.averageLatency || 0,
-                    throughput: systemMetrics?.totalThroughput || 0,
-                    errorRate: systemMetrics?.systemErrorRate || 0
-                  },
-                  recentActions: [],
-                  componentsAdded: workspaceComponents.map(c => c.type),
-                  connectionsCreated: workspaceConnections.length,
-                  errorsEncountered: [],
-                  timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
-                }}
-                currentDifficulty="beginner"
-                isActive={true}
-                onHintInteraction={(hintId, action) => {
-                  console.log('Hint interaction:', hintId, action);
-                }}
-                onExplanationRequested={(concept) => {
-                  console.log('Explanation requested:', concept);
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Progressive Constraints Panel */}
-        {showConstraintsPanel && isSimulationRunning && (
-          <div className="bg-white rounded-lg shadow-xl border border-gray-300 animate-in fade-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800">Progressive Constraints</h3>
-              <button
-                onClick={() => setShowConstraintsPanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <ProgressiveConstraintsPanel
-              scenarioId="demo-scenario"
-              sessionId={constraintSessionId}
-              userId={currentUserId}
-              currentTime={elapsedTime}
-              isActive={true}
-              onConstraintActivated={(constraint) => {
-                console.log('Constraint activated:', constraint);
-              }}
-              onPerformanceUpdate={(metrics) => {
-                console.log('Performance updated:', metrics);
-              }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Failure Injection Panel - Bottom left */}
-      {showFailurePanel && (
-        <div className="fixed bottom-4 left-72 z-40 w-96 animate-in fade-in slide-in-from-left duration-300">
-          <div className="bg-white rounded-lg shadow-xl border border-gray-300">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800">Failure Injection</h3>
-              <button
-                onClick={() => setShowFailurePanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <FailureInjectionPanel
-              isVisible={true}
-              components={workspaceComponents.map(c => ({
-                id: c.id,
-                name: c.metadata.name,
-                type: c.type
-              }))}
-              activeFailures={activeFailures}
-              onInjectFailure={handleInjectFailure}
-              onRemoveFailure={handleRemoveFailure}
-              simulationRunning={isSimulationRunning}
-            />
-          </div>
-        </div>
-      )}
     </DndProviderFixed>
   );
 };

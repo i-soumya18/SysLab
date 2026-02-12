@@ -78,30 +78,9 @@ export function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Navigation */}
-      <nav className="border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <button onClick={() => navigate('/')} className="text-2xl font-bold text-blue-600">
-              System Design Simulator
-            </button>
-            <div className="flex items-center space-x-4">
-              <a href="/components" className="text-sm text-gray-600 hover:text-gray-900">Components</a>
-              <a href="/about" className="text-sm text-gray-600 hover:text-gray-900">About</a>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                {user ? 'Dashboard' : 'Get Started'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <div className="bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Hero */}
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 text-center">
+      <div className="mx-auto max-w-7xl px-4 py-16 text-center sm:px-6 lg:px-8">
         <h1 className="text-5xl font-extrabold text-gray-900">
           Simple, Transparent Pricing
         </h1>

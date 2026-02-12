@@ -4,14 +4,62 @@ interface ScalabilityDashboardProps {
   apiBaseUrl: string;
 }
 
-interface ScalabilityDashboardData {
-  systemCapacity: any;
-  userMetrics: any;
-  loadBalancerStats: any;
-  healthStatus: any;
-  recentScalingEvents: any[];
-  recentCapacityAlerts: any[];
+interface SystemCapacity {
+  maxConcurrentUsers?: number;
+  totalNodes?: number;
 }
+
+interface UserMetrics {
+  currentConcurrentUsers?: number;
+}
+
+interface LoadBalancerStats {
+  strategy?: string;
+  averageLatencyMs?: number;
+}
+
+interface HealthStatus {
+  overallStatus?: string;
+  healthyNodes?: number;
+}
+
+interface ScalingEvent {
+  id?: string;
+  type?: unknown;
+  reason?: unknown;
+  deltaCapacity?: unknown;
+}
+
+interface CapacityAlert {
+  id?: string;
+  severity?: unknown;
+  message?: unknown;
+}
+
+interface ScalabilityDashboardData {
+  systemCapacity?: SystemCapacity;
+  userMetrics?: UserMetrics;
+  loadBalancerStats?: LoadBalancerStats;
+  healthStatus?: HealthStatus;
+  recentScalingEvents: ScalingEvent[];
+  recentCapacityAlerts: CapacityAlert[];
+}
+
+const formatValue = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return '–';
+  }
+
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[object]';
+    }
+  }
+
+  return String(value);
+};
 
 export const ScalabilityDashboard: React.FC<ScalabilityDashboardProps> = ({ apiBaseUrl }) => {
   const [data, setData] = useState<ScalabilityDashboardData | null>(null);
@@ -68,17 +116,17 @@ export const ScalabilityDashboard: React.FC<ScalabilityDashboardProps> = ({ apiB
   const { systemCapacity, userMetrics, loadBalancerStats, healthStatus, recentScalingEvents, recentCapacityAlerts } = data;
 
   return (
-    <div
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '8px',
-        border: '1px solid #e0e0e0',
-        padding: '10px 12px',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '12px',
-        color: '#343a40'
-      }}
-    >
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0',
+          padding: '10px 12px',
+          fontFamily: 'Arial, sans-serif',
+          fontSize: '12px',
+          color: '#343a40'
+        }}
+      >
       <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span>📈</span>
@@ -162,7 +210,8 @@ export const ScalabilityDashboard: React.FC<ScalabilityDashboardProps> = ({ apiB
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '72px', overflowY: 'auto' }}>
             {recentScalingEvents.slice(0, 4).map((event, index) => (
               <li key={`${event.id ?? index}`} style={{ fontSize: '11px', color: '#495057', marginBottom: '2px' }}>
-                <strong>{event.type}</strong> → {event.reason ?? 'auto-scale'} ({event.deltaCapacity ?? 0})
+                <strong>{formatValue(event.type ?? 'scale')}</strong>{' '}
+                → {formatValue(event.reason ?? 'auto-scale')} ({formatValue(event.deltaCapacity ?? 0)})
               </li>
             ))}
           </ul>
@@ -175,7 +224,8 @@ export const ScalabilityDashboard: React.FC<ScalabilityDashboardProps> = ({ apiB
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '60px', overflowY: 'auto' }}>
             {recentCapacityAlerts.slice(0, 3).map((alert, index) => (
               <li key={`${alert.id ?? index}`} style={{ fontSize: '11px', color: '#c92a2a', marginBottom: '2px' }}>
-                <strong>{alert.severity ?? 'warning'}</strong>: {alert.message ?? 'Capacity threshold reached'}
+                <strong>{formatValue(alert.severity ?? 'warning')}</strong>:{' '}
+                {formatValue(alert.message ?? 'Capacity threshold reached')}
               </li>
             ))}
           </ul>

@@ -4,25 +4,7 @@ export function AboutPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white">
-      <nav className="border-b border-gray-200 shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <button onClick={() => navigate('/')} className="text-2xl font-bold text-blue-600">
-              System Design Simulator
-            </button>
-            <div>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Get Started
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <div className="bg-white">
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-extrabold text-gray-900">About System Design Simulator</h1>
         

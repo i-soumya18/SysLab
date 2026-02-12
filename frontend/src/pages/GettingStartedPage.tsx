@@ -10,28 +10,7 @@ export function GettingStartedPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <nav className="border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="text-2xl font-bold text-blue-600"
-            >
-              System Design Simulator
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Back to Dashboard
-            </button>
-          </div>
-        </div>
-      </nav>
-
+    <div className="bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:flex-row lg:px-8">
         <aside className="w-full rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:w-72">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">

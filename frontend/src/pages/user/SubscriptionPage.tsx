@@ -172,39 +172,7 @@ export function SubscriptionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Navigation Header */}
-      <nav className="border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <button onClick={() => navigate('/dashboard')} className="text-2xl font-bold text-blue-600">
-              System Design Simulator
-            </button>
-
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => navigate('/profile')}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Profile
-              </button>
-              <button
-                onClick={() => navigate('/settings')}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Settings
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <div className="bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8">

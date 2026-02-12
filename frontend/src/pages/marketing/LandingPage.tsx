@@ -16,37 +16,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Navigation */}
-      <nav className="border-b border-white/10 bg-white/5 backdrop-blur-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <span className="text-2xl font-bold text-white">
-                System Design Simulator
-              </span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <a href="/components" className="text-sm text-white/80 hover:text-white">
-                Components
-              </a>
-              <a href="/pricing" className="text-sm text-white/80 hover:text-white">
-                Pricing
-              </a>
-              <a href="/about" className="text-sm text-white/80 hover:text-white">
-                About
-              </a>
-              <button
-                onClick={user ? () => navigate('/getting-started') : handleGetStarted}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                {user ? 'Getting Started' : 'Get Started'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <>
       {/* Hero Section */}
       <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
         <div className="text-center">
@@ -189,22 +159,6 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 bg-white/5 py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="text-white/60">
-              © 2026 System Design Simulator. Built for learning.
-            </div>
-            <div className="flex space-x-6">
-              <a href="/pricing" className="text-white/60 hover:text-white">Pricing</a>
-              <a href="/about" className="text-white/60 hover:text-white">About</a>
-              <a href="/components" className="text-white/60 hover:text-white">Docs</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-    </div>
+    </>
   );
 }

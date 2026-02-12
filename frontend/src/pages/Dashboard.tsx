@@ -191,78 +191,7 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Navigation Header */}
-      <nav className="border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <button onClick={() => navigate('/dashboard')} className="text-2xl font-bold text-blue-600">
-              System Design Simulator
-            </button>
-
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate('/components')}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Components
-              </button>
-              <button
-                onClick={() => navigate('/pricing')}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Pricing
-              </button>
-
-              {/* User Menu */}
-              <div className="relative group">
-                <button className="flex items-center space-x-2 rounded-lg px-3 py-2 hover:bg-gray-100">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-medium text-white">
-                    {getInitials(user?.displayName || user?.email || '')}
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">
-                    {user?.displayName || user?.email?.split('@')[0] || 'User'}
-                  </span>
-                </button>
-
-                {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className="py-1">
-                    <button
-                      onClick={() => navigate('/profile')}
-                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Profile
-                    </button>
-                    <button
-                      onClick={() => navigate('/settings')}
-                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Settings
-                    </button>
-                    <button
-                      onClick={() => navigate('/subscription')}
-                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Subscription
-                    </button>
-                    <hr className="my-1" />
-                    <button
-                      onClick={handleLogout}
-                      className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
@@ -546,7 +475,6 @@ export function Dashboard() {
               </p>
             </div>
           </div>
-        </div>
       </div>
     </div>
   );
