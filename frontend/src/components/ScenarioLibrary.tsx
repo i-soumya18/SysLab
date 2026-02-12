@@ -33,7 +33,7 @@ export const ScenarioLibrary: React.FC<ScenarioLibraryProps> = ({
   const loadScenarios = async () => {
     try {
       setLoading(true);
-      const url = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/scenarios`);
+      const url = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/scenarios`);
       
       if (categoryFilter) url.searchParams.append('category', categoryFilter);
       if (difficultyFilter) url.searchParams.append('difficulty', difficultyFilter);

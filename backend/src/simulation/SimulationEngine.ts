@@ -12,6 +12,8 @@ import { FailureManager, FailureManagerFactory } from './FailureManager';
 import { MetricsCollector, AggregatedMetrics, SystemMetrics } from './MetricsCollector';
 import { MetricsStorage } from './MetricsStorage';
 import { BottleneckReporter, BottleneckAlert } from './BottleneckReporter';
+import { PerformanceOptimizer } from '../performance/PerformanceOptimizer';
+import { PerformanceMonitoringService } from '../performance/PerformanceMonitoringService';
 
 export class SimulationEngine extends EventEmitter {
   private scheduler: PriorityQueueEventScheduler;
@@ -22,6 +24,8 @@ export class SimulationEngine extends EventEmitter {
   private metricsCollector: MetricsCollector;
   private metricsStorage: MetricsStorage;
   private bottleneckReporter: BottleneckReporter;
+  private performanceOptimizer: PerformanceOptimizer;
+  private performanceMonitoring: PerformanceMonitoringService;
 
   constructor() {
     super();
@@ -35,6 +39,17 @@ export class SimulationEngine extends EventEmitter {
     this.metricsCollector = new MetricsCollector();
     this.metricsStorage = new MetricsStorage();
     this.bottleneckReporter = new BottleneckReporter();
+    
+    // Initialize performance optimization (SRS NFR-1)
+    this.performanceOptimizer = new PerformanceOptimizer({
+      targetUpdateTime: 100, // 100ms per SRS NFR-1
+      cacheSize: 1000,
+      enableProfiling: true,
+      optimizationLevel: 'aggressive',
+      batchSize: 50
+    });
+    
+    this.performanceMonitoring = new PerformanceMonitoringService(this.performanceOptimizer);
 
     // Connect metrics collector to storage
     this.metricsCollector.on('metrics_added', (metrics: ComponentMetrics) => {
@@ -95,6 +110,7 @@ export class SimulationEngine extends EventEmitter {
     }
 
     this.state.isRunning = true;
+    this.state.isPaused = false;
     this.state.startTime = Date.now();
     this.state.endTime = this.state.startTime + (this.workspace.configuration.duration * 1000);
 
@@ -103,6 +119,9 @@ export class SimulationEngine extends EventEmitter {
 
     // Start bottleneck monitoring
     this.bottleneckReporter.start();
+    
+    // Start performance monitoring (SRS NFR-1)
+    this.performanceMonitoring.startMonitoring(1000); // Monitor every second
 
     // Schedule initial events
     this.scheduleInitialEvents();
@@ -113,6 +132,63 @@ export class SimulationEngine extends EventEmitter {
     this.emit('started', { 
       workspaceId: this.workspace.id,
       duration: this.workspace.configuration.duration 
+    });
+  }
+
+  /**
+   * Pause the simulation without clearing scheduled events
+   */
+  pause(): void {
+    if (!this.state.isRunning || this.state.isPaused) {
+      return;
+    }
+
+    this.state.isRunning = false;
+    this.state.isPaused = true;
+
+    if (this.intervalId) {
+      clearTimeout(this.intervalId);
+      this.intervalId = null;
+    }
+
+    // Stop background services while paused
+    this.metricsCollector.stop();
+    this.bottleneckReporter.stop();
+    this.performanceMonitoring.stopMonitoring();
+
+    this.emit('paused', {
+      workspaceId: this.workspace?.id,
+      eventCount: this.state.eventCount,
+      currentTime: this.state.currentTime
+    });
+  }
+
+  /**
+   * Resume a previously paused simulation
+   */
+  resume(): void {
+    if (!this.workspace || !this.state.isPaused) {
+      return;
+    }
+
+    if (this.state.isRunning) {
+      return;
+    }
+
+    this.state.isRunning = true;
+    this.state.isPaused = false;
+
+    // Restart background services
+    this.metricsCollector.start();
+    this.bottleneckReporter.start();
+    this.performanceMonitoring.startMonitoring(1000);
+
+    // Continue processing remaining scheduled events
+    this.runSimulationLoop();
+
+    this.emit('resumed', {
+      workspaceId: this.workspace.id,
+      currentTime: this.state.currentTime
     });
   }
 
@@ -132,6 +208,9 @@ export class SimulationEngine extends EventEmitter {
 
     // Stop bottleneck monitoring
     this.bottleneckReporter.stop();
+    
+    // Stop performance monitoring
+    this.performanceMonitoring.stopMonitoring();
 
     this.emit('stopped', { 
       workspaceId: this.workspace?.id,
@@ -231,6 +310,32 @@ export class SimulationEngine extends EventEmitter {
   getOptimizationRecommendations() {
     return this.bottleneckReporter.generateOptimizationRecommendations();
   }
+  
+  /**
+   * Get performance dashboard (SRS NFR-1)
+   */
+  getPerformanceDashboard() {
+    return this.performanceMonitoring.getPerformanceDashboard();
+  }
+  
+  /**
+   * Get optimized metrics with sub-100ms performance (SRS NFR-1)
+   */
+  async getOptimizedMetrics() {
+    const rawMetrics = new Map<string, ComponentMetrics[]>();
+    
+    // Collect raw metrics for all components
+    for (const [componentId] of this.state.components) {
+      const metrics = this.state.metrics.get(componentId) || [];
+      rawMetrics.set(componentId, metrics);
+    }
+    
+    // Use performance optimizer for sub-100ms updates
+    return await this.performanceOptimizer.optimizeSimulationUpdate(
+      this.workspace!,
+      rawMetrics
+    );
+  }
 
   /**
    * Perform bottleneck analysis
@@ -284,6 +389,7 @@ export class SimulationEngine extends EventEmitter {
     return {
       currentTime: 0,
       isRunning: false,
+      isPaused: false,
       startTime: 0,
       endTime: 0,
       eventCount: 0,

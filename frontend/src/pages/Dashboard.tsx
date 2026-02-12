@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../hooks/useFirebaseAuth';
 import { progressApi } from '../services/progressApi';
 import type { ProgressStats } from '../services/progressApi';
+import { WorkspaceApiService } from '../services/workspaceApi';
 
 interface Workspace {
   id: string;
@@ -26,7 +27,10 @@ interface WorkspaceListResponse {
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+// Use a relative default so the frontend can talk to the backend
+// through the same origin (e.g. the Nginx gateway on :8080 in Docker).
+// Use environment variable for API URL, fallback to relative path
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -36,6 +40,7 @@ export function Dashboard() {
   const [progressStats, setProgressStats] = useState<ProgressStats | null>(null);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [isDeletingWorkspaceId, setIsDeletingWorkspaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch user workspaces
@@ -45,22 +50,21 @@ export function Dashboard() {
     const fetchWorkspaces = async () => {
       try {
         setIsLoadingWorkspaces(true);
-        const response = await fetch(
-          `${API_BASE_URL}/workspaces?userId=${encodeURIComponent(user.uid)}&limit=6&sortBy=updatedAt&sortOrder=desc`
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch workspaces');
-        }
-
-        const result: WorkspaceListResponse = await response.json();
+        const result = await WorkspaceApiService.listWorkspaces({
+          userId: user.uid,
+          limit: 6,
+          sortBy: 'updatedAt',
+          sortOrder: 'desc'
+        });
         setWorkspaces(result.data);
-        setError(null); // Clear any previous errors
+        setError(null);
       } catch (err) {
+        // eslint-disable-next-line no-console
         console.error('Error fetching workspaces:', err);
-        // Only show error if it's a real network/server error, not empty results
         if (err instanceof TypeError && err.message === 'Failed to fetch') {
           setError('Unable to connect to server. Please make sure the backend is running.');
+        } else if (err instanceof Error) {
+          setError(err.message || 'Failed to load workspaces. Please try again.');
         } else {
           setError('Failed to load workspaces. Please try again.');
         }
@@ -123,6 +127,42 @@ export function Dashboard() {
     } catch (err) {
       console.error('Error creating workspace:', err);
       setError('Failed to create workspace');
+    }
+  };
+
+  const handleDeleteWorkspace = async (workspaceId: string, workspaceName: string): Promise<void> => {
+    if (!user) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the workspace "${workspaceName}"? This action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsDeletingWorkspaceId(workspaceId);
+      await WorkspaceApiService.deleteWorkspace(workspaceId, user.uid);
+      setWorkspaces(prev => prev.filter(workspace => workspace.id !== workspaceId));
+      if (error) {
+        setError(null);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error deleting workspace:', err);
+      if (err instanceof Error) {
+        setError(
+          err.message ||
+            'Failed to delete workspace. Please try again or refresh the page.'
+        );
+      } else {
+        setError('Failed to delete workspace. Please try again or refresh the page.');
+      }
+    } finally {
+      setIsDeletingWorkspaceId(null);
     }
   };
 
@@ -329,10 +369,7 @@ export function Dashboard() {
           </button>
 
           <button
-            onClick={() => {
-              // TODO: Implement tutorial/getting started flow
-              alert('Getting started tutorial coming soon!');
-            }}
+            onClick={() => navigate('/getting-started')}
             className="flex items-center gap-2 rounded-lg border-2 border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -392,45 +429,61 @@ export function Dashboard() {
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {workspaces.map((workspace) => (
-                <button
+                <div
                   key={workspace.id}
-                  onClick={() => navigate(`/workspace/${workspace.id}`)}
                   className="group rounded-xl border border-gray-200 bg-white p-6 text-left shadow-sm transition-all hover:border-blue-500 hover:shadow-lg"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">
-                        {workspace.name}
-                      </h3>
-                      {workspace.description && (
-                        <p className="mt-2 text-sm text-gray-600 line-clamp-2">
-                          {workspace.description}
-                        </p>
-                      )}
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/workspace/${workspace.id}`)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 pr-2">
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">
+                          {workspace.name}
+                        </h3>
+                        {workspace.description && (
+                          <p className="mt-2 text-sm text-gray-600 line-clamp-2">
+                            {workspace.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                    <div className="flex items-center gap-4">
-                      <span className="flex items-center gap-1">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                        {workspace.components?.length || 0} components
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                        {workspace.connections?.length || 0} connections
-                      </span>
+                    <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                          {workspace.components?.length || 0} components
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                          {workspace.connections?.length || 0} connections
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-4 text-xs text-gray-500">
-                    Updated {new Date(workspace.updatedAt).toLocaleDateString()}
+                    <div className="mt-4 text-xs text-gray-500">
+                      Updated {new Date(workspace.updatedAt).toLocaleDateString()}
+                    </div>
+                  </button>
+
+                  <div className="mt-4 flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWorkspace(workspace.id, workspace.name)}
+                      disabled={isDeletingWorkspaceId === workspace.id}
+                      className="inline-flex items-center rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isDeletingWorkspaceId === workspace.id ? 'Deleting…' : 'Delete'}
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}

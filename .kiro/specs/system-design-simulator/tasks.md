@@ -38,12 +38,14 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 
 - [x] **MVLE-1**: User can drag 4 components onto canvas (Client, LB, Service, DB)
 - [x] **MVLE-2**: User can connect components with visual edges
-- [ ] **MVLE-3**: User can set traffic scale (100 to 1M users)
-- [ ] **MVLE-4**: User clicks "Run" and simulation executes
-- [ ] **MVLE-5**: System visually shows bottleneck (e.g., DB glowing red)
+- [x] **MVLE-3**: User can set traffic scale (100 to 1M users)
+- [x] **MVLE-4**: User clicks "Run" and simulation executes
+- [x] **MVLE-5**: System visually shows bottleneck (e.g., DB glowing red)
 - [ ] **MVLE-6**: Metrics dashboard shows latency spike
 - [ ] **MVLE-7**: User can add cache/replica to fix issue
 - [ ] **MVLE-8**: Re-run simulation shows improvement
+
+
 
 **Target: All MVLE tasks complete = Core learning loop functional**
 
@@ -52,12 +54,14 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 ### Phase 1: SRS FR-1 - User Authentication & Account Management
 
 - [ ] 1. User Authentication System (SRS FR-1)
-  - [ ] 1.1 Create user registration with email and OAuth
+  - [x] 1.1 Create user registration with email and firebase
     - Implement email registration per SRS FR-1.1
-    - Integrate Google and GitHub OAuth providers per SRS FR-1.1
+    - Integrate Google / firebase providers per SRS FR-1.1
     - Create secure account creation with email verification
     - Add user profile management and preferences
     - _Requirements: SRS FR-1.1_
+    implement user Authentication with robust error handling using firebase auth service. use these configurations - 
+
 
   - [ ]* 1.2 Write property test for user authentication
     - **Property 1: User Authentication Round-Trip**
@@ -80,10 +84,10 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - Implement free and paid tier support per SRS FR-1.4
     - Add billing integration and subscription management per SRS FR-1.4
     - Create feature access controls based on subscription tier per SRS FR-1.4
-    - _Requirements: SRS FR-1.4_
+    - _Requirements: SRS FR-1.he core "Oh Sh*t" moment:4_
 
 ### Phase 2: SRS FR-2 - Visual System Design Canvas
-
+he core "Oh Sh*t" moment:
 - [x] 2. Visual Canvas Implementation (SRS FR-2)
   - [x] 2.1 Create drag-and-drop canvas interface
     - Implement drag-and-drop component placement per SRS FR-2.1
@@ -172,6 +176,7 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
   - [x] 4.3 Add queueing and backpressure modeling
     - Implement queueing theory calculations (M/M/1, M/M/c) per SRS FR-4.3
     - Create backpressure propagation through system graph per SRS FR-4.3
+    - Implement realistic load propagation through components per SRS FR-4.2
     - Add queue overflow and capacity handling per SRS FR-4.3
     - _Requirements: SRS FR-4.3_
 
@@ -206,6 +211,7 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - Add live metric streaming via WebSocket per SRS FR-5.2
     - _Requirements: SRS FR-5.2, NFR-1_
 
+    - Implement realistic load propagation through components per SRS FR-4.2
   - [ ]* 5.3 Write property test for scale control
     - **Property 5: Scale Control Accuracy**
     - **Validates: SRS FR-5.1, FR-5.2**
@@ -221,23 +227,16 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - Add cascade failure modeling per SRS FR-5.4
     - Implement system recovery monitoring per SRS FR-5.4
     - _Requirements: SRS FR-5.4_
-
-### Phase 6: SRS FR-6 - Failure & Constraint Injection
-
-- [ ] 6. Failure Injection System (SRS FR-6)
-  - [ ] 6.1 Create component failure injection
-    - Implement component disable functionality per SRS FR-6.1
-    - Add partial failure and degraded mode simulation per SRS FR-6.1
-    - Create failure impact propagation per SRS FR-6.1
+    - _Requirements: SRS FR-5.4_
     - _Requirements: SRS FR-6.1_
 
-  - [ ] 6.2 Implement latency injection
+  - [x] 6.2 Implement latency injection
     - Create configurable network latency injection per SRS FR-6.2
     - Add latency spike simulation per SRS FR-6.2
     - Implement jitter and packet loss modeling per SRS FR-6.2
     - _Requirements: SRS FR-6.2_
 
-  - [ ] 6.3 Add network partition simulation
+  - [x] 6.3 Add network partition simulation
     - Implement network partition scenarios per SRS FR-6.3
     - Create split-brain condition modeling per SRS FR-6.3
     - Add partition recovery simulation per SRS FR-6.3
@@ -247,13 +246,13 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - **Property 6: Failure Injection and Recovery**
     - **Validates: SRS FR-6.1, FR-6.2, FR-6.3**
 
-  - [ ] 6.5 Implement regional outage simulation
+  - [x] 6.5 Implement regional outage simulation
     - Create multi-component regional failure per SRS FR-6.4
     - Add geographic failure pattern modeling per SRS FR-6.4
     - Implement disaster recovery scenarios per SRS FR-6.4
     - _Requirements: SRS FR-6.4_
 
-  - [ ] 6.6 Add recovery behavior monitoring
+  - [x] 6.6 Add recovery behavior monitoring
     - Create recovery pattern observation per SRS FR-6.5
     - Implement recovery time tracking per SRS FR-6.5
     - Add recovery strategy analysis per SRS FR-6.5
@@ -261,20 +260,20 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 
 ### Phase 7: SRS FR-7 - Metrics & Observability Dashboard
 
-- [ ] 7. Metrics and Observability (SRS FR-7)
-  - [ ] 7.1 Implement latency metrics
+- [x] 7. Metrics and Observability (SRS FR-7)
+  - [x] 7.1 Implement latency metrics
     - Create p50, p95, p99 latency tracking per SRS FR-7.1
     - Add latency histogram and distribution analysis per SRS FR-7.1
     - Implement latency trend monitoring per SRS FR-7.1
     - _Requirements: SRS FR-7.1_
 
-  - [ ] 7.2 Add error rate monitoring
+  - [x] 7.2 Add error rate monitoring
     - Implement error rate calculation and tracking per SRS FR-7.2
     - Create error categorization and analysis per SRS FR-7.2
     - Add error rate alerting and thresholds per SRS FR-7.2
     - _Requirements: SRS FR-7.2_
 
-  - [ ] 7.3 Create throughput monitoring
+  - [x] 7.3 Create throughput monitoring
     - Implement throughput measurement and tracking per SRS FR-7.3
     - Add throughput trend analysis per SRS FR-7.3
     - Create throughput capacity planning per SRS FR-7.3
@@ -284,13 +283,13 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - **Property 7: Metrics Collection Accuracy**
     - **Validates: SRS FR-7.1, FR-7.2, FR-7.3**
 
-  - [ ] 7.5 Add resource saturation monitoring
+  - [x] 7.5 Add resource saturation monitoring
     - Implement CPU, memory, network, storage monitoring per SRS FR-7.4
     - Create resource utilization visualization per SRS FR-7.4
     - Add resource saturation alerting per SRS FR-7.4
     - _Requirements: SRS FR-7.4_
 
-  - [ ] 7.6 Create component and global views
+  - [x] 7.6 Create component and global views
     - Implement component-specific metrics per SRS FR-7.5
     - Create system-wide performance dashboards per SRS FR-7.5
     - Add drill-down capabilities from global to component level per SRS FR-7.5
@@ -298,20 +297,20 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 
 ### Phase 8: SRS FR-8 - Cost Modeling Engine
 
-- [ ] 8. Cost Modeling System (SRS FR-8)
-  - [ ] 8.1 Implement compute cost estimation
+- [x] 8. Cost Modeling System (SRS FR-8)
+  - [x] 8.1 Implement compute cost estimation
     - Create compute cost calculation per SRS FR-8.1
     - Add instance type and sizing cost modeling per SRS FR-8.1
     - Implement auto-scaling cost implications per SRS FR-8.1
     - _Requirements: SRS FR-8.1_
 
-  - [ ] 8.2 Add storage cost modeling
+  - [x] 8.2 Add storage cost modeling
     - Implement storage cost calculation per SRS FR-8.2
     - Create data volume and replication cost modeling per SRS FR-8.2
     - Add storage tier and lifecycle cost analysis per SRS FR-8.2
     - _Requirements: SRS FR-8.2_
 
-  - [ ] 8.3 Create network cost estimation
+  - [x] 8.3 Create network cost estimation
     - Implement data transfer cost calculation per SRS FR-8.3
     - Add bandwidth and geographic cost modeling per SRS FR-8.3
     - Create CDN and edge cost analysis per SRS FR-8.3
@@ -321,13 +320,13 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - **Property 8: Cost Calculation Accuracy**
     - **Validates: SRS FR-8.1, FR-8.2, FR-8.3**
 
-  - [ ] 8.5 Implement traffic-based cost scaling
+  - [x] 8.5 Implement traffic-based cost scaling
     - Create cost scaling with user load per SRS FR-8.4
     - Add traffic pattern cost implications per SRS FR-8.4
     - Implement peak vs average cost analysis per SRS FR-8.4
     - _Requirements: SRS FR-8.4_
 
-  - [ ] 8.6 Add cost vs performance tradeoff analysis
+  - [x] 8.6 Add cost vs performance tradeoff analysis
     - Create cost optimization recommendations per SRS FR-8.5
     - Implement performance vs cost comparison per SRS FR-8.5
     - Add cost-effective scaling strategy suggestions per SRS FR-8.5
@@ -335,20 +334,20 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 
 ### Phase 9: SRS FR-9 - Learning & Scenario Mode
 
-- [ ] 9. Learning and Scenario System (SRS FR-9)
-  - [ ] 9.1 Create predefined scenario library
+- [x] 9. Learning and Scenario System (SRS FR-9)
+  - [x] 9.1 Create predefined scenario library
     - Implement scenario catalog and management per SRS FR-9.1
     - Create scenario templates with objectives per SRS FR-9.1
     - Add scenario difficulty levels and prerequisites per SRS FR-9.1
     - _Requirements: SRS FR-9.1_
 
-  - [ ] 9.2 Implement progressive constraint system
+  - [x] 9.2 Implement progressive constraint system
     - Create progressive constraint introduction per SRS FR-9.2
     - Add adaptive difficulty adjustment per SRS FR-9.2
     - Implement constraint timing and sequencing per SRS FR-9.2
     - _Requirements: SRS FR-9.2_
 
-  - [ ] 9.3 Add hint and explanation system
+  - [x] 9.3 Add hint and explanation system
     - Create contextual hint delivery per SRS FR-9.3
     - Implement progressive disclosure of complexity per SRS FR-9.3
     - Add explanation and learning content per SRS FR-9.3
@@ -358,7 +357,7 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - **Property 9: Learning Scenario Progression**
     - **Validates: SRS FR-9.1, FR-9.2, FR-9.3**
 
-  - [ ] 9.5 Implement progress tracking
+  - [x] 9.5 Implement progress tracking
     - Create scenario completion tracking per SRS FR-9.4
     - Add learning progress analytics per SRS FR-9.4
     - Implement achievement and milestone system per SRS FR-9.4
@@ -366,30 +365,30 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 
 ### Phase 10: SRS FR-10 - Collaboration
 
-- [ ] 10. Real-time Collaboration (SRS FR-10)
-  - [ ] 10.1 Create design sharing system
+- [x] 10. Real-time Collaboration (SRS FR-10)
+  - [x] 10.1 Create design sharing system
     - Implement design sharing functionality per SRS FR-10.1
     - Add permission management (view, edit, admin) per SRS FR-10.1
     - Create sharing link generation and access per SRS FR-10.1
     - _Requirements: SRS FR-10.1_
 
-  - [ ] 10.2 Implement multi-user editing
+  - [x] 10.2 Implement multi-user editing
     - Create simultaneous multi-user editing per SRS FR-10.2
     - Add real-time cursor and selection tracking per SRS FR-10.2
     - Implement user presence indicators per SRS FR-10.2
     - _Requirements: SRS FR-10.2_
 
-  - [ ] 10.3 Add real-time synchronization
+  - [x] 10.3 Add real-time synchronization
     - Implement operational transformation for conflict resolution per SRS FR-10.3
     - Create real-time change propagation per SRS FR-10.3
     - Add WebSocket-based real-time communication per SRS FR-10.3
     - _Requirements: SRS FR-10.3_
 
-  - [ ]* 10.4 Write property test for collaboration
+  - [x]* 10.4 Write property test for collaboration
     - **Property 10: Real-time Collaboration Consistency**
     - **Validates: SRS FR-10.2, FR-10.3**
 
-  - [ ] 10.5 Implement version history
+  - [x] 10.5 Implement version history
     - Create complete version history tracking per SRS FR-10.4
     - Add rollback and branch management per SRS FR-10.4
     - Implement change attribution and timestamps per SRS FR-10.4
@@ -397,41 +396,41 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 
 ### Phase 11: SRS Non-Functional Requirements Implementation
 
-- [ ] 11. Performance Optimization (SRS NFR-1, NFR-2, NFR-3)
-  - [ ] 11.1 Implement sub-100ms simulation updates
+- [x] 11. Performance Optimization (SRS NFR-1, NFR-2, NFR-3)
+  - [x] 11.1 Implement sub-100ms simulation updates
     - Optimize simulation engine for <100ms updates per SRS NFR-1
     - Create efficient metric calculation and caching per SRS NFR-1
     - Add performance monitoring and alerting per SRS NFR-1
     - _Requirements: SRS NFR-1_
 
-  - [ ] 11.2 Ensure real-time UI responsiveness
+  - [x] 11.2 Ensure real-time UI responsiveness
     - Optimize UI interactions for real-time feel per SRS NFR-2
     - Implement optimistic updates and rollback per SRS NFR-2
     - Add UI performance monitoring per SRS NFR-2
     - _Requirements: SRS NFR-2_
 
-  - [ ] 11.3 Implement user isolation
+  - [x] 11.3 Implement user isolation
     - Create complete user simulation isolation per SRS NFR-3
     - Add resource quotas and limits per SRS NFR-3
     - Implement tenant-scoped data access per SRS NFR-3
     - _Requirements: SRS NFR-3_
-
-- [ ] 12. Scalability Implementation (SRS NFR-4, NFR-5)
-  - [ ] 12.1 Support thousands of concurrent users
+### Phase 12: Integration and System Testing
+- [-] 12. Scalability Implementation (SRS NFR-4, NFR-5)
+  - [x] 12.1 Support thousands of concurrent users
     - Implement horizontal scaling architecture per SRS NFR-4
     - Add auto-scaling and load balancing per SRS NFR-4
     - Create concurrent user monitoring per SRS NFR-4
     - _Requirements: SRS NFR-4_
 
-  - [ ] 12.2 Scale simulation workloads
+  - [x] 12.2 Scale simulation workloads
     - Implement simulation load distribution per SRS NFR-5
     - Add simulation queuing and resource management per SRS NFR-5
     - Create simulation performance optimization per SRS NFR-5
     - _Requirements: SRS NFR-5_
 
-### Phase 12: Integration and System Testing
 
-- [ ] 13. SRS Compliance Integration Testing
+### Phase 13: Production Deployment
+- [-] 13. SRS Compliance Integration Testing
   - [ ] 13.1 Test complete user journey workflow
     - Validate "Build → Scale → Break → Observe → Fix" workflow
     - Test all SRS FR-1 through FR-10 integration
@@ -446,7 +445,7 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
     - Verify user isolation under stress per SRS NFR-3
     - _Requirements: SRS NFR-1, NFR-2, NFR-3, NFR-4, NFR-5_
 
-### Phase 13: Production Deployment
+
 
 - [ ] 14. SaaS Platform Deployment
   - [ ] 14.1 Deploy production infrastructure

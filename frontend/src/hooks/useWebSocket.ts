@@ -52,7 +52,10 @@ interface CanvasUpdate {
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
-    url = import.meta.env.VITE_WEBSOCKET_URL || 'http://localhost:3000',
+    // Prefer explicit WS URL, then generic websocket URL, then same-origin.
+    url = import.meta.env.VITE_WS_URL
+      ?? import.meta.env.VITE_WEBSOCKET_URL
+      ?? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080'),
     token,
     autoConnect = true,
     workspaceId,

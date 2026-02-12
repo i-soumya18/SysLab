@@ -227,7 +227,17 @@ export interface ComponentMetrics {
   queueDepth: number;
 }
 
-// Scenario interface for learning exercises
+// System-wide metrics interface
+export interface SystemMetrics {
+  timestamp: number;
+  activeComponents: number;
+  healthyComponents: number;
+  totalThroughput: number;
+  averageLatency: number;
+  systemErrorRate: number;
+}
+
+// Scenario interface for learning exercises implementing SRS FR-9.1
 export interface Scenario {
   id: string;
   name: string;
@@ -236,6 +246,13 @@ export interface Scenario {
   initialWorkspace: Partial<Workspace>;
   hints: string[];
   evaluationCriteria: string[];
+  // Enhanced properties for SRS FR-9.1
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  prerequisites: string[]; // IDs of scenarios that should be completed first
+  category: string;
+  estimatedTimeMinutes: number;
+  tags: string[];
+  learningOutcomes: string[];
 }
 
 // User progress tracking interface

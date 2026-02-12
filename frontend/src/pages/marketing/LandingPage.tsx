@@ -5,14 +5,14 @@ import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
 export function LandingPage() {
   const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
-  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const handleGetStarted = () => {
     if (user) {
-      navigate('/dashboard');
-    } else {
-      setShowLoginModal(true);
+      navigate('/getting-started');
+      return;
     }
+
+    navigate('/dashboard');
   };
 
   return (
@@ -36,21 +36,12 @@ export function LandingPage() {
               <a href="/about" className="text-sm text-white/80 hover:text-white">
                 About
               </a>
-              {user ? (
-                <button
-                  onClick={() => navigate('/dashboard')}
-className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Dashboard
-                </button>
-              ) : (
-                <button
-                  onClick={handleGetStarted}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Get Started
-                </button>
-              )}
+              <button
+                onClick={user ? () => navigate('/getting-started') : handleGetStarted}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                {user ? 'Getting Started' : 'Get Started'}
+              </button>
             </div>
           </div>
         </div>
@@ -71,7 +62,7 @@ className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover
           </p>
           <div className="mt-10 flex items-center justify-center gap-4">
             <button
-              onClick={handleGetStarted}
+              onClick={user ? () => navigate('/getting-started') : handleGetStarted}
               className="rounded-lg bg-blue-600 px-8 py-4 text-lg font-semibold text-white shadow-lg hover:bg-blue-700"
             >
               Start Simulating
@@ -187,7 +178,7 @@ className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover
             Join thousands of engineers building system design intuition through simulation.
           </p>
           <button
-            onClick={handleGetStarted}
+            onClick={user ? () => navigate('/getting-started') : handleGetStarted}
             className="mt-10 rounded-lg bg-blue-600 px-12 py-4 text-lg font-semibold text-white shadow-lg hover:bg-blue-700"
           >
             Start Free
@@ -214,29 +205,6 @@ className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover
         </div>
       </footer>
 
-      {/* Login Modal (if showing) */}
-      {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold text-gray-900">Get Started</h2>
-            <p className="mt-2 text-gray-600">Create a free account to start simulating</p>
-            <div className="mt-6 space-y-4">
-              <button className="w-full rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700">
-                Sign Up with Email
-              </button>
-              <button className="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-gray-700 hover:bg-gray-50">
-                Continue with Google
-              </button>
-            </div>
-            <button
-              onClick={() => setShowLoginModal(false)}
-              className="mt-6 w-full text-center text-sm text-gray-500 hover:text-gray-700"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

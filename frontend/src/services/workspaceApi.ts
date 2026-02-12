@@ -95,9 +95,92 @@ export interface ShareAccessInfo {
   share: WorkspaceShare;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+export interface WorkspaceListQuery {
+  userId?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: 'name' | 'createdAt' | 'updatedAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  description?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  components?: unknown[];
+  connections?: unknown[];
+}
+
+export interface WorkspaceListResponse {
+  success: boolean;
+  data: WorkspaceSummary[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 export class WorkspaceApiService {
+  /**
+   * List workspaces with optional search and pagination.
+   */
+  static async listWorkspaces(query: WorkspaceListQuery = {}): Promise<WorkspaceListResponse> {
+    const params = new URLSearchParams();
+    if (query.userId) params.append('userId', query.userId);
+    if (query.search) params.append('search', query.search);
+    if (typeof query.limit === 'number') params.append('limit', String(query.limit));
+    if (typeof query.offset === 'number') params.append('offset', String(query.offset));
+    if (query.sortBy) params.append('sortBy', query.sortBy);
+    if (query.sortOrder) params.append('sortOrder', query.sortOrder);
+
+    const response = await fetch(`${API_BASE_URL}/workspaces?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error?.message ?? 'Failed to fetch workspaces');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Delete a workspace by ID for a given user.
+   */
+  static async deleteWorkspace(workspaceId: string, userId?: string): Promise<void> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.append('userId', userId);
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/${encodeURIComponent(workspaceId)}?${params.toString()}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error?.message ?? 'Failed to delete workspace');
+    }
+  }
+
   /**
    * Export workspace to downloadable format
    */

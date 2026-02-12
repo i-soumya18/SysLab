@@ -1,0 +1,16 @@
+# Backend .dockerignore
+node_modules
+npm-debug.log
+dist
+.env
+.env.*
+!.env.example
+*.md
+.git
+.gitignore
+coverage
+test
+*.test.ts
+*.spec.ts
+.vscode
+.idea

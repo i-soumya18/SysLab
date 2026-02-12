@@ -27,7 +27,7 @@ export class MetricsWebSocketHandler {
   private wss: WebSocketServer;
   private metricsService: RealTimeMetricsService;
   private clients: Map<string, WebSocket> = new Map();
-  private heartbeatInterval: NodeJS.Timeout;
+  private heartbeatInterval!: NodeJS.Timeout;
 
   constructor(port: number = 8081) {
     // Initialize real-time metrics service with optimized config for sub-100ms updates

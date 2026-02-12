@@ -247,10 +247,7 @@ export class ScaleSimulationService extends EventEmitter {
     return {
       type: 'constant',
       baseLoad,
-      peakMultiplier: 1.5,
-      duration: 300, // 5 minutes
-      rampUpTime: 30,
-      rampDownTime: 30
+      peakLoad: Math.floor(baseLoad * 1.5)
     };
   }
 

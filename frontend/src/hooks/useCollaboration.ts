@@ -46,7 +46,7 @@ export function useCollaboration(options: UseCollaborationOptions): UseCollabora
   });
 
   const webSocketService = getWebSocketService({
-    url: import.meta.env.VITE_WEBSOCKET_URL || 'http://localhost:3000'
+    url: import.meta.env.VITE_WS_URL || 'http://localhost:8080'
   });
   const eventCallbacksRef = useRef<Map<string, Function>>(new Map());
   const cursorThrottleRef = useRef<NodeJS.Timeout | null>(null);

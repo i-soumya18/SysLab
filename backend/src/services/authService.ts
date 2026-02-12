@@ -45,6 +45,13 @@ export interface PasswordResetConfirm {
   newPassword: string;
 }
 
+export interface RegistrationData {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 export class AuthService {
   private db: Pool;
   private jwtSecret: string;
@@ -58,6 +65,89 @@ export class AuthService {
     this.jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production';
     this.tokenExpiry = process.env.JWT_EXPIRY || '1h';
     this.refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRY || '7d';
+  }
+
+  /**
+   * Register a new user
+   * Implements SRS FR-1.1: User registration with email verification
+   */
+  async register(registrationData: RegistrationData, userAgent?: string, ipAddress?: string): Promise<AuthResult> {
+    try {
+      const { email, password, firstName, lastName } = registrationData;
+
+      // Check if user already exists
+      const existingUserQuery = 'SELECT id FROM users WHERE email = $1';
+      const existingUserResult = await this.db.query(existingUserQuery, [email.toLowerCase()]);
+
+      if (existingUserResult.rows.length > 0) {
+        return {
+          success: false,
+          error: 'An account with this email already exists'
+        };
+      }
+
+      // Hash password
+      const saltRounds = 12;
+      const passwordHash = await bcrypt.hash(password, saltRounds);
+
+      // Generate email verification token
+      const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+
+      // Create user
+      const insertUserQuery = `
+        INSERT INTO users (email, password_hash, first_name, last_name, email_verified,
+                          subscription_tier, email_verification_token, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        RETURNING id, email, first_name, last_name, email_verified, subscription_tier, created_at, updated_at
+      `;
+
+      const userResult = await this.db.query(insertUserQuery, [
+        email.toLowerCase(),
+        passwordHash,
+        firstName || null,
+        lastName || null,
+        true, // For demo purposes, auto-verify email
+        'free', // Default subscription tier
+        emailVerificationToken
+      ]);
+
+      const userData = userResult.rows[0];
+
+      // Generate tokens
+      const token = this.generateAccessToken(userData.id, userData.email);
+      const refreshToken = this.generateRefreshToken(userData.id);
+
+      // Store session
+      await this.createSession(userData.id, refreshToken, userAgent, ipAddress);
+
+      const user: User = {
+        id: userData.id,
+        email: userData.email,
+        firstName: userData.first_name,
+        lastName: userData.last_name,
+        emailVerified: userData.email_verified,
+        subscriptionTier: userData.subscription_tier,
+        createdAt: userData.created_at,
+        updatedAt: userData.updated_at
+      };
+
+      // TODO: Send verification email in production
+      console.log(`Email verification token for ${email}: ${emailVerificationToken}`);
+
+      return {
+        success: true,
+        user,
+        token,
+        refreshToken
+      };
+
+    } catch (error) {
+      console.error('Registration error:', error);
+      return {
+        success: false,
+        error: 'An error occurred during registration'
+      };
+    }
   }
 
   /**
@@ -430,6 +520,96 @@ export class AuthService {
        VALUES ($1, $2, $3, $4, $5)`,
       [userId, tokenHash, expiresAt, userAgent, ipAddress]
     );
+  }
+
+  /**
+   * Verify email address with token
+   * Implements SRS FR-1.1: Email verification
+   */
+  async verifyEmail(token: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Find user with verification token
+      const userQuery = `
+        SELECT id FROM users 
+        WHERE email_verification_token = $1 AND email_verified = false
+      `;
+      const userResult = await this.db.query(userQuery, [token]);
+      
+      if (userResult.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Invalid or expired verification token'
+        };
+      }
+
+      const userId = userResult.rows[0].id;
+      
+      // Mark email as verified and clear token
+      await this.db.query(
+        `UPDATE users 
+         SET email_verified = true, email_verification_token = NULL, updated_at = NOW()
+         WHERE id = $1`,
+        [userId]
+      );
+      
+      return { success: true };
+
+    } catch (error) {
+      console.error('Email verification error:', error);
+      return {
+        success: false,
+        error: 'An error occurred during email verification'
+      };
+    }
+  }
+
+  /**
+   * Resend email verification
+   * Implements SRS FR-1.1: Email verification
+   */
+  async resendEmailVerification(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Check if user exists and email is not verified
+      const userQuery = 'SELECT id, email_verified FROM users WHERE email = $1';
+      const userResult = await this.db.query(userQuery, [email.toLowerCase()]);
+      
+      if (userResult.rows.length === 0) {
+        // Don't reveal if email exists or not for security
+        return { success: true };
+      }
+
+      if (userResult.rows[0].email_verified) {
+        return {
+          success: false,
+          error: 'Email is already verified'
+        };
+      }
+
+      const userId = userResult.rows[0].id;
+      
+      // Generate new verification token
+      const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+      
+      // Update verification token
+      await this.db.query(
+        `UPDATE users 
+         SET email_verification_token = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [emailVerificationToken, userId]
+      );
+
+      // TODO: Send verification email
+      console.log(`Email verification token for ${email}: ${emailVerificationToken}`);
+      
+      return { success: true };
+
+    } catch (error) {
+      console.error('Resend email verification error:', error);
+      return {
+        success: false,
+        error: 'An error occurred while resending verification email'
+      };
+    }
   }
 
   /**

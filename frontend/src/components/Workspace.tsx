@@ -3,9 +3,10 @@
  * Combines the component palette and canvas with drag-and-drop functionality
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useParams } from 'react-router-dom';
 import { Canvas } from './Canvas';
 import CollaborationPresence from './CollaborationPresence';
 import { ComponentPalette } from './ComponentPalette';
@@ -19,18 +20,23 @@ import { ScenarioLibrary } from './ScenarioLibrary';
 import { StatusBar } from './StatusBar';
 import { SystemCollapseMonitor, type CollapseEvent, type RecoveryEvent } from './SystemCollapseMonitor';
 import { WorkspaceImportModal } from './WorkspaceImportModal';
+import { BottleneckVisualizer } from './BottleneckVisualizer';
 import { useFirebaseAuthContext } from '../hooks/useFirebaseAuth';
 import { useCollaboration } from '../hooks/useCollaboration';
+import useWebSocket from '../hooks/useWebSocket';
 import { WorkspaceApiService } from '../services/workspaceApi';
 import { scenarioApi } from '../services/scenarioApi';
-import type { BottleneckInfo, Component, ComponentMetrics, SystemMetrics } from '../types';
+import { CostDashboard } from './CostDashboard';
+import { ScalabilityDashboard } from './ScalabilityDashboard';
+import type { BottleneckInfo, Component, ComponentMetrics, SystemMetrics, Workspace as WorkspaceModel } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 // Fix React types compatibility with react-dnd
 const DndProviderFixed = DndProvider as any;
 
 export const Workspace: React.FC = () => {
+  const { id: routeWorkspaceId } = useParams<{ id?: string }>();
   const { user } = useFirebaseAuthContext();
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('demo-workspace-id');
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
@@ -45,24 +51,27 @@ export const Workspace: React.FC = () => {
   const [workspaceConnections, setWorkspaceConnections] = useState<any[]>([]);
 
   // Simulation state
-  const [_simulationId, setSimulationId] = useState<string | null>(null);
+  const [_simulationId, _setSimulationId] = useState<string | null>(null);
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | undefined>(undefined);
   const [componentMetrics, setComponentMetrics] = useState<Map<string, ComponentMetrics>>(new Map());
   const [bottlenecksMap, setBottlenecksMap] = useState<Map<string, BottleneckInfo>>(new Map());
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const metricsPollingRef = useRef<NodeJS.Timeout | null>(null);
-  const simulationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [collapseEvents] = useState<CollapseEvent[]>([]);
   const [recoveryEvents] = useState<RecoveryEvent[]>([]);
   const [completedScenarios] = useState<string[]>([]);
   const [activeInsightsTab, setActiveInsightsTab] = useState<'scenarios' | 'progress' | 'health'>('scenarios');
 
   // Learning panels state (SRS FR-9.2, FR-9.3, FR-6)
-  const [showHintsPanel, _setShowHintsPanel] = useState<boolean>(true);
-  const [showConstraintsPanel, _setShowConstraintsPanel] = useState<boolean>(true);
-  const [showFailurePanel, _setShowFailurePanel] = useState<boolean>(true);
+  const [showHintsPanel, setShowHintsPanel] = useState<boolean>(false);
+  const [showConstraintsPanel, setShowConstraintsPanel] = useState<boolean>(false);
+  const [showFailurePanel, setShowFailurePanel] = useState<boolean>(false);
   const [activeFailures, setActiveFailures] = useState<FailureInjection[]>([]);
   const [constraintSessionId] = useState<string>(`session-${Date.now()}`);
+
+  // Floating panels visibility state
+  const [showMetricsPanel, setShowMetricsPanel] = useState<boolean>(false);
+  const [showCostPanel, setShowCostPanel] = useState<boolean>(false);
+  const [showScalabilityPanel, setShowScalabilityPanel] = useState<boolean>(false);
 
   const { collaborationState } = useCollaboration({
     workspaceId: currentWorkspaceId,
@@ -70,11 +79,136 @@ export const Workspace: React.FC = () => {
     enabled: true
   });
 
+  const {
+    isConnected: isWebSocketConnected,
+    simulationMetrics: wsSimulationMetrics,
+    simulationProgress: wsSimulationProgress,
+    simulationStatus: wsSimulationStatus,
+    startSimulation: wsStartSimulation,
+    stopSimulation: wsStopSimulation,
+    pauseSimulation: wsPauseSimulation,
+    resumeSimulation: wsResumeSimulation,
+    subscribe
+  } = useWebSocket({
+    workspaceId: currentWorkspaceId,
+    userId: currentUserId,
+    autoConnect: true
+  });
+
+  const loadWorkspaceById = async (workspaceId: string, userId: string): Promise<void> => {
+    try {
+      const url = new URL(`${API_BASE_URL}/workspaces/${workspaceId}`);
+      if (userId) {
+        url.searchParams.append('userId', userId);
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const message =
+          (errorBody && errorBody.error && errorBody.error.message) ||
+          `Failed to load workspace: ${response.statusText}`;
+        throw new Error(message);
+      }
+
+      const body: { success?: boolean; data?: WorkspaceModel } = await response.json();
+      if (!body.data) {
+        throw new Error('Workspace data is missing in the response');
+      }
+
+      const loadedWorkspace = body.data;
+      setCurrentWorkspaceId(loadedWorkspace.id);
+      setWorkspaceComponents(loadedWorkspace.components || []);
+      setWorkspaceConnections(loadedWorkspace.connections || []);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load workspace from route:', error);
+      if (error instanceof Error) {
+        alert(
+          `Unable to load workspace. Please check the link or choose another workspace. Details: ${error.message}`
+        );
+      } else {
+        alert('Unable to load workspace. Please check the link or choose another workspace.');
+      }
+    }
+  };
+
   useEffect(() => {
     if (user?.uid) {
       setCurrentUserId(user.uid);
     }
   }, [user]);
+
+  useEffect(() => {
+    // Don't attempt to load workspace if user is not authenticated
+    if (routeWorkspaceId && currentUserId && currentUserId !== 'anonymous-user' && routeWorkspaceId !== currentWorkspaceId) {
+      void loadWorkspaceById(routeWorkspaceId, currentUserId);
+    }
+  }, [routeWorkspaceId, currentUserId]);
+
+  useEffect(() => {
+    if (wsSimulationStatus) {
+      setIsSimulationRunning(wsSimulationStatus.isRunning);
+      // Auto-show metrics panel when simulation starts
+      if (wsSimulationStatus.isRunning && !showMetricsPanel) {
+        setShowMetricsPanel(true);
+      }
+    }
+  }, [wsSimulationStatus, showMetricsPanel]);
+
+  useEffect(() => {
+    if (wsSimulationProgress) {
+      setElapsedTime(Math.floor(wsSimulationProgress.currentTime / 1000));
+    }
+  }, [wsSimulationProgress]);
+
+  useEffect(() => {
+    if (!wsSimulationMetrics) {
+      return;
+    }
+
+    if (wsSimulationMetrics.type === 'system_metrics') {
+      setSystemMetrics(wsSimulationMetrics.data as SystemMetrics);
+    } else if (wsSimulationMetrics.type === 'component_metrics') {
+      const metric = wsSimulationMetrics.data as ComponentMetrics;
+      setComponentMetrics(prev => {
+        const next = new Map(prev);
+        next.set(metric.componentId, metric);
+        return next;
+      });
+    }
+  }, [wsSimulationMetrics]);
+
+  useEffect(() => {
+    const unsubscribe = subscribe('simulation:bottleneck', (payload: { data?: BottleneckInfo[] | BottleneckInfo }) => {
+      const data = payload?.data;
+      if (!data) {
+        return;
+      }
+
+      const list = Array.isArray(data) ? data : [data];
+      const next = new Map<string, BottleneckInfo>();
+      list.forEach(bottleneck => {
+        next.set(bottleneck.componentId, bottleneck);
+      });
+      setBottlenecksMap(next);
+
+      // Auto-show hints panel when bottlenecks are detected
+      if (list.length > 0 && isSimulationRunning && !showHintsPanel) {
+        setShowHintsPanel(true);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribe, isSimulationRunning, showHintsPanel]);
 
   const handleComponentAdd = (component: Component) => {
     console.log('Component added:', component);
@@ -135,7 +269,15 @@ export const Workspace: React.FC = () => {
   const handleImportSuccess = (workspace: any) => {
     console.log('Workspace imported successfully:', workspace);
     alert(`Workspace "${workspace.name}" imported successfully!`);
-    // TODO: Reload the workspace or update the UI with the imported workspace
+    if (workspace.id) {
+      setCurrentWorkspaceId(workspace.id);
+    }
+    if (workspace.components) {
+      setWorkspaceComponents(workspace.components);
+    }
+    if (workspace.connections) {
+      setWorkspaceConnections(workspace.connections);
+    }
   };
 
   const handleScenarioSelect = (scenarioId: string) => {
@@ -168,10 +310,8 @@ export const Workspace: React.FC = () => {
         return;
       }
 
-      setIsSimulationRunning(true);
       setElapsedTime(0);
 
-      // Build workspace configuration
       const workspace = {
         id: currentWorkspaceId,
         name: 'Demo Workspace',
@@ -196,39 +336,15 @@ export const Workspace: React.FC = () => {
         updatedAt: new Date()
       };
 
-      console.log('Starting simulation with workspace:', workspace);
+      console.log('Starting simulation (WebSocket) with workspace:', workspace);
 
-      // Call POST /api/v1/simulation/start with workspace data
-      const response = await fetch(`${API_BASE_URL}/simulation/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          workspaceId: currentWorkspaceId,
-          workspace: workspace,
-          userCount: currentScale,
-          duration: 60
-        })
+      await wsStartSimulation({
+        workspace,
+        userCount: currentScale,
+        duration: 60
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(errorData.error || `Failed to start simulation: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setSimulationId(data.simulationId);
-
-      // Start elapsed time tracking
-      simulationTimerRef.current = setInterval(() => {
-        setElapsedTime(prevTime => prevTime + 1);
-      }, 1000);
-
-      // Start metrics polling
-      pollMetrics(data.simulationId);
-
-      console.log('Simulation started with ID:', data.simulationId, 'Scale:', currentScale, 'users');
+      setIsSimulationRunning(true);
     } catch (error: any) {
       console.error('Failed to start simulation:', error);
       setIsSimulationRunning(false);
@@ -236,334 +352,477 @@ export const Workspace: React.FC = () => {
     }
   };
 
-  const pollMetrics = (simId: string) => {
-    // Clear any existing polling
-    if (metricsPollingRef.current) {
-      clearInterval(metricsPollingRef.current);
-    }
-
-    // Poll metrics every 2 seconds
-    metricsPollingRef.current = setInterval(async () => {
-      try {
-        const response = await fetch(`/api/v1/simulation/metrics/${simId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch metrics: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // Update system metrics
-        if (data.system) {
-          setSystemMetrics(data.system);
-        }
-
-        // Update component metrics
-        if (data.components && Array.isArray(data.components)) {
-          const metricsMap = new Map<string, ComponentMetrics>();
-          data.components.forEach((metric: ComponentMetrics) => {
-            metricsMap.set(metric.componentId, metric);
-          });
-          setComponentMetrics(metricsMap);
-        }
-
-        // Store bottlenecks in a Map keyed by componentId for easy lookup
-        if (data.bottlenecks && Array.isArray(data.bottlenecks)) {
-          const bottleneckMap = new Map<string, BottleneckInfo>();
-          data.bottlenecks.forEach((bottleneck: BottleneckInfo) => {
-            bottleneckMap.set(bottleneck.componentId, bottleneck);
-          });
-          setBottlenecksMap(bottleneckMap);
-        }
-
-        // Check if simulation has completed
-        if (data.status === 'completed' || data.status === 'failed') {
-          handleStopSimulation();
-        }
-      } catch (error) {
-        console.error('Error polling metrics:', error);
-      }
-    }, 2000);
-  };
-
   const handleStopSimulation = () => {
     setIsSimulationRunning(false);
-
-    // Clear timers
-    if (metricsPollingRef.current) {
-      clearInterval(metricsPollingRef.current);
-      metricsPollingRef.current = null;
-    }
-
-    if (simulationTimerRef.current) {
-      clearInterval(simulationTimerRef.current);
-      simulationTimerRef.current = null;
-    }
-
-    console.log('Simulation stopped');
+    wsStopSimulation().catch(error => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to stop simulation via WebSocket:', error);
+    });
   };
 
   // Failure Injection handlers (SRS FR-6)
-  const handleInjectFailure = (failure: Omit<FailureInjection, 'id'>) => {
-    const newFailure: FailureInjection = {
-      ...failure,
-      id: `failure-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      startTime: Date.now()
-    };
-    setActiveFailures(prev => [...prev, newFailure]);
-    console.log('Failure injected:', newFailure);
-    // TODO: Call backend API to inject failure in simulation
-    // await fetch('/api/v1/failure-injection/inject', {
-    //   method: 'POST',
-    //   body: JSON.stringify(newFailure)
-    // });
+  const handleInjectFailure = async (failure: Omit<FailureInjection, 'id'>): Promise<void> => {
+    try {
+      const baseUrl = `${API_BASE_URL}/failure-injection`;
+
+      const mapFailureTypeToConfig = (): {
+        path: string;
+        body: unknown;
+      } => {
+        const severity = failure.severity;
+        const durationMs = failure.duration * 1000;
+
+        switch (failure.type) {
+          case 'slow':
+            return {
+              path: `/component/${encodeURIComponent(failure.componentId)}`,
+              body: {
+                componentId: failure.componentId,
+                failureType: 'latency_spike',
+                severity,
+                duration: durationMs,
+                recoveryType: 'automatic'
+              }
+            };
+          case 'network-partition':
+            return {
+              path: `/component/${encodeURIComponent(failure.componentId)}`,
+              body: {
+                componentId: failure.componentId,
+                failureType: 'network_partition',
+                severity,
+                duration: durationMs,
+                recoveryType: 'automatic'
+              }
+            };
+          case 'high-load':
+            return {
+              path: `/component/${encodeURIComponent(failure.componentId)}`,
+              body: {
+                componentId: failure.componentId,
+                failureType: 'degraded_mode',
+                severity,
+                duration: durationMs,
+                recoveryType: 'automatic'
+              }
+            };
+          case 'resource-exhaustion':
+            return {
+              path: `/component/${encodeURIComponent(failure.componentId)}`,
+              body: {
+                componentId: failure.componentId,
+                failureType: 'component_disable',
+                severity,
+                duration: durationMs,
+                recoveryType: 'manual'
+              }
+            };
+          case 'crash':
+          default:
+            return {
+              path: `/component/${encodeURIComponent(failure.componentId)}`,
+              body: {
+                componentId: failure.componentId,
+                failureType: 'component_disable',
+                severity,
+                duration: durationMs,
+                recoveryType: 'automatic'
+              }
+            };
+        }
+      };
+
+      const config = mapFailureTypeToConfig();
+      const response = await fetch(`${baseUrl}${config.path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config.body)
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const message =
+          (errorBody && errorBody.error && errorBody.error.message) ||
+          `Failed to inject failure: ${response.statusText}`;
+        throw new Error(message);
+      }
+
+      const result: {
+        injectionId: string;
+      } = await response.json();
+
+      const newFailure: FailureInjection = {
+        ...failure,
+        id: result.injectionId,
+        startTime: Date.now()
+      };
+
+      setActiveFailures(prev => [...prev, newFailure]);
+      // eslint-disable-next-line no-console
+      console.log('Failure injected:', newFailure);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to inject failure:', error);
+      if (error instanceof Error) {
+        alert(
+          `Failed to inject failure. Try again or adjust parameters. Details: ${error.message}`
+        );
+      } else {
+        alert('Failed to inject failure. Try again or adjust parameters.');
+      }
+    }
   };
 
-  const handleRemoveFailure = (failureId: string) => {
-    setActiveFailures(prev => prev.filter(f => f.id !== failureId));
-    console.log('Failure removed:', failureId);
-    // TODO: Call backend API to remove failure
-    // await fetch('/api/v1/failure-injection/remove', {
-    //   method: 'POST',
-    //   body: JSON.stringify({ failureId })
-    // });
-  };
+  const handleRemoveFailure = async (failureId: string): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/failure-injection/stop/${encodeURIComponent(failureId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          recoveryType: 'immediate'
+        })
+      });
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (metricsPollingRef.current) {
-        clearInterval(metricsPollingRef.current);
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const message =
+          (errorBody && errorBody.error && errorBody.error.message) ||
+          `Failed to stop failure injection: ${response.statusText}`;
+        throw new Error(message);
       }
-      if (simulationTimerRef.current) {
-        clearInterval(simulationTimerRef.current);
+
+      setActiveFailures(prev => prev.filter(f => f.id !== failureId));
+      // eslint-disable-next-line no-console
+      console.log('Failure removed:', failureId);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to remove failure:', error);
+      if (error instanceof Error) {
+        alert(
+          `Failed to remove failure injection. You can continue the simulation or retry. Details: ${error.message}`
+        );
+      } else {
+        alert('Failed to remove failure injection. You can continue the simulation or retry.');
       }
-    };
-  }, []);
+    }
+  };
 
   return (
     <DndProviderFixed backend={HTML5Backend}>
-      <div style={{
-        display: 'flex',
-        height: '100vh',
-        backgroundColor: '#f5f5f5',
-        fontFamily: 'Arial, sans-serif'
-      }}>
-        {/* Component Palette */}
-        <div style={{
-          width: '220px',
-          backgroundColor: '#fff',
-          borderRight: '1px solid #e0e0e0',
-          padding: '10px'
-        }}>
-          <ComponentPalette />
-        </div>
+      <div className="flex h-screen bg-gray-50">
+        {/* Left Sidebar - Component Palette */}
+        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-800">Components</h2>
+            <p className="text-xs text-gray-500 mt-1">Drag to canvas</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            <ComponentPalette />
+          </div>
+        </aside>
 
-        {/* Main Canvas Area */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '20px'
-        }}>
-          {/* Toolbar */}
-          <div style={{
-            height: '60px',
-            backgroundColor: '#fff',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px',
-            marginBottom: '20px',
-            padding: '0 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <h1 style={{
-              margin: 0,
-              fontSize: '24px',
-              fontWeight: 'bold',
-              color: '#333'
-            }}>
-              System Design Simulator
-            </h1>
-            
-            <div style={{
-              display: 'flex',
-              gap: '10px'
-            }}>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top Toolbar */}
+          <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-gray-800">System Design Simulator</h1>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="px-2 py-1 bg-gray-100 rounded">
+                  {componentCount} components
+                </span>
+                {isWebSocketConnected ? (
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Connected
+                  </span>
+                ) : (
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded flex items-center gap-1">
+                    <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                    Connecting...
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsImportModalOpen(true)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#17a2b8',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
+                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-md transition-colors"
               >
-                Import Workspace
+                Import
               </button>
               <button
                 onClick={handleExportWorkspace}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#ffc107',
-                  color: '#212529',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-md transition-colors"
               >
-                Export Workspace
-              </button>
-              <button style={{
-                padding: '8px 16px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}>
-                Save Workspace
+                Export
               </button>
               <button
-                onClick={isSimulationRunning ? handleStopSimulation : handleStartSimulation}
-                disabled={workspaceComponents.length === 0}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: isSimulationRunning ? '#dc3545' : (workspaceComponents.length === 0 ? '#6c757d' : '#28a745'),
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: workspaceComponents.length === 0 ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  opacity: workspaceComponents.length === 0 ? 0.6 : 1
-                }}
-                title={workspaceComponents.length === 0 ? 'Add components to the canvas first' : (isSimulationRunning ? 'Stop simulation' : 'Run simulation')}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
               >
-                {isSimulationRunning ? '⏹ Stop Simulation' : '▶ Run Simulation'}
+                Save
+              </button>
+
+              {/* Panels Menu */}
+              <div className="relative group">
+                <button className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-md transition-colors">
+                  📊 Panels
+                </button>
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="p-2 space-y-1">
+                    <button
+                      onClick={() => setShowMetricsPanel(!showMetricsPanel)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showMetricsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    >
+                      {showMetricsPanel ? '✓' : '○'} Metrics Dashboard
+                    </button>
+                    <button
+                      onClick={() => setShowCostPanel(!showCostPanel)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showCostPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    >
+                      {showCostPanel ? '✓' : '○'} Cost Dashboard
+                    </button>
+                    <button
+                      onClick={() => setShowScalabilityPanel(!showScalabilityPanel)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showScalabilityPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    >
+                      {showScalabilityPanel ? '✓' : '○'} Scalability
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={() => setShowHintsPanel(!showHintsPanel)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showHintsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    >
+                      {showHintsPanel ? '✓' : '○'} Hints
+                    </button>
+                    <button
+                      onClick={() => setShowConstraintsPanel(!showConstraintsPanel)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showConstraintsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    >
+                      {showConstraintsPanel ? '✓' : '○'} Constraints
+                    </button>
+                    <button
+                      onClick={() => setShowFailurePanel(!showFailurePanel)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${showFailurePanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    >
+                      {showFailurePanel ? '✓' : '○'} Failure Injection
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={isSimulationRunning ? handleStopSimulation : handleStartSimulation}
+                disabled={workspaceComponents.length === 0 || !isWebSocketConnected}
+                className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${
+                  isSimulationRunning
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : workspaceComponents.length === 0 || !isWebSocketConnected
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+                title={
+                  !isWebSocketConnected
+                    ? 'Waiting for real-time connection'
+                    : workspaceComponents.length === 0
+                      ? 'Add components to the canvas first'
+                      : (isSimulationRunning ? 'Stop simulation' : 'Run simulation')
+                }
+              >
+                {isSimulationRunning ? '⏹ Stop' : '▶ Run'}
+              </button>
+              <button
+                onClick={isSimulationRunning ? () => wsPauseSimulation().catch(console.error) : () => wsResumeSimulation().catch(console.error)}
+                disabled={!isWebSocketConnected || workspaceComponents.length === 0}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  !isWebSocketConnected || workspaceComponents.length === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+                title={isSimulationRunning ? 'Pause simulation' : 'Resume simulation'}
+              >
+                {isSimulationRunning ? '⏸' : '⏯'}
               </button>
             </div>
-          </div>
+          </header>
 
-          {/* Canvas Container */}
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            gap: '20px'
-          }}>
-            {/* Canvas */}
-            <div style={{
-              flex: 1,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'flex-start'
-            }}>
-              <Canvas
-                width={1000}
-                height={600}
-                onComponentAdd={handleComponentAdd}
-                onComponentSelect={handleComponentSelect}
-                onComponentUpdate={handleComponentUpdate}
-                onComponentDelete={handleComponentDelete}
-                onComponentCountChange={handleComponentCountChange}
-                onConnectionCreate={handleConnectionCreate}
-                onConnectionDelete={handleConnectionDelete}
-                bottlenecks={bottlenecksMap}
-              />
+          {/* Main Workspace Area */}
+          <div className="flex-1 flex gap-4 p-4 min-h-0">
+            {/* Canvas Section */}
+            <div className="flex-1 flex flex-col gap-4 min-w-0">
+              {/* Canvas Container */}
+              <div className="flex-1 bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-center overflow-hidden">
+                <Canvas
+                  width={1000}
+                  height={600}
+                  onComponentAdd={handleComponentAdd}
+                  onComponentSelect={handleComponentSelect}
+                  onComponentUpdate={handleComponentUpdate}
+                  onComponentDelete={handleComponentDelete}
+                  onComponentCountChange={handleComponentCountChange}
+                  onConnectionCreate={handleConnectionCreate}
+                  onConnectionDelete={handleConnectionDelete}
+                  bottlenecks={bottlenecksMap}
+                />
+              </div>
+
+              {/* Status Bar */}
+              <div className="bg-white rounded-lg border border-gray-200 px-4 py-2">
+                <StatusBar
+                  selectedComponent={selectedComponent}
+                  componentCount={componentCount}
+                />
+              </div>
+
+              {/* Insights Panel with Tabs */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setActiveInsightsTab('scenarios')}
+                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                        activeInsightsTab === 'scenarios'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Scenarios
+                    </button>
+                    <button
+                      onClick={() => setActiveInsightsTab('progress')}
+                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                        activeInsightsTab === 'progress'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Progress
+                    </button>
+                    <button
+                      onClick={() => setActiveInsightsTab('health')}
+                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                        activeInsightsTab === 'health'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      System Health
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500">Track progress and monitor stability</p>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto">
+                  {activeInsightsTab === 'scenarios' && (
+                    <ScenarioLibrary
+                      userId={currentUserId}
+                      completedScenarios={completedScenarios}
+                      onScenarioSelect={(scenario) => handleScenarioSelect(scenario.id)}
+                      onScenarioLoad={handleScenarioLoad}
+                    />
+                  )}
+
+                  {activeInsightsTab === 'progress' && (
+                    <ProgressDashboard
+                      userId={currentUserId}
+                      onScenarioSelect={(scenarioId) => handleScenarioSelect(scenarioId)}
+                    />
+                  )}
+
+                  {activeInsightsTab === 'health' && (
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <SystemCollapseMonitor
+                          components={workspaceComponents}
+                          collapseEvents={collapseEvents}
+                          recoveryEvents={recoveryEvents}
+                          showRecoveryTimeline
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <BottleneckVisualizer
+                          components={workspaceComponents}
+                          componentMetrics={componentMetrics}
+                          onComponentSelect={(componentId) => {
+                            const component = workspaceComponents.find(c => c.id === componentId) || null;
+                            setSelectedComponent(component);
+                          }}
+                          showDetails
+                          enableAnimation
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Properties Panel */}
-            <div style={{
-              width: '300px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px'
-            }}>
+            {/* Right Sidebar - Properties & Controls */}
+            <aside className="w-80 flex flex-col gap-4">
               {/* Component Properties */}
-              <div style={{
-                backgroundColor: '#fff',
-                border: '1px solid #e0e0e0',
-                borderRadius: '8px',
-                padding: '20px'
-              }}>
-                <h3 style={{
-                  margin: '0 0 16px 0',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  color: '#333'
-                }}>
-                  Properties
-                </h3>
-                
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h3 className="text-base font-semibold text-gray-800 mb-3">Properties</h3>
+
                 {selectedComponent ? (
-                  <div>
-                    <div style={{ marginBottom: '16px' }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#666' }}>
-                        Component Details
-                      </h4>
-                      <p style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm text-gray-600 mb-2">Component Details</h4>
+                      <p className="text-base font-semibold text-gray-900 mb-1">
                         {selectedComponent.metadata.name}
                       </p>
-                      <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
+                      <p className="text-xs text-gray-600">
                         {selectedComponent.metadata.description}
                       </p>
                     </div>
 
-                    <div style={{ marginBottom: '16px' }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#666' }}>
-                        Configuration
-                      </h4>
-                      <div style={{ fontSize: '12px', color: '#333' }}>
-                        <div style={{ marginBottom: '4px' }}>
-                          <strong>Capacity:</strong> {selectedComponent.configuration.capacity}
+                    <div>
+                      <h4 className="text-sm text-gray-600 mb-2">Configuration</h4>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Capacity:</span>
+                          <span className="font-medium text-gray-900">{selectedComponent.configuration.capacity}</span>
                         </div>
-                        <div style={{ marginBottom: '4px' }}>
-                          <strong>Latency:</strong> {selectedComponent.configuration.latency}ms
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Latency:</span>
+                          <span className="font-medium text-gray-900">{selectedComponent.configuration.latency}ms</span>
                         </div>
-                        <div style={{ marginBottom: '4px' }}>
-                          <strong>Failure Rate:</strong> {(selectedComponent.configuration.failureRate * 100).toFixed(3)}%
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Failure Rate:</span>
+                          <span className="font-medium text-gray-900">
+                            {(selectedComponent.configuration.failureRate * 100).toFixed(3)}%
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     <div>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#666' }}>
-                        Position
-                      </h4>
-                      <div style={{ fontSize: '12px', color: '#333' }}>
-                        <div style={{ marginBottom: '4px' }}>
-                          <strong>X:</strong> {selectedComponent.position.x}px
+                      <h4 className="text-sm text-gray-600 mb-2">Position</h4>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">X:</span>
+                          <span className="font-medium text-gray-900">{selectedComponent.position.x}px</span>
                         </div>
-                        <div>
-                          <strong>Y:</strong> {selectedComponent.position.y}px
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Y:</span>
+                          <span className="font-medium text-gray-900">{selectedComponent.position.y}px</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p style={{
-                    color: '#666',
-                    fontSize: '14px',
-                    fontStyle: 'italic'
-                  }}>
+                  <p className="text-sm text-gray-500 italic">
                     Select a component to view its properties
                   </p>
                 )}
               </div>
 
-              {/* Scale Control - MVLE-3 */}
-              <div>
+              {/* Scale Control */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <ScaleControl
                   currentScale={currentScale}
                   onScaleChange={handleScaleChange}
@@ -572,134 +831,22 @@ export const Workspace: React.FC = () => {
                   onStopSimulation={handleStopSimulation}
                 />
               </div>
-            </div>
-          </div>
 
-          {/* Status Bar */}
-          <div style={{ marginTop: '10px' }}>
-            <StatusBar
-              selectedComponent={selectedComponent}
-              componentCount={componentCount}
-            />
-          </div>
-
-          {/* Insights Panel: Scenarios, Progress, System Health */}
-          <div
-            style={{
-              marginTop: '16px',
-              backgroundColor: '#fff',
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              padding: '12px 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '4px'
-              }}
-            >
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveInsightsTab('scenarios')}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '9999px',
-                    border: 'none',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    backgroundColor: activeInsightsTab === 'scenarios' ? '#007bff' : '#f1f3f5',
-                    color: activeInsightsTab === 'scenarios' ? '#ffffff' : '#495057'
-                  }}
-                >
-                  Scenarios
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveInsightsTab('progress')}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '9999px',
-                    border: 'none',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    backgroundColor: activeInsightsTab === 'progress' ? '#007bff' : '#f1f3f5',
-                    color: activeInsightsTab === 'progress' ? '#ffffff' : '#495057'
-                  }}
-                >
-                  Progress
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveInsightsTab('health')}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '9999px',
-                    border: 'none',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    backgroundColor: activeInsightsTab === 'health' ? '#007bff' : '#f1f3f5',
-                    color: activeInsightsTab === 'health' ? '#ffffff' : '#495057'
-                  }}
-                >
-                  System Health
-                </button>
-              </div>
-              <div style={{ fontSize: '12px', color: '#868e96' }}>
-                Learn, track progress, and monitor stability as you iterate.
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '12px',
-                maxHeight: '260px',
-                overflow: 'hidden'
-              }}
-            >
-              {activeInsightsTab === 'scenarios' && (
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  <ScenarioLibrary
-                    userId={currentUserId}
-                    completedScenarios={completedScenarios}
-                    onScenarioSelect={(scenario) => handleScenarioSelect(scenario.id)}
-                    onScenarioLoad={handleScenarioLoad}
-                  />
+              {/* Simulation Time */}
+              {isSimulationRunning && (
+                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-900">Elapsed Time</span>
+                    <span className="text-2xl font-bold text-blue-600">{elapsedTime}s</span>
+                  </div>
                 </div>
               )}
-
-              {activeInsightsTab === 'progress' && (
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  <ProgressDashboard
-                    userId={currentUserId}
-                    onScenarioSelect={(scenarioId) => handleScenarioSelect(scenarioId)}
-                  />
-                </div>
-              )}
-
-              {activeInsightsTab === 'health' && (
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  <SystemCollapseMonitor
-                    components={workspaceComponents}
-                    collapseEvents={collapseEvents}
-                    recoveryEvents={recoveryEvents}
-                    showRecoveryTimeline
-                  />
-                </div>
-              )}
-            </div>
+            </aside>
           </div>
         </div>
       </div>
 
-      {/* Import Modal */}
+      {/* Modals and Overlays */}
       <WorkspaceImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
@@ -707,77 +854,181 @@ export const Workspace: React.FC = () => {
         userId={currentUserId}
       />
 
-      {/* Collaboration Presence Overlay */}
       <CollaborationPresence
         participants={collaborationState.participants}
         currentUserId={currentUserId}
       />
 
-      {/* Metrics Dashboard - MVLE-6 */}
-      <MetricsDashboard
-        isVisible={isSimulationRunning}
-        systemMetrics={systemMetrics}
-        componentMetrics={componentMetrics}
-        bottlenecks={Array.from(bottlenecksMap.values())}
-        simulationStatus={isSimulationRunning ? 'running' : 'idle'}
-        elapsedTime={elapsedTime}
-      />
+      {/* Metrics Dashboard - Positioned top-left during simulation */}
+      {showMetricsPanel && isSimulationRunning && (
+        <div className="fixed top-20 left-72 z-40 max-w-md animate-in fade-in slide-in-from-left duration-300">
+          <div className="bg-white rounded-lg shadow-xl border border-gray-300">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800">Metrics Dashboard</h3>
+              <button
+                onClick={() => setShowMetricsPanel(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <MetricsDashboard
+              isVisible={true}
+              systemMetrics={systemMetrics}
+              componentMetrics={componentMetrics}
+              bottlenecks={Array.from(bottlenecksMap.values())}
+              simulationStatus={isSimulationRunning ? 'running' : 'idle'}
+              elapsedTime={elapsedTime}
+            />
+          </div>
+        </div>
+      )}
 
-      {/* Hints Panel - SRS FR-9.3 */}
-      <HintsPanel
-        context={{
-          userId: currentUserId,
-          scenarioId: 'demo-scenario',
-          currentTime: elapsedTime,
-          userPerformance: {
-            latency: systemMetrics?.averageLatency || 0,
-            throughput: systemMetrics?.totalThroughput || 0,
-            errorRate: systemMetrics?.systemErrorRate || 0
-          },
-          recentActions: [], // TODO: Track user actions
-          componentsAdded: workspaceComponents.map(c => c.type),
-          connectionsCreated: workspaceConnections.length,
-          errorsEncountered: [], // TODO: Track errors
-          timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
-        }}
-        currentDifficulty="beginner"
-        isActive={showHintsPanel && isSimulationRunning}
-        onHintInteraction={(hintId, action) => {
-          console.log('Hint interaction:', hintId, action);
-        }}
-        onExplanationRequested={(concept) => {
-          console.log('Explanation requested:', concept);
-        }}
-      />
+      {/* Additional Dashboards - Positioned on the right */}
+      <div className="fixed top-20 right-4 z-30 w-80 flex flex-col gap-3">
+        {/* Cost Dashboard */}
+        {showCostPanel && (
+          <div className="bg-white rounded-lg shadow-xl border border-gray-300 animate-in fade-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800">Cost Dashboard</h3>
+              <button
+                onClick={() => setShowCostPanel(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <CostDashboard
+              components={workspaceComponents}
+              userCount={currentScale}
+            />
+          </div>
+        )}
 
-      {/* Progressive Constraints Panel - SRS FR-9.2 */}
-      <ProgressiveConstraintsPanel
-        scenarioId="demo-scenario"
-        sessionId={constraintSessionId}
-        userId={currentUserId}
-        currentTime={elapsedTime}
-        isActive={showConstraintsPanel && isSimulationRunning}
-        onConstraintActivated={(constraint) => {
-          console.log('Constraint activated:', constraint);
-        }}
-        onPerformanceUpdate={(metrics) => {
-          console.log('Performance updated:', metrics);
-        }}
-      />
+        {/* Scalability Dashboard */}
+        {showScalabilityPanel && (
+          <div className="bg-white rounded-lg shadow-xl border border-gray-300 animate-in fade-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800">Scalability Dashboard</h3>
+              <button
+                onClick={() => setShowScalabilityPanel(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <ScalabilityDashboard apiBaseUrl={API_BASE_URL} />
+          </div>
+        )}
+      </div>
 
-      {/* Failure Injection Panel - SRS FR-6 */}
-      <FailureInjectionPanel
-        isVisible={showFailurePanel}
-        components={workspaceComponents.map(c => ({
-          id: c.id,
-          name: c.metadata.name,
-          type: c.type
-        }))}
-        activeFailures={activeFailures}
-        onInjectFailure={handleInjectFailure}
-        onRemoveFailure={handleRemoveFailure}
-        simulationRunning={isSimulationRunning}
-      />
+      {/* Learning Panels - Bottom right, stacked */}
+      <div className="fixed bottom-4 right-4 z-40 w-96 flex flex-col gap-3">
+        {/* Hints Panel */}
+        {showHintsPanel && isSimulationRunning && (
+          <div className="bg-white rounded-lg shadow-xl border border-gray-300 max-h-64 overflow-hidden animate-in fade-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800">Hints</h3>
+              <button
+                onClick={() => setShowHintsPanel(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-auto max-h-56">
+              <HintsPanel
+                context={{
+                  userId: currentUserId,
+                  scenarioId: 'demo-scenario',
+                  currentTime: elapsedTime,
+                  userPerformance: {
+                    latency: systemMetrics?.averageLatency || 0,
+                    throughput: systemMetrics?.totalThroughput || 0,
+                    errorRate: systemMetrics?.systemErrorRate || 0
+                  },
+                  recentActions: [],
+                  componentsAdded: workspaceComponents.map(c => c.type),
+                  connectionsCreated: workspaceConnections.length,
+                  errorsEncountered: [],
+                  timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
+                }}
+                currentDifficulty="beginner"
+                isActive={true}
+                onHintInteraction={(hintId, action) => {
+                  console.log('Hint interaction:', hintId, action);
+                }}
+                onExplanationRequested={(concept) => {
+                  console.log('Explanation requested:', concept);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Progressive Constraints Panel */}
+        {showConstraintsPanel && isSimulationRunning && (
+          <div className="bg-white rounded-lg shadow-xl border border-gray-300 animate-in fade-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800">Progressive Constraints</h3>
+              <button
+                onClick={() => setShowConstraintsPanel(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <ProgressiveConstraintsPanel
+              scenarioId="demo-scenario"
+              sessionId={constraintSessionId}
+              userId={currentUserId}
+              currentTime={elapsedTime}
+              isActive={true}
+              onConstraintActivated={(constraint) => {
+                console.log('Constraint activated:', constraint);
+              }}
+              onPerformanceUpdate={(metrics) => {
+                console.log('Performance updated:', metrics);
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Failure Injection Panel - Bottom left */}
+      {showFailurePanel && (
+        <div className="fixed bottom-4 left-72 z-40 w-96 animate-in fade-in slide-in-from-left duration-300">
+          <div className="bg-white rounded-lg shadow-xl border border-gray-300">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800">Failure Injection</h3>
+              <button
+                onClick={() => setShowFailurePanel(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <FailureInjectionPanel
+              isVisible={true}
+              components={workspaceComponents.map(c => ({
+                id: c.id,
+                name: c.metadata.name,
+                type: c.type
+              }))}
+              activeFailures={activeFailures}
+              onInjectFailure={handleInjectFailure}
+              onRemoveFailure={handleRemoveFailure}
+              simulationRunning={isSimulationRunning}
+            />
+          </div>
+        </div>
+      )}
     </DndProviderFixed>
   );
 };
