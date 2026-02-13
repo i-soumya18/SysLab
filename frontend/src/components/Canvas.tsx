@@ -13,7 +13,6 @@ import { ConnectionWire } from './ConnectionWire';
 import { useConnectionManager } from './ConnectionManager';
 import { ConnectionConfigPanel } from './ConnectionConfigPanel';
 import { ConnectionContextMenu } from './ConnectionContextMenu';
-import { ComponentConfigPanel } from './ComponentConfigPanel';
 
 // Drag item type for React DnD
 export interface DragItem {
@@ -44,6 +43,7 @@ interface CanvasProps {
   onComponentUpdate?: (component: Component) => void;
   onComponentDelete?: (componentId: string) => void;
   onComponentCountChange?: (count: number) => void;
+  onComponentConfigure?: (component: Component) => void;
   onConnectionCreate?: (connection: Connection) => void;
   onConnectionDelete?: (connectionId: string) => void;
   onConnectionSelect?: (connection: Connection | null) => void;
@@ -66,6 +66,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onComponentUpdate,
   onComponentDelete,
   onComponentCountChange,
+  onComponentConfigure,
   onConnectionCreate,
   onConnectionDelete,
   onConnectionSelect,
@@ -81,7 +82,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [showConnectionConfig, setShowConnectionConfig] = useState(false);
-  const [showComponentConfig, setShowComponentConfig] = useState(false);
   const [connectionContextMenu, setConnectionContextMenu] = useState<{
     connection: Connection;
     position: { x: number; y: number };
@@ -156,6 +156,67 @@ export const Canvas: React.FC<CanvasProps> = ({
       y: Math.round(position.y / gridSize) * gridSize
     };
   }, [enableGridSnapping, gridSize]);
+
+  // Check if a position overlaps with existing components
+  const checkCollision = useCallback((position: Position, excludeId?: string): boolean => {
+    const componentWidth = 100;
+    const componentHeight = 80;
+    const padding = 20; // Minimum spacing between components
+
+    return components.some(comp => {
+      if (excludeId && comp.id === excludeId) return false;
+      
+      const compRight = comp.position.x + componentWidth + padding;
+      const compBottom = comp.position.y + componentHeight + padding;
+      const newRight = position.x + componentWidth + padding;
+      const newBottom = position.y + componentHeight + padding;
+
+      return (
+        position.x < compRight &&
+        newRight > comp.position.x &&
+        position.y < compBottom &&
+        newBottom > comp.position.y
+      );
+    });
+  }, [components]);
+
+  // Find next available position without collision
+  const findAvailablePosition = useCallback((startPosition: Position): Position => {
+    const componentWidth = 100;
+    const componentHeight = 80;
+    const spacing = 120; // Grid spacing for new components
+    let currentPos = { ...startPosition };
+    let attempts = 0;
+    const maxAttempts = 200; // Increased attempts for larger canvases
+
+    // Try to find a nearby position that doesn't collide
+    while (checkCollision(currentPos) && attempts < maxAttempts) {
+      // Try moving right first
+      currentPos.x += spacing;
+      if (currentPos.x + componentWidth + 20 > width) {
+        // Move to next row
+        currentPos.x = 20; // Start with some padding from left
+        currentPos.y += spacing;
+        if (currentPos.y + componentHeight + 20 > height) {
+          // Wrap around to top, but shift right
+          currentPos.y = 20;
+          currentPos.x += spacing * 2; // Try a different column
+          if (currentPos.x + componentWidth > width) {
+            currentPos.x = 20; // Reset to start
+          }
+        }
+      }
+      attempts++;
+    }
+
+    // Ensure position is within bounds
+    const finalPos = {
+      x: Math.max(0, Math.min(width - componentWidth - 20, currentPos.x)),
+      y: Math.max(0, Math.min(height - componentHeight - 20, currentPos.y))
+    };
+
+    return snapToGrid(finalPos);
+  }, [checkCollision, snapToGrid, width, height]);
 
   // Convert screen coordinates to canvas coordinates
   const screenToCanvas = useCallback((screenX: number, screenY: number): Position => {
@@ -324,15 +385,20 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       if (offset && canvasRect) {
         const canvasPosition = screenToCanvas(offset.x, offset.y);
-        const snappedPosition = snapToGrid({
+        const initialPosition = snapToGrid({
           x: Math.max(0, Math.min(width - 100, canvasPosition.x)),
           y: Math.max(0, Math.min(height - 100, canvasPosition.y))
         });
 
+        // Find a position without collision
+        const finalPosition = checkCollision(initialPosition)
+          ? findAvailablePosition(initialPosition)
+          : initialPosition;
+
         const newComponent = componentLibrary.createComponent(
           item.componentKey,
           item.componentType,
-          snappedPosition
+          finalPosition
         );
 
         if (newComponent) {
@@ -346,36 +412,41 @@ export const Canvas: React.FC<CanvasProps> = ({
     })
   });
 
-  // Handle component selection
+  // Handle component selection (without auto-opening config panel)
   const handleComponentSelect = useCallback((component: Component | null) => {
     setSelectedComponent(component);
     onComponentSelect?.(component);
-    if (component) {
-      setShowComponentConfig(true);
-    } else {
-      setShowComponentConfig(false);
-    }
+    // Don't auto-open config panel - user must click "Configure" from menu
   }, [onComponentSelect]);
 
   // Handle component position updates
   const handleComponentMove = useCallback((componentId: string, newPosition: Position) => {
     const snappedPosition = snapToGrid(newPosition);
     
+    // Check for collision, but allow slight overlap during drag (user can adjust)
+    // Only prevent if there's significant overlap
+    const hasCollision = checkCollision(snappedPosition, componentId);
+    
+    // If collision detected, try to find nearby available position
+    const finalPosition = hasCollision
+      ? findAvailablePosition(snappedPosition)
+      : snappedPosition;
+    
     setComponents(prev => 
       prev.map(comp => 
         comp.id === componentId 
-          ? { ...comp, position: snappedPosition }
+          ? { ...comp, position: finalPosition }
           : comp
       )
     );
 
     // Update the selected component if it's the one being moved
     if (selectedComponent?.id === componentId) {
-      const updatedComponent = { ...selectedComponent, position: snappedPosition };
+      const updatedComponent = { ...selectedComponent, position: finalPosition };
       setSelectedComponent(updatedComponent);
       onComponentUpdate?.(updatedComponent);
     }
-  }, [selectedComponent, onComponentUpdate, snapToGrid]);
+  }, [selectedComponent, onComponentUpdate, snapToGrid, checkCollision, findAvailablePosition]);
 
   // Handle component configuration updates
   const handleComponentUpdate = useCallback((updatedComponent: Component) => {
@@ -421,7 +492,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       handleComponentSelect(null);
       setSelectedConnection(null);
       setShowConnectionConfig(false);
-      setShowComponentConfig(false);
       setConnectionContextMenu(null);
       onConnectionSelect?.(null);
       setContextMenu(null);
@@ -429,8 +499,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     connectionManager.handleCanvasClick(e);
   }, [handleComponentSelect, onConnectionSelect, connectionManager]);
 
-  // Handle context menu
+  // Handle context menu (for both left-click and right-click)
   const handleContextMenu = useCallback((component: Component, position: { x: number; y: number }) => {
+    setContextMenu({ component, position });
+    handleComponentSelect(component);
+  }, [handleComponentSelect]);
+
+  // Handle component click - show menu instead of opening config panel
+  const handleComponentClick = useCallback((component: Component, position: { x: number; y: number }) => {
     setContextMenu({ component, position });
     handleComponentSelect(component);
   }, [handleComponentSelect]);
@@ -477,12 +553,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     setContextMenu(null);
   }, [onComponentAdd, onComponentCountChange]);
 
-  // Handle component configuration
+  // Handle component configuration - delegate to parent
   const handleComponentConfigure = useCallback((component: Component) => {
     handleComponentSelect(component);
-    setShowComponentConfig(true);
+    onComponentConfigure?.(component);
     setContextMenu(null);
-  }, [handleComponentSelect]);
+  }, [handleComponentSelect, onComponentConfigure]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -504,7 +580,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             handleComponentSelect(null);
             setSelectedConnection(null);
             setShowConnectionConfig(false);
-            setShowComponentConfig(false);
             setConnectionContextMenu(null);
             onConnectionSelect?.(null);
             setContextMenu(null);
@@ -521,7 +596,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           case 'Escape':
             setSelectedConnection(null);
             setShowConnectionConfig(false);
-            setShowComponentConfig(false);
             setConnectionContextMenu(null);
             onConnectionSelect?.(null);
             break;
@@ -756,13 +830,18 @@ export const Canvas: React.FC<CanvasProps> = ({
               key={component.id}
               component={component}
               isSelected={selectedComponent?.id === component.id || selectedComponents.includes(component.id)}
-              onSelect={(comp) => {
+              onSelect={(comp, event) => {
                 if (comp && selectedComponents.length > 0) {
                   // If we have multiple selected and clicking on one, select just that one
                   setSelectedComponents([]);
-                  handleComponentSelect(comp);
-                } else {
-                  handleComponentSelect(comp);
+                }
+                // Show context menu on click instead of opening config panel
+                if (comp && event) {
+                  handleComponentClick(comp, { x: event.clientX, y: event.clientY });
+                } else if (!comp) {
+                  // Deselect if clicking on nothing
+                  handleComponentSelect(null);
+                  setContextMenu(null);
                 }
               }}
               onMove={handleComponentMove}
@@ -1077,18 +1156,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         />
       )}
       
-      {/* Component Configuration Panel */}
-      {showComponentConfig && selectedComponent && (
-        <ComponentConfigPanel
-          component={selectedComponent}
-          onUpdate={handleComponentUpdate}
-          onClose={() => {
-            setShowComponentConfig(false);
-            setSelectedComponent(null);
-            onComponentSelect?.(null);
-          }}
-        />
-      )}
     </div>
   );
 };

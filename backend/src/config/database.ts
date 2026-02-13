@@ -63,6 +63,11 @@ async function initializeSchema(): Promise<void> {
       );
     `);
 
+    // Ensure is_admin exists (for DBs created before admin feature)
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
+    `);
+
     // Create user sessions table for JWT token management
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (

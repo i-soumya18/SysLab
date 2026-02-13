@@ -10,7 +10,7 @@ import type { Component, Position } from '../types';
 interface CanvasComponentProps {
   component: Component;
   isSelected: boolean;
-  onSelect: (component: Component | null) => void;
+  onSelect: (component: Component | null, event?: React.MouseEvent) => void;
   onMove: (componentId: string, newPosition: Position) => void;
   onContextMenu?: (component: Component, position: { x: number; y: number }) => void;
   onConnectionPointClick?: (componentId: string, port: string, position: { x: number; y: number }) => void;
@@ -78,10 +78,11 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
 
   drag(ref);
 
-  // Handle component click for selection
+  // Handle component click - always show menu, don't toggle selection
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onSelect(isSelected ? null : component);
+    // Always pass the component and event to show the menu
+    onSelect(component, e);
   };
 
   // Handle right-click for context menu

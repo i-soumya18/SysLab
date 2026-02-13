@@ -28,6 +28,8 @@ import { WorkspaceApiService } from '../services/workspaceApi';
 import { scenarioApi } from '../services/scenarioApi';
 import { CostDashboard } from './CostDashboard';
 import { ScalabilityDashboard } from './ScalabilityDashboard';
+import { ComponentConfigPanel } from './ComponentConfigPanel';
+import { ResizableCard } from './ResizableCard';
 import type {
   BottleneckInfo,
   Component,
@@ -88,6 +90,18 @@ export const Workspace: React.FC = () => {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(256);
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(320);
   const [insightsHeight, setInsightsHeight] = useState<number>(240);
+  const [showConfigPanel, setShowConfigPanel] = useState<boolean>(false);
+  
+  // Individual card heights for right sidebar
+  const [propertiesPanelHeight, setPropertiesPanelHeight] = useState<number>(300);
+  const [scaleControlHeight, setScaleControlHeight] = useState<number>(340);
+  const [simulationTimeHeight, setSimulationTimeHeight] = useState<number>(80);
+  const [metricsPanelHeight, setMetricsPanelHeight] = useState<number>(250);
+  const [costPanelHeight, setCostPanelHeight] = useState<number>(200);
+  const [scalabilityPanelHeight, setScalabilityPanelHeight] = useState<number>(250);
+  const [hintsPanelHeight, setHintsPanelHeight] = useState<number>(200);
+  const [constraintsPanelHeight, setConstraintsPanelHeight] = useState<number>(200);
+  const [failurePanelHeight, setFailurePanelHeight] = useState<number>(200);
 
   const minLeftSidebarWidth = 200;
   const maxLeftSidebarWidth = 400;
@@ -248,8 +262,18 @@ export const Workspace: React.FC = () => {
 
   const handleComponentSelect = (component: Component | null) => {
     setSelectedComponent(component);
+    // Don't auto-open config panel - user must click "Configure" from menu
+    if (!component) {
+      setShowConfigPanel(false);
+    }
     console.log('Component selected:', component);
   };
+
+  const handleComponentConfigure = useCallback(() => {
+    if (selectedComponent) {
+      setShowConfigPanel(true);
+    }
+  }, [selectedComponent]);
 
   const handleComponentUpdate = (component: Component) => {
     console.log('Component updated:', component);
@@ -971,10 +995,11 @@ export const Workspace: React.FC = () => {
             {/* Canvas Section */}
             <div className="flex-1 flex flex-col gap-4 min-w-0 pr-4">
               {/* Canvas Container */}
-              <div className="flex-1 bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-center overflow-hidden">
-                <Canvas
-                  width={1000}
-                  height={600}
+              <div className="flex-1 bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-center overflow-auto min-h-0">
+                <div className="w-full h-full min-w-[800px] min-h-[500px]">
+                  <Canvas
+                    width={1000}
+                    height={600}
                   initialComponents={workspaceComponents}
                   initialConnections={workspaceConnections}
                   onComponentAdd={handleComponentAdd}
@@ -982,10 +1007,12 @@ export const Workspace: React.FC = () => {
                   onComponentUpdate={handleComponentUpdate}
                   onComponentDelete={handleComponentDelete}
                   onComponentCountChange={handleComponentCountChange}
+                  onComponentConfigure={handleComponentConfigure}
                   onConnectionCreate={handleConnectionCreate}
                   onConnectionDelete={handleConnectionDelete}
-                  bottlenecks={bottlenecksMap}
-                />
+                    bottlenecks={bottlenecksMap}
+                  />
+                </div>
               </div>
 
               {/* Status Bar */}
@@ -1102,68 +1129,126 @@ export const Workspace: React.FC = () => {
 
             {/* Right Sidebar - Properties & Controls */}
             <aside
-              className="flex flex-col gap-4"
-              style={{ width: rightSidebarWidth }}
+              className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden"
+              style={{ width: rightSidebarWidth, maxHeight: 'calc(100vh - 80px)' }}
             >
-              {/* Component Properties */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h3 className="text-base font-semibold text-gray-800 mb-3">Properties</h3>
-
+              {/* Component Properties / Configuration Panel */}
+              <ResizableCard
+                minHeight={150}
+                maxHeight={600}
+                defaultHeight={propertiesPanelHeight}
+                onResize={setPropertiesPanelHeight}
+                className="flex-shrink-0"
+                header={
+                  selectedComponent ? (
+                    showConfigPanel ? (
+                      <div className="flex items-center justify-between w-full">
+                        <h3 className="text-base font-semibold text-gray-800">Configuration</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowConfigPanel(false)}
+                          className="text-sm text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100"
+                        >
+                          View Properties
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between w-full">
+                        <h3 className="text-base font-semibold text-gray-800">Properties</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowConfigPanel(true)}
+                          className="text-sm text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                        >
+                          Configure
+                        </button>
+                      </div>
+                    )
+                  ) : (
+                    <h3 className="text-base font-semibold text-gray-800">Properties</h3>
+                  )
+                }
+                onClose={selectedComponent ? () => {
+                  setShowConfigPanel(false);
+                  setSelectedComponent(null);
+                } : undefined}
+              >
                 {selectedComponent ? (
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm text-gray-600 mb-2">Component Details</h4>
-                      <p className="text-base font-semibold text-gray-900 mb-1">
-                        {selectedComponent.metadata.name}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {selectedComponent.metadata.description}
-                      </p>
+                  showConfigPanel ? (
+                    <div className="p-4">
+                      <ComponentConfigPanel
+                        component={selectedComponent}
+                        onUpdate={handleComponentUpdate}
+                        onClose={() => {
+                          setShowConfigPanel(false);
+                          setSelectedComponent(null);
+                        }}
+                      />
                     </div>
+                  ) : (
+                    <div className="p-4 space-y-4">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-sm text-gray-600 mb-2">Component Details</h4>
+                          <p className="text-base font-semibold text-gray-900 mb-1">
+                            {selectedComponent.metadata.name}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {selectedComponent.metadata.description}
+                          </p>
+                        </div>
 
-                    <div>
-                      <h4 className="text-sm text-gray-600 mb-2">Configuration</h4>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Capacity:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.configuration.capacity}</span>
+                        <div>
+                          <h4 className="text-sm text-gray-600 mb-2">Configuration</h4>
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Capacity:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.configuration.capacity}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Latency:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.configuration.latency}ms</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Failure Rate:</span>
+                              <span className="font-medium text-gray-900">
+                                {(selectedComponent.configuration.failureRate * 100).toFixed(3)}%
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Latency:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.configuration.latency}ms</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Failure Rate:</span>
-                          <span className="font-medium text-gray-900">
-                            {(selectedComponent.configuration.failureRate * 100).toFixed(3)}%
-                          </span>
+
+                        <div>
+                          <h4 className="text-sm text-gray-600 mb-2">Position</h4>
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">X:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.position.x}px</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Y:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.position.y}px</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    <div>
-                      <h4 className="text-sm text-gray-600 mb-2">Position</h4>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">X:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.position.x}px</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Y:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.position.y}px</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  )
                 ) : (
                   <p className="text-sm text-gray-500 italic">
                     Select a component to view its properties
                   </p>
                 )}
-              </div>
+              </ResizableCard>
 
               {/* Scale Control */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <ResizableCard
+                minHeight={280}
+                maxHeight={500}
+                defaultHeight={scaleControlHeight}
+                onResize={setScaleControlHeight}
+                className="flex-shrink-0"
+              >
                 <ScaleControl
                   currentScale={currentScale}
                   onScaleChange={handleScaleChange}
@@ -1171,32 +1256,35 @@ export const Workspace: React.FC = () => {
                   onStartSimulation={handleStartSimulation}
                   onStopSimulation={handleStopSimulation}
                 />
-              </div>
+              </ResizableCard>
 
               {/* Simulation Time */}
               {isSimulationRunning && (
-                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                <ResizableCard
+                  minHeight={60}
+                  maxHeight={150}
+                  defaultHeight={simulationTimeHeight}
+                  onResize={setSimulationTimeHeight}
+                  className="flex-shrink-0 bg-blue-50 border-blue-200"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-blue-900">Elapsed Time</span>
                     <span className="text-2xl font-bold text-blue-600">{elapsedTime}s</span>
                   </div>
-                </div>
+                </ResizableCard>
               )}
 
               {/* Metrics Dashboard (docked) */}
               {showMetricsPanel && isSimulationRunning && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Metrics Dashboard</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowMetricsPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={metricsPanelHeight}
+                  onResize={setMetricsPanelHeight}
+                  title="Metrics Dashboard"
+                  onClose={() => setShowMetricsPanel(false)}
+                  className="flex-shrink-0"
+                >
                   <MetricsDashboard
                     isVisible={true}
                     systemMetrics={systemMetrics}
@@ -1205,105 +1293,91 @@ export const Workspace: React.FC = () => {
                     simulationStatus={isSimulationRunning ? 'running' : 'idle'}
                     elapsedTime={elapsedTime}
                   />
-                </div>
+                </ResizableCard>
               )}
 
               {/* Cost Dashboard (docked) */}
               {showCostPanel && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Cost Dashboard</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowCostPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={costPanelHeight}
+                  onResize={setCostPanelHeight}
+                  title="Cost Dashboard"
+                  onClose={() => setShowCostPanel(false)}
+                  className="flex-shrink-0"
+                >
                   <CostDashboard
                     components={workspaceComponents}
                     userCount={currentScale}
                   />
-                </div>
+                </ResizableCard>
               )}
 
               {/* Scalability Dashboard (docked) */}
               {showScalabilityPanel && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Scalability Dashboard</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowScalabilityPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={scalabilityPanelHeight}
+                  onResize={setScalabilityPanelHeight}
+                  title="Scalability Dashboard"
+                  onClose={() => setShowScalabilityPanel(false)}
+                  className="flex-shrink-0"
+                >
                   <ScalabilityDashboard apiBaseUrl={API_BASE_URL} />
-                </div>
+                </ResizableCard>
               )}
 
               {/* Learning Panels (docked) */}
               {showHintsPanel && isSimulationRunning && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Hints</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowHintsPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="max-h-56 overflow-auto">
-                    <HintsPanel
-                      context={{
-                        userId: currentUserId,
-                        scenarioId: 'demo-scenario',
-                        currentTime: elapsedTime,
-                        userPerformance: {
-                          latency: systemMetrics?.averageLatency || 0,
-                          throughput: systemMetrics?.totalThroughput || 0,
-                          errorRate: systemMetrics?.systemErrorRate || 0
-                        },
-                        recentActions: [],
-                        componentsAdded: workspaceComponents.map(c => c.type),
-                        connectionsCreated: workspaceConnections.length,
-                        errorsEncountered: [],
-                        timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
-                      }}
-                      currentDifficulty="beginner"
-                      isActive={true}
-                      onHintInteraction={(hintId, action) => {
-                        console.log('Hint interaction:', hintId, action);
-                      }}
-                      onExplanationRequested={(concept) => {
-                        console.log('Explanation requested:', concept);
-                      }}
-                    />
-                  </div>
-                </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={hintsPanelHeight}
+                  onResize={setHintsPanelHeight}
+                  title="Hints"
+                  onClose={() => setShowHintsPanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <HintsPanel
+                    context={{
+                      userId: currentUserId,
+                      scenarioId: 'demo-scenario',
+                      currentTime: elapsedTime,
+                      userPerformance: {
+                        latency: systemMetrics?.averageLatency || 0,
+                        throughput: systemMetrics?.totalThroughput || 0,
+                        errorRate: systemMetrics?.systemErrorRate || 0
+                      },
+                      recentActions: [],
+                      componentsAdded: workspaceComponents.map(c => c.type),
+                      connectionsCreated: workspaceConnections.length,
+                      errorsEncountered: [],
+                      timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
+                    }}
+                    currentDifficulty="beginner"
+                    isActive={true}
+                    onHintInteraction={(hintId, action) => {
+                      console.log('Hint interaction:', hintId, action);
+                    }}
+                    onExplanationRequested={(concept) => {
+                      console.log('Explanation requested:', concept);
+                    }}
+                  />
+                </ResizableCard>
               )}
 
               {showConstraintsPanel && isSimulationRunning && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Progressive Constraints</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowConstraintsPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={constraintsPanelHeight}
+                  onResize={setConstraintsPanelHeight}
+                  title="Progressive Constraints"
+                  onClose={() => setShowConstraintsPanel(false)}
+                  className="flex-shrink-0"
+                >
                   <ProgressiveConstraintsPanel
                     scenarioId="demo-scenario"
                     sessionId={constraintSessionId}
@@ -1317,23 +1391,20 @@ export const Workspace: React.FC = () => {
                       console.log('Performance updated:', metrics);
                     }}
                   />
-                </div>
+                </ResizableCard>
               )}
 
               {/* Failure Injection Panel (docked) */}
               {showFailurePanel && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Failure Injection</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowFailurePanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={failurePanelHeight}
+                  onResize={setFailurePanelHeight}
+                  title="Failure Injection"
+                  onClose={() => setShowFailurePanel(false)}
+                  className="flex-shrink-0"
+                >
                   <FailureInjectionPanel
                     isVisible={true}
                     components={workspaceComponents.map(c => ({
@@ -1346,7 +1417,7 @@ export const Workspace: React.FC = () => {
                     onRemoveFailure={handleRemoveFailure}
                     simulationRunning={isSimulationRunning}
                   />
-                </div>
+                </ResizableCard>
               )}
             </aside>
           </div>
