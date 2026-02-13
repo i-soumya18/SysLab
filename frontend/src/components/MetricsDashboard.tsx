@@ -14,6 +14,7 @@ interface MetricsDashboardProps {
   bottlenecks?: BottleneckInfo[];
   simulationStatus: 'idle' | 'running' | 'paused' | 'completed';
   elapsedTime: number;
+  loadPattern?: { currentLoad: number; pattern: string } | null;
 }
 
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
@@ -22,7 +23,8 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   componentMetrics = new Map(),
   bottlenecks = [],
   simulationStatus,
-  elapsedTime
+  elapsedTime,
+  loadPattern
 }) => {
   if (!isVisible) return null;
 
@@ -65,20 +67,15 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   return (
     <div
       style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        width: '450px',
-        maxHeight: '500px',
+        width: '100%',
+        height: '100%',
         backgroundColor: 'white',
         borderRadius: '8px',
         border: '1px solid #e0e0e0',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        fontFamily: 'Arial, sans-serif',
-        zIndex: 999
+        fontFamily: 'Arial, sans-serif'
       }}
     >
       {/* Header */}
@@ -130,25 +127,53 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         style={{
           flex: 1,
           overflowY: 'auto',
+          overflowX: 'hidden',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px'
+          gap: '16px',
+          minHeight: 0
         }}
       >
-        {/* Elapsed Time */}
-        <div
-          style={{
-            padding: '8px 12px',
-            backgroundColor: '#f0f0f0',
-            borderRadius: '4px',
-            textAlign: 'center',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            color: '#333'
-          }}
-        >
-          Elapsed Time: {formatTime(elapsedTime)}
+        {/* Elapsed Time and Load Pattern */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div
+            style={{
+              padding: '8px 12px',
+              backgroundColor: '#f0f0f0',
+              borderRadius: '4px',
+              textAlign: 'center',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#333'
+            }}
+          >
+            Elapsed Time: {formatTime(elapsedTime)}
+          </div>
+          
+          {loadPattern && (
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#e8f5e9',
+                borderLeft: '4px solid #4CAF50',
+                borderRadius: '4px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div style={{ fontSize: '12px', color: '#333' }}>
+                <div style={{ fontWeight: 'bold' }}>Current Load</div>
+                <div style={{ fontSize: '10px', color: '#666' }}>
+                  Pattern: {typeof loadPattern.pattern === 'string' ? loadPattern.pattern : (loadPattern.pattern?.type || 'unknown')}
+                </div>
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4CAF50' }}>
+                {typeof loadPattern.currentLoad === 'number' ? loadPattern.currentLoad.toFixed(0) : '0'} req/s
+              </div>
+            </div>
+          )}
         </div>
 
         {/* System Overview Cards */}
@@ -251,46 +276,55 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
               Bottlenecks ({bottlenecks.length})
             </h4>
 
-            {bottlenecks.map((bottleneck, index) => (
-              <div
-                key={index}
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: '#f5f5f5',
-                  borderLeft: '4px solid ' + getSeverityColor(bottleneck.severity),
-                  borderRadius: '4px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', flex: 1 }}>
-                    <span style={{ marginRight: '4px' }}>{getSeverityIcon(bottleneck.severity)}</span>
-                    {bottleneck.componentType}
+            {bottlenecks.map((bottleneck, index) => {
+              // Safely handle missing properties
+              const severity = bottleneck.severity || 'low';
+              const componentType = bottleneck.componentType || 'Unknown';
+              const type = bottleneck.type || 'bottleneck';
+              const impact = bottleneck.impact || 0;
+              const description = bottleneck.description || 'No description available';
+              
+              return (
+                <div
+                  key={index}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#f5f5f5',
+                    borderLeft: '4px solid ' + getSeverityColor(severity),
+                    borderRadius: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', flex: 1 }}>
+                      <span style={{ marginRight: '4px' }}>{getSeverityIcon(severity)}</span>
+                      {componentType}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        padding: '2px 6px',
+                        backgroundColor: getSeverityColor(severity),
+                        color: 'white',
+                        borderRadius: '3px',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {severity.toUpperCase()}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                      padding: '2px 6px',
-                      backgroundColor: getSeverityColor(bottleneck.severity),
-                      color: 'white',
-                      borderRadius: '3px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {bottleneck.severity.toUpperCase()}
+                  <div style={{ fontSize: '10px', color: '#666' }}>
+                    {type.toUpperCase()} • Impact: {impact}%
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic' }}>
+                    {description}
                   </div>
                 </div>
-                <div style={{ fontSize: '10px', color: '#666' }}>
-                  {bottleneck.type.toUpperCase()} • Impact: {bottleneck.impact}%
-                </div>
-                <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic' }}>
-                  {bottleneck.description}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

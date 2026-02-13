@@ -30,6 +30,7 @@ import { CostDashboard } from './CostDashboard';
 import { ScalabilityDashboard } from './ScalabilityDashboard';
 import { ComponentConfigPanel } from './ComponentConfigPanel';
 import { ResizableCard } from './ResizableCard';
+import { componentLibrary } from './ComponentLibrary';
 import type {
   BottleneckInfo,
   Component,
@@ -44,6 +45,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/
 
 // Fix React types compatibility with react-dnd
 const DndProviderFixed = DndProvider as any;
+
+// Helper function to check if a string is a valid UUID
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
 
 export const Workspace: React.FC = () => {
   const { id: routeWorkspaceId } = useParams<{ id?: string }>();
@@ -69,10 +76,12 @@ export const Workspace: React.FC = () => {
   const [componentMetrics, setComponentMetrics] = useState<Map<string, ComponentMetrics>>(new Map());
   const [bottlenecksMap, setBottlenecksMap] = useState<Map<string, BottleneckInfo>>(new Map());
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const [collapseEvents] = useState<CollapseEvent[]>([]);
-  const [recoveryEvents] = useState<RecoveryEvent[]>([]);
+  const [collapseEvents, setCollapseEvents] = useState<CollapseEvent[]>([]);
+  const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([]);
+  const [loadPattern, setLoadPattern] = useState<{ currentLoad: number; pattern: string } | null>(null);
   const [completedScenarios] = useState<string[]>([]);
   const [activeInsightsTab, setActiveInsightsTab] = useState<'scenarios' | 'progress' | 'health'>('scenarios');
+  const [currentScenarioId, setCurrentScenarioId] = useState<string | null>(null);
 
   // Learning panels state (SRS FR-9.2, FR-9.3, FR-6)
   const [showHintsPanel, setShowHintsPanel] = useState<boolean>(false);
@@ -171,6 +180,8 @@ export const Workspace: React.FC = () => {
       setWorkspaceComponents(loadedWorkspace.components || []);
       setWorkspaceConnections(loadedWorkspace.connections || []);
       setWorkspaceMeta(loadedWorkspace);
+      // Clear scenario ID when loading a regular workspace (not from scenario)
+      setCurrentScenarioId(null);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to load workspace from route:', error);
@@ -230,8 +241,11 @@ export const Workspace: React.FC = () => {
     }
   }, [wsSimulationMetrics]);
 
+  // Subscribe to bottleneck events
   useEffect(() => {
-    const unsubscribe = subscribe('simulation:bottleneck', (payload: { data?: BottleneckInfo[] | BottleneckInfo }) => {
+    if (!subscribe) return;
+    
+    const unsubscribe = subscribe('simulation:bottleneck', (payload: { data?: BottleneckInfo[] | BottleneckInfo; type?: string }) => {
       const data = payload?.data;
       if (!data) {
         return;
@@ -240,9 +254,19 @@ export const Workspace: React.FC = () => {
       const list = Array.isArray(data) ? data : [data];
       const next = new Map<string, BottleneckInfo>();
       list.forEach(bottleneck => {
-        next.set(bottleneck.componentId, bottleneck);
+        if (bottleneck && bottleneck.componentId) {
+          next.set(bottleneck.componentId, bottleneck);
+        }
       });
-      setBottlenecksMap(next);
+      
+      // Only update if bottlenecks actually changed
+      setBottlenecksMap(prev => {
+        if (prev.size === next.size && 
+            Array.from(prev.keys()).every(id => next.has(id) && prev.get(id) === next.get(id))) {
+          return prev; // No change
+        }
+        return next;
+      });
 
       // Auto-show hints panel when bottlenecks are detected
       if (list.length > 0 && isSimulationRunning && !showHintsPanel) {
@@ -254,6 +278,114 @@ export const Workspace: React.FC = () => {
       unsubscribe();
     };
   }, [subscribe, isSimulationRunning, showHintsPanel]);
+
+  // Subscribe to load pattern events
+  useEffect(() => {
+    if (!subscribe) return;
+    
+    const unsubscribe = subscribe('simulation:load', (payload: { type?: string; data?: any }) => {
+      if (!payload?.data) return;
+      
+      if (payload.type === 'load_changed') {
+        const patternData = payload.data.pattern || payload.data.type;
+        const patternString = typeof patternData === 'string' 
+          ? patternData 
+          : (patternData?.type || 'unknown');
+        const currentLoad = payload.data.currentLoad || payload.data.load || patternData?.baseLoad || 0;
+        
+        setLoadPattern(prev => {
+          const newPattern = {
+            currentLoad: typeof currentLoad === 'number' ? currentLoad : 0,
+            pattern: patternString
+          };
+          // Only update if values actually changed
+          if (prev?.currentLoad === newPattern.currentLoad && prev?.pattern === newPattern.pattern) {
+            return prev;
+          }
+          return newPattern;
+        });
+      } else if (payload.type === 'load_pattern_scheduled') {
+        const patternData = payload.data.pattern || payload.data.type;
+        const patternString = typeof patternData === 'string' 
+          ? patternData 
+          : (patternData?.type || 'scheduled');
+        const expectedLoad = payload.data.expectedLoad || patternData?.baseLoad || 0;
+        
+        setLoadPattern(prev => {
+          const newPattern = {
+            currentLoad: typeof expectedLoad === 'number' ? expectedLoad : 0,
+            pattern: patternString
+          };
+          // Only update if values actually changed
+          if (prev?.currentLoad === newPattern.currentLoad && prev?.pattern === newPattern.pattern) {
+            return prev;
+          }
+          return newPattern;
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribe]);
+
+  // Subscribe to collapse and recovery events
+  useEffect(() => {
+    const unsubscribeFailure = subscribe('simulation:failure', (payload: { type?: string; data?: any }) => {
+      if (payload?.type === 'random_failure_occurred' || payload?.type === 'failure_injected') {
+        const failureData = payload.data;
+        if (failureData?.componentId) {
+          const collapseEvent: CollapseEvent = {
+            id: `collapse-${Date.now()}-${Math.random()}`,
+            componentId: failureData.componentId,
+            componentType: failureData.componentType || 'unknown',
+            timestamp: new Date(failureData.timestamp || Date.now()),
+            reason: failureData.reason || failureData.type || 'Component failure',
+            severity: failureData.severity || 'high',
+            impact: failureData.impact || { affectedComponents: [], systemWide: false }
+          };
+          setCollapseEvents(prev => [...prev.slice(-49), collapseEvent]); // Keep last 50 events
+        }
+      }
+    });
+
+    const unsubscribeEvent = subscribe('simulation:event', (payload: { type?: string; data?: any }) => {
+      if (payload?.type === 'component_failed') {
+        const failureData = payload.data;
+        if (failureData?.componentId) {
+          const collapseEvent: CollapseEvent = {
+            id: `collapse-${Date.now()}-${Math.random()}`,
+            componentId: failureData.componentId,
+            componentType: failureData.componentType || 'unknown',
+            timestamp: new Date(failureData.timestamp || Date.now()),
+            reason: 'Component failure detected',
+            severity: 'high',
+            impact: { affectedComponents: [failureData.componentId], systemWide: false }
+          };
+          setCollapseEvents(prev => [...prev.slice(-49), collapseEvent]);
+        }
+      } else if (payload?.type === 'component_recovered') {
+        const recoveryData = payload.data;
+        if (recoveryData?.componentId) {
+          const recoveryEvent: RecoveryEvent = {
+            id: `recovery-${Date.now()}-${Math.random()}`,
+            componentId: recoveryData.componentId,
+            componentType: recoveryData.componentType || 'unknown',
+            timestamp: new Date(recoveryData.timestamp || Date.now()),
+            recoveryTime: recoveryData.recoveryTime || 0,
+            strategy: recoveryData.strategy || 'automatic'
+          };
+          setRecoveryEvents(prev => [...prev.slice(-49), recoveryEvent]); // Keep last 50 events
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeFailure();
+      unsubscribeEvent();
+    };
+  }, [subscribe]);
 
   const handleComponentAdd = (component: Component) => {
     console.log('Component added:', component);
@@ -341,14 +473,192 @@ export const Workspace: React.FC = () => {
 
   const handleScenarioLoad = async (scenarioId: string) => {
     try {
+      // Show loading state
+      setIsSaving(true);
+      
+      // Store the current scenario ID
+      setCurrentScenarioId(scenarioId);
+      
       const result = await scenarioApi.loadScenario(scenarioId, currentUserId);
       const loadedWorkspace = result.workspace as WorkspaceModel;
-      setCurrentWorkspaceId(loadedWorkspace.id);
-      setWorkspaceComponents(loadedWorkspace.components || []);
-      setWorkspaceConnections(loadedWorkspace.connections || []);
-      setWorkspaceMeta(loadedWorkspace);
+      const scenario = result.scenario;
+      
+      // Build components from component keys if scenario provides them
+      let componentsToLoad: Component[] = [];
+      
+      // First, try to use components from loaded workspace
+      if (loadedWorkspace.components && loadedWorkspace.components.length > 0) {
+        componentsToLoad = loadedWorkspace.components.map((comp: any) => {
+          // If component has componentKey, create it from component library
+          if (comp.componentKey && comp.type) {
+            const libraryComponent = componentLibrary.createComponent(
+              comp.componentKey,
+              comp.type,
+              comp.position || { x: 100, y: 100 },
+              comp.configuration
+            );
+            if (libraryComponent) {
+              // Preserve the original ID if provided, and position
+              return { 
+                ...libraryComponent, 
+                id: comp.id || libraryComponent.id,
+                position: comp.position || libraryComponent.position
+              };
+            }
+          }
+          // Otherwise use component as-is, ensuring it has required fields
+          return {
+            ...comp,
+            id: comp.id || `component-${Date.now()}-${Math.random()}`,
+            position: comp.position || { x: 100, y: 100 },
+            metadata: comp.metadata || { name: comp.type, version: '1.0' }
+          } as Component;
+        });
+      }
+      // If no components in workspace, try scenario's initialWorkspace
+      else if (scenario?.initialWorkspace?.components && scenario.initialWorkspace.components.length > 0) {
+        componentsToLoad = scenario.initialWorkspace.components.map((comp: any, index: number) => {
+          // If component has componentKey, create it from component library
+          if (comp.componentKey && comp.type) {
+            const libraryComponent = componentLibrary.createComponent(
+              comp.componentKey,
+              comp.type,
+              comp.position || { x: 100 + (index % 4) * 200, y: 100 + Math.floor(index / 4) * 150 },
+              comp.configuration
+            );
+            if (libraryComponent) {
+              return { 
+                ...libraryComponent, 
+                id: comp.id || libraryComponent.id,
+                position: comp.position || libraryComponent.position
+              };
+            }
+          }
+          // Otherwise create a basic component
+          return {
+            id: comp.id || `component-${Date.now()}-${index}`,
+            type: comp.type,
+            position: comp.position || { x: 100 + (index % 4) * 200, y: 100 + Math.floor(index / 4) * 150 },
+            configuration: comp.configuration || { capacity: 1000, latency: 50, failureRate: 0.01 },
+            metadata: comp.metadata || { name: comp.type, version: '1.0' }
+          } as Component;
+        });
+      }
+      
+      // Build a mapping from old component IDs to new UUID IDs BEFORE converting
+      // This ensures connections can reference the correct component IDs
+      const componentIdMap = new Map<string, string>();
+      componentsToLoad.forEach(comp => {
+        const oldId = comp.id;
+        if (oldId && !isValidUUID(oldId)) {
+          // Generate a new UUID for non-UUID IDs
+          const newId = crypto.randomUUID();
+          componentIdMap.set(oldId, newId);
+        }
+      });
+      
+      // Ensure all components have proper UUID IDs and positions
+      // Use the mapping we just created to preserve ID relationships
+      componentsToLoad = componentsToLoad.map((comp: Component, index: number) => {
+        const oldId = comp.id;
+        let newId: string;
+        
+        if (oldId && isValidUUID(oldId)) {
+          // Already a UUID, keep it
+          newId = oldId;
+        } else if (oldId && componentIdMap.has(oldId)) {
+          // Use the mapped UUID
+          newId = componentIdMap.get(oldId)!;
+        } else {
+          // Generate a new UUID if somehow missing
+          newId = crypto.randomUUID();
+          if (oldId) {
+            componentIdMap.set(oldId, newId);
+          }
+        }
+        
+        return {
+          ...comp,
+          id: newId,
+          position: comp.position || { x: 100 + (index % 4) * 200, y: 100 + Math.floor(index / 4) * 150 }
+        };
+      });
+      
+      // Ensure connections reference valid component IDs and have UUID IDs
+      // Use the componentIdMap to translate old IDs to new UUIDs
+      const validComponentIds = new Set(componentsToLoad.map(c => c.id));
+      const connectionsToLoad = (loadedWorkspace.connections || scenario?.initialWorkspace?.connections || [])
+        .map((conn: Connection) => {
+          // Map old component IDs to new UUIDs using the componentIdMap
+          let sourceId = conn.sourceComponentId;
+          let targetId = conn.targetComponentId;
+          
+          // Check if the connection references an old ID that needs mapping
+          if (componentIdMap.has(sourceId)) {
+            sourceId = componentIdMap.get(sourceId)!;
+          }
+          if (componentIdMap.has(targetId)) {
+            targetId = componentIdMap.get(targetId)!;
+          }
+          
+          // Ensure both IDs are valid UUIDs (should be after mapping)
+          if (!isValidUUID(sourceId)) {
+            console.warn(`Connection source ID ${sourceId} is not a valid UUID, skipping connection`);
+            return null;
+          }
+          if (!isValidUUID(targetId)) {
+            console.warn(`Connection target ID ${targetId} is not a valid UUID, skipping connection`);
+            return null;
+          }
+          
+          return {
+            ...conn,
+            id: (conn.id && isValidUUID(conn.id)) ? conn.id : crypto.randomUUID(),
+            sourceComponentId: sourceId,
+            targetComponentId: targetId
+          };
+        })
+        .filter((conn: Connection | null): conn is Connection => 
+          conn !== null && 
+          validComponentIds.has(conn.sourceComponentId) && 
+          validComponentIds.has(conn.targetComponentId)
+        );
+      
+      // When loading a scenario, always create a new workspace (don't use the UUID from the scenario)
+      // Scenarios are templates - they should always result in new workspace creation
+      const workspaceId = 'demo-workspace-id';
+      
+      setCurrentWorkspaceId(workspaceId);
+      setWorkspaceComponents(componentsToLoad);
+      setWorkspaceConnections(connectionsToLoad);
+      setWorkspaceMeta({
+        ...loadedWorkspace,
+        id: workspaceId,
+        configuration: loadedWorkspace.configuration || scenario?.initialWorkspace?.configuration || buildSimulationConfig()
+      });
+      
+      // Close scenario library panel
+      setActiveInsightsTab('scenarios');
+      
+      // Save the workspace immediately so user can start experimenting
+      if (componentsToLoad.length > 0) {
+        // Trigger save after state updates - this will create a new workspace if ID is invalid
+        setTimeout(async () => {
+          try {
+            await saveWorkspace({ silent: true });
+          } catch (error) {
+            console.error('Failed to save scenario workspace:', error);
+            // Don't show error to user if silent save fails - they can still use the workspace
+          } finally {
+            setIsSaving(false);
+          }
+        }, 200);
+      } else {
+        setIsSaving(false);
+      }
     } catch (error) {
       console.error('Failed to load scenario into workspace:', error);
+      setIsSaving(false);
       alert('Failed to load scenario. Please try again.');
     }
   };
@@ -411,10 +721,20 @@ export const Workspace: React.FC = () => {
   };
 
   const handleStopSimulation = () => {
+    if (!isSimulationRunning) {
+      // No simulation running, nothing to stop
+      return;
+    }
+    
     setIsSimulationRunning(false);
     wsStopSimulation().catch(error => {
       // eslint-disable-next-line no-console
       console.error('Failed to stop simulation via WebSocket:', error);
+      // Don't show error to user if simulation wasn't actually running
+      if (error.message && error.message.includes('No running simulation')) {
+        // Silently ignore - simulation was already stopped
+        return;
+      }
     });
   };
 
@@ -582,19 +902,84 @@ export const Workspace: React.FC = () => {
       setIsSaving(true);
       setSaveError(null);
 
+      // Clean components - remove any extra fields like componentKey that aren't in the schema
+      // Ensure all IDs are valid UUIDs
+      const cleanedComponents = workspaceComponents.map(comp => {
+        const compId = isValidUUID(comp.id) ? comp.id : crypto.randomUUID();
+        return {
+          id: compId,
+          type: comp.type,
+          position: comp.position,
+          configuration: comp.configuration,
+          metadata: comp.metadata
+        };
+      });
+
+      // Create a mapping for component ID updates
+      const componentIdUpdateMap = new Map<string, string>();
+      workspaceComponents.forEach((comp, idx) => {
+        if (!isValidUUID(comp.id)) {
+          componentIdUpdateMap.set(comp.id, cleanedComponents[idx].id);
+        }
+      });
+
+      // Clean connections - ensure all required fields are present and IDs are UUIDs
+      const cleanedConnections = workspaceConnections.map(conn => {
+        const connId = isValidUUID(conn.id) ? conn.id : crypto.randomUUID();
+        let sourceId = conn.sourceComponentId;
+        let targetId = conn.targetComponentId;
+        
+        // Update component IDs if they were changed
+        if (componentIdUpdateMap.has(sourceId)) {
+          sourceId = componentIdUpdateMap.get(sourceId)!;
+        }
+        if (componentIdUpdateMap.has(targetId)) {
+          targetId = componentIdUpdateMap.get(targetId)!;
+        }
+        
+        // Ensure source and target IDs are valid UUIDs
+        if (!isValidUUID(sourceId)) {
+          sourceId = crypto.randomUUID();
+        }
+        if (!isValidUUID(targetId)) {
+          targetId = crypto.randomUUID();
+        }
+        
+        return {
+          id: connId,
+          sourceComponentId: sourceId,
+          targetComponentId: targetId,
+          sourcePort: conn.sourcePort,
+          targetPort: conn.targetPort,
+          configuration: conn.configuration
+        };
+      }).filter(conn => {
+        // Ensure both source and target components exist
+        const sourceExists = cleanedComponents.some(c => c.id === conn.sourceComponentId);
+        const targetExists = cleanedComponents.some(c => c.id === conn.targetComponentId);
+        return sourceExists && targetExists;
+      });
+
       const payload = {
         name: workspaceMeta?.name ?? 'New Workspace',
         description: workspaceMeta?.description ?? 'A system design workspace',
         userId: currentUserId,
-        components: workspaceComponents,
-        connections: workspaceConnections,
+        components: cleanedComponents,
+        connections: cleanedConnections,
         configuration: workspaceMeta?.configuration ?? buildSimulationConfig()
       };
 
       let nextWorkspaceId = currentWorkspaceId;
       let response: Response;
 
-      if (currentWorkspaceId === 'demo-workspace-id' && !routeWorkspaceId) {
+      // Create new workspace if:
+      // 1. It's a demo workspace ID
+      // 2. It's not a valid UUID format (e.g., scenario-generated IDs)
+      // 3. No route workspace ID exists
+      if (
+        (currentWorkspaceId === 'demo-workspace-id' || !isValidUUID(currentWorkspaceId)) &&
+        !routeWorkspaceId
+      ) {
         // Create a new workspace on first save
         response = await fetch(`${API_BASE_URL}/workspaces`, {
           method: 'POST',
@@ -604,14 +989,40 @@ export const Workspace: React.FC = () => {
           body: JSON.stringify(payload)
         });
       } else {
-        // Update existing workspace
-        response = await fetch(`${API_BASE_URL}/workspaces/${encodeURIComponent(currentWorkspaceId)}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
+        // Update existing workspace (only if it's a valid UUID)
+        if (!isValidUUID(currentWorkspaceId)) {
+          // If somehow we have an invalid UUID, create a new workspace instead
+          response = await fetch(`${API_BASE_URL}/workspaces`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          // Try to update existing workspace
+          response = await fetch(`${API_BASE_URL}/workspaces/${encodeURIComponent(currentWorkspaceId)}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          // If workspace doesn't exist (404), fall back to creating a new one
+          if (response.status === 404) {
+            console.warn(`Workspace ${currentWorkspaceId} not found, creating new workspace instead`);
+            response = await fetch(`${API_BASE_URL}/workspaces`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload)
+            });
+            // Reset workspace ID so we use the new one from the response
+            nextWorkspaceId = 'demo-workspace-id';
+          }
+        }
       }
 
       if (!response.ok) {
@@ -767,12 +1178,16 @@ export const Workspace: React.FC = () => {
           className="bg-white border-r border-gray-200 flex flex-col"
           style={{ width: leftSidebarWidth }}
         >
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
             <h2 className="text-lg font-semibold text-gray-800">Components</h2>
             <p className="text-xs text-gray-500 mt-1">Drag to canvas</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            <ComponentPalette />
+          <div className="flex-1 overflow-hidden p-3" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <ComponentPalette 
+              width={leftSidebarWidth - 24} 
+              height={undefined}
+              onWidthChange={setLeftSidebarWidth}
+            />
           </div>
         </aside>
 
@@ -1275,7 +1690,7 @@ export const Workspace: React.FC = () => {
               )}
 
               {/* Metrics Dashboard (docked) */}
-              {showMetricsPanel && isSimulationRunning && (
+              {showMetricsPanel && (
                 <ResizableCard
                   minHeight={150}
                   maxHeight={500}
@@ -1285,6 +1700,7 @@ export const Workspace: React.FC = () => {
                   onClose={() => setShowMetricsPanel(false)}
                   className="flex-shrink-0"
                 >
+                  <div className="h-full overflow-hidden">
                   <MetricsDashboard
                     isVisible={true}
                     systemMetrics={systemMetrics}
@@ -1292,7 +1708,9 @@ export const Workspace: React.FC = () => {
                     bottlenecks={Array.from(bottlenecksMap.values())}
                     simulationStatus={isSimulationRunning ? 'running' : 'idle'}
                     elapsedTime={elapsedTime}
+                    loadPattern={loadPattern}
                   />
+                  </div>
                 </ResizableCard>
               )}
 
@@ -1343,7 +1761,7 @@ export const Workspace: React.FC = () => {
                   <HintsPanel
                     context={{
                       userId: currentUserId,
-                      scenarioId: 'demo-scenario',
+                      scenarioId: currentScenarioId || 'demo-scenario',
                       currentTime: elapsedTime,
                       userPerformance: {
                         latency: systemMetrics?.averageLatency || 0,
@@ -1379,7 +1797,7 @@ export const Workspace: React.FC = () => {
                   className="flex-shrink-0"
                 >
                   <ProgressiveConstraintsPanel
-                    scenarioId="demo-scenario"
+                    scenarioId={currentScenarioId || 'demo-scenario'}
                     sessionId={constraintSessionId}
                     userId={currentUserId}
                     currentTime={elapsedTime}

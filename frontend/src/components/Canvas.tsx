@@ -134,12 +134,24 @@ export const Canvas: React.FC<CanvasProps> = ({
   });
 
   // Initialize from parent-provided workspace state when present (e.g. loaded or imported workspace)
+  // Compare component IDs to avoid unnecessary updates
+  const prevInitialComponentsRef = useRef<string>('');
   useEffect(() => {
-    if (initialComponents && initialComponents.length > 0) {
-      setComponents(initialComponents);
-      onComponentCountChange?.(initialComponents.length);
+    if (!initialComponents || initialComponents.length === 0) {
+      return;
     }
-  }, [initialComponents, onComponentCountChange]);
+    
+    // Create a signature from component IDs to detect actual changes
+    const componentIds = initialComponents.map(c => c.id).sort().join(',');
+    if (componentIds === prevInitialComponentsRef.current) {
+      // Components haven't actually changed, skip update
+      return;
+    }
+    
+    prevInitialComponentsRef.current = componentIds;
+    setComponents(initialComponents);
+    // Don't call onComponentCountChange here - it will be called by the effect that watches components.length
+  }, [initialComponents]);
 
   useEffect(() => {
     if (initialConnections && initialConnections.length > 0) {
@@ -229,29 +241,41 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, [pan, zoom]);
 
-  // Zoom handling
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!enableZoom) return;
-    
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * delta));
-    
-    // Zoom towards mouse position
-    const canvasRect = canvasRef.current?.getBoundingClientRect();
-    if (canvasRect) {
-      const mouseX = e.clientX - canvasRect.left;
-      const mouseY = e.clientY - canvasRect.top;
+  // Zoom handling with non-passive event listener to allow preventDefault
+  useEffect(() => {
+    const canvasElement = canvasRef.current;
+    if (!canvasElement || !enableZoom) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
       
-      const zoomRatio = newZoom / zoom;
-      const newPan = {
-        x: mouseX - (mouseX - pan.x) * zoomRatio,
-        y: mouseY - (mouseY - pan.y) * zoomRatio
-      };
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * delta));
       
-      setZoom(newZoom);
-      setPan(newPan);
-    }
+      // Zoom towards mouse position
+      const canvasRect = canvasElement.getBoundingClientRect();
+      if (canvasRect) {
+        const mouseX = e.clientX - canvasRect.left;
+        const mouseY = e.clientY - canvasRect.top;
+        
+        const zoomRatio = newZoom / zoom;
+        const newPan = {
+          x: mouseX - (mouseX - pan.x) * zoomRatio,
+          y: mouseY - (mouseY - pan.y) * zoomRatio
+        };
+        
+        setZoom(newZoom);
+        setPan(newPan);
+      }
+    };
+
+    // Add event listener with passive: false to allow preventDefault
+    canvasElement.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      canvasElement.removeEventListener('wheel', handleWheel);
+    };
   }, [enableZoom, zoom, minZoom, maxZoom, pan]);
 
   // Selection box handling
@@ -514,7 +538,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Keep parent informed of component count without mutating it during render
   useEffect(() => {
     onComponentCountChange?.(components.length);
-  }, [components.length, onComponentCountChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [components.length]);
 
   // Handle component deletion
   const handleComponentDelete = useCallback((componentId: string) => {
@@ -659,7 +684,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      onWheel={handleWheel}
     >
       {/* Canvas content with zoom and pan transform */}
       <div

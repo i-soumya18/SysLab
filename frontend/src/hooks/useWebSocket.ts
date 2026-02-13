@@ -171,23 +171,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     };
   }, []);
 
-  // Auto-connect
-  useEffect(() => {
-    if (autoConnect && webSocketService.current && !connectionStatus.connected && !connectionStatus.connecting) {
-      connect();
-    }
-  }, [autoConnect, connectionStatus.connected, connectionStatus.connecting]);
-
-  // Auto-join workspace
-  useEffect(() => {
-    if (workspaceId && connectionStatus.connected && webSocketService.current) {
-      const currentWorkspaceId = webSocketService.current.getCurrentWorkspaceId();
-      if (currentWorkspaceId !== workspaceId) {
-        joinWorkspace(workspaceId, userId);
-      }
-    }
-  }, [workspaceId, userId, connectionStatus.connected]);
-
   // Connection methods
   const connect = useCallback(async () => {
     if (!webSocketService.current) return;
@@ -220,6 +203,44 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       throw error;
     }
   }, []);
+
+  // Auto-connect
+  useEffect(() => {
+    if (autoConnect && webSocketService.current && !connectionStatus.connected && !connectionStatus.connecting) {
+      connect();
+    }
+  }, [autoConnect, connectionStatus.connected, connectionStatus.connecting, connect]);
+
+  // Auto-join workspace with retry mechanism
+  useEffect(() => {
+    if (!workspaceId || !connectionStatus.connected || !webSocketService.current) {
+      return;
+    }
+
+    const currentWorkspaceId = webSocketService.current.getCurrentWorkspaceId();
+    if (currentWorkspaceId === workspaceId) {
+      return; // Already joined
+    }
+
+    // Add a small delay to ensure socket is fully ready
+    const joinTimeout = setTimeout(async () => {
+      try {
+        await joinWorkspace(workspaceId, userId);
+      } catch (error) {
+        // Retry once after a short delay if it fails
+        console.warn('Failed to join workspace, retrying...', error);
+        setTimeout(async () => {
+          try {
+            await joinWorkspace(workspaceId, userId);
+          } catch (retryError) {
+            console.error('Failed to join workspace after retry:', retryError);
+          }
+        }, 500);
+      }
+    }, 100);
+
+    return () => clearTimeout(joinTimeout);
+  }, [workspaceId, userId, connectionStatus.connected, joinWorkspace]);
 
   const leaveWorkspace = useCallback(async () => {
     if (!webSocketService.current) return;
@@ -255,7 +276,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     
     try {
       await webSocketService.current.controlSimulation('stop');
-    } catch (error) {
+    } catch (error: any) {
+      // Silently ignore "No running simulation" errors - simulation might already be stopped
+      if (error?.message && error.message.includes('No running simulation')) {
+        return;
+      }
       console.error('Failed to stop simulation:', error);
       throw error;
     }
