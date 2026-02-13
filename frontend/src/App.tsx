@@ -6,6 +6,8 @@ import { PricingPage } from './pages/marketing/PricingPage';
 import { AboutPage } from './pages/marketing/AboutPage';
 import { ComponentLibraryPage } from './pages/marketing/ComponentLibraryPage';
 import { Dashboard } from './pages/Dashboard';
+import { AllWorkspacesPage } from './pages/AllWorkspacesPage';
+import { ScenarioLibraryPage } from './pages/ScenarioLibraryPage';
 import { Workspace } from './components/Workspace';
 import { GettingStartedPage } from './pages/GettingStartedPage';
 import { ProfilePage } from './pages/user/ProfilePage';
@@ -103,6 +105,26 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppShell>
               <Dashboard />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/workspaces"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <AllWorkspacesPage />
+            </AppShell>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/scenarios"
+        element={(
+          <ProtectedRoute>
+            <AppShell>
+              <ScenarioLibraryPage />
             </AppShell>
           </ProtectedRoute>
         )}

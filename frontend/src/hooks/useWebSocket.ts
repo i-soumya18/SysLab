@@ -94,14 +94,35 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       setConnectionStatus(status);
     };
 
-    // Simulation metrics listener
+    // Simulation metrics listener - throttled to prevent excessive updates
+    let lastMetricsUpdate = 0;
     const simulationMetricsListener = (metrics: SimulationMetrics) => {
+      const now = Date.now();
+      // Throttle to max 10 updates per second (100ms minimum interval)
+      if (now - lastMetricsUpdate < 100) {
+        return;
+      }
+      lastMetricsUpdate = now;
       setSimulationMetrics(metrics);
     };
 
-    // Simulation events listener
+    // Simulation events listener - throttled to prevent excessive updates
+    let lastEventUpdate = 0;
     const simulationEventsListener = (event: SimulationEvent) => {
-      setSimulationEvents(prev => [...prev.slice(-99), event]); // Keep last 100 events
+      const now = Date.now();
+      // Throttle to max 10 updates per second (100ms minimum interval)
+      if (now - lastEventUpdate < 100) {
+        return;
+      }
+      lastEventUpdate = now;
+      setSimulationEvents(prev => {
+        // Only update if event is actually new (check timestamp)
+        const lastEvent = prev[prev.length - 1];
+        if (lastEvent && lastEvent.timestamp === event.timestamp) {
+          return prev; // No change
+        }
+        return [...prev.slice(-99), event]; // Keep last 100 events
+      });
     };
 
     // Simulation progress listener

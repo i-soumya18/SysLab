@@ -39,11 +39,14 @@ export class ScenarioApiService {
   /**
    * Get all available scenarios
    */
-  async getAllScenarios(category?: string): Promise<Scenario[]> {
+  async getAllScenarios(category?: string, difficulty?: string): Promise<Scenario[]> {
     try {
       const url = new URL(`${API_BASE_URL}/scenarios`);
       if (category) {
         url.searchParams.append('category', category);
+      }
+      if (difficulty) {
+        url.searchParams.append('difficulty', difficulty);
       }
 
       const response = await fetch(url.toString());

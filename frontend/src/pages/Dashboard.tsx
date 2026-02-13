@@ -314,10 +314,7 @@ export function Dashboard() {
             <h2 className="text-2xl font-bold text-gray-900">Recent Workspaces</h2>
             {workspaces.length > 0 && (
               <button
-                onClick={() => {
-                  // TODO: Navigate to all workspaces page
-                  alert('View all workspaces coming soon!');
-                }}
+                onClick={() => navigate('/workspaces')}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700"
               >
                 View All →
@@ -428,53 +425,71 @@ export function Dashboard() {
               </p>
             </div>
             <button
-              onClick={() => {
-                // TODO: Navigate to scenario library
-                alert('Full scenario library coming soon!');
-              }}
+              onClick={() => navigate('/scenarios')}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
               Browse All
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                  Beginner
-                </span>
-              </div>
-              <h3 className="font-semibold text-gray-900">Simple Web App</h3>
-              <p className="mt-1 text-xs text-gray-600">
-                Design a basic web application that can handle 1,000 concurrent users
-              </p>
+          {isLoadingStats ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-lg border border-gray-200 p-4 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-full"></div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div 
+                className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => navigate('/scenarios?difficulty=beginner')}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                    Beginner
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Simple Web App</h3>
+                <p className="mt-1 text-xs text-gray-600">
+                  Design a basic web application that can handle 1,000 concurrent users
+                </p>
+              </div>
 
-            <div className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800">
-                  Intermediate
-                </span>
+              <div 
+                className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => navigate('/scenarios?difficulty=intermediate')}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800">
+                    Intermediate
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Social Media Feed</h3>
+                <p className="mt-1 text-xs text-gray-600">
+                  Build a real-time feed system that scales to millions of users
+                </p>
               </div>
-              <h3 className="font-semibold text-gray-900">Social Media Feed</h3>
-              <p className="mt-1 text-xs text-gray-600">
-                Build a real-time feed system that scales to millions of users
-              </p>
-            </div>
 
-            <div className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
-                  Advanced
-                </span>
+              <div 
+                className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => navigate('/scenarios?difficulty=advanced')}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
+                    Advanced
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Global CDN Network</h3>
+                <p className="mt-1 text-xs text-gray-600">
+                  Design a globally distributed content delivery system
+                </p>
               </div>
-              <h3 className="font-semibold text-gray-900">Global CDN Network</h3>
-              <p className="mt-1 text-xs text-gray-600">
-                Design a globally distributed content delivery system
-              </p>
             </div>
-          </div>
+          )}
       </div>
     </div>
   );

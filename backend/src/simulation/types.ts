@@ -30,6 +30,7 @@ export interface SimulationState {
   eventCount: number;
   components: Map<string, any>;
   metrics: Map<string, any[]>;
+  isCollapsed?: boolean;
 }
 
 export interface EventScheduler {

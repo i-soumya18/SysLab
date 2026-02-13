@@ -340,7 +340,7 @@ export const Workspace: React.FC = () => {
             id: `collapse-${Date.now()}-${Math.random()}`,
             componentId: failureData.componentId,
             componentType: failureData.componentType || 'unknown',
-            timestamp: new Date(failureData.timestamp || Date.now()),
+            timestamp: failureData.timestamp || Date.now(),
             reason: failureData.reason || failureData.type || 'Component failure',
             severity: failureData.severity || 'high',
             impact: failureData.impact || { affectedComponents: [], systemWide: false }
@@ -358,7 +358,7 @@ export const Workspace: React.FC = () => {
             id: `collapse-${Date.now()}-${Math.random()}`,
             componentId: failureData.componentId,
             componentType: failureData.componentType || 'unknown',
-            timestamp: new Date(failureData.timestamp || Date.now()),
+            timestamp: failureData.timestamp || Date.now(),
             reason: 'Component failure detected',
             severity: 'high',
             impact: { affectedComponents: [failureData.componentId], systemWide: false }
@@ -372,7 +372,7 @@ export const Workspace: React.FC = () => {
             id: `recovery-${Date.now()}-${Math.random()}`,
             componentId: recoveryData.componentId,
             componentType: recoveryData.componentType || 'unknown',
-            timestamp: new Date(recoveryData.timestamp || Date.now()),
+            timestamp: recoveryData.timestamp || Date.now(),
             recoveryTime: recoveryData.recoveryTime || 0,
             strategy: recoveryData.strategy || 'automatic'
           };
