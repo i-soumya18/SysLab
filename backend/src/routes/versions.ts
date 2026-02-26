@@ -28,7 +28,7 @@ const CreateVersionRequestSchema = z.object({
 });
 
 const VersionListOptionsSchema = z.object({
-  workspaceId: z.string().uuid(),
+  workspaceId: z.string().uuid().optional(),
   limit: z.coerce.number().min(1).max(100).default(50),
   offset: z.coerce.number().min(0).default(0),
   includeMetrics: z.coerce.boolean().default(false)

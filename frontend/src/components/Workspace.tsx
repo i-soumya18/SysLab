@@ -98,6 +98,15 @@ export const Workspace: React.FC = () => {
   // Layout sizing state
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(256);
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(320);
+
+  // Workspace name editing state
+  const [isEditingName, setIsEditingName] = useState<boolean>(false);
+  const [editedName, setEditedName] = useState<string>('');
+  const [isSavingName, setIsSavingName] = useState<boolean>(false);
+
+  // Workspace load error state
+  const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null);
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState<boolean>(false);
   const [insightsHeight, setInsightsHeight] = useState<number>(240);
   const [showConfigPanel, setShowConfigPanel] = useState<boolean>(false);
   
@@ -150,6 +159,15 @@ export const Workspace: React.FC = () => {
 
   const loadWorkspaceById = async (workspaceId: string, userId: string): Promise<void> => {
     try {
+      // Validate workspace ID format first
+      if (!isValidUUID(workspaceId)) {
+        // Not a valid UUID - skip loading and use demo workspace
+        return;
+      }
+
+      setIsLoadingWorkspace(true);
+      setWorkspaceLoadError(null);
+
       const url = new URL(`${API_BASE_URL}/workspaces/${workspaceId}`);
       if (userId) {
         url.searchParams.append('userId', userId);
@@ -164,15 +182,21 @@ export const Workspace: React.FC = () => {
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => null);
-        const message =
-          (errorBody && errorBody.error && errorBody.error.message) ||
-          `Failed to load workspace: ${response.statusText}`;
-        throw new Error(message);
+        if (response.status === 404) {
+          setWorkspaceLoadError('Workspace not found. It may have been deleted or the link is invalid.');
+        } else {
+          const message =
+            (errorBody && errorBody.error && errorBody.error.message) ||
+            `Failed to load workspace: ${response.statusText}`;
+          setWorkspaceLoadError(message);
+        }
+        return;
       }
 
       const body: { success?: boolean; data?: WorkspaceModel } = await response.json();
       if (!body.data) {
-        throw new Error('Workspace data is missing in the response');
+        setWorkspaceLoadError('Workspace data is missing in the response');
+        return;
       }
 
       const loadedWorkspace = body.data;
@@ -186,12 +210,49 @@ export const Workspace: React.FC = () => {
       // eslint-disable-next-line no-console
       console.error('Failed to load workspace from route:', error);
       if (error instanceof Error) {
-        alert(
-          `Unable to load workspace. Please check the link or choose another workspace. Details: ${error.message}`
-        );
+        setWorkspaceLoadError(`Error: ${error.message}`);
       } else {
-        alert('Unable to load workspace. Please check the link or choose another workspace.');
+        setWorkspaceLoadError('Failed to load workspace. Please try again.');
       }
+    } finally {
+      setIsLoadingWorkspace(false);
+    }
+  };
+
+  const renameWorkspace = async (newName: string): Promise<void> => {
+    if (!currentWorkspaceId || !currentUserId || !newName.trim()) {
+      return;
+    }
+
+    try {
+      setIsSavingName(true);
+      
+      const response = await fetch(`${API_BASE_URL}/workspaces/${currentWorkspaceId}?userId=${currentUserId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newName.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to rename workspace');
+      }
+
+      const body = await response.json();
+      if (body.data) {
+        setWorkspaceMeta(body.data);
+      }
+
+      setIsEditingName(false);
+      setEditedName('');
+    } catch (error) {
+      console.error('Error renaming workspace:', error);
+      alert('Failed to rename workspace. Please try again.');
+    } finally {
+      setIsSavingName(false);
     }
   };
 
@@ -203,7 +264,8 @@ export const Workspace: React.FC = () => {
 
   useEffect(() => {
     // Don't attempt to load workspace if user is not authenticated
-    if (routeWorkspaceId && currentUserId && currentUserId !== 'anonymous-user' && routeWorkspaceId !== currentWorkspaceId) {
+    // Also skip if routeWorkspaceId is not a valid UUID (e.g., demo workspace or invalid IDs)
+    if (routeWorkspaceId && isValidUUID(routeWorkspaceId) && currentUserId && currentUserId !== 'anonymous-user' && routeWorkspaceId !== currentWorkspaceId) {
       void loadWorkspaceById(routeWorkspaceId, currentUserId);
     }
   }, [routeWorkspaceId, currentUserId]);
@@ -475,22 +537,35 @@ export const Workspace: React.FC = () => {
     try {
       // Show loading state
       setIsSaving(true);
+      setWorkspaceLoadError(null); // Clear any previous workspace load errors
       
       // Store the current scenario ID
       setCurrentScenarioId(scenarioId);
       
+      console.log(`📋 Loading scenario: ${scenarioId}`);
       const result = await scenarioApi.loadScenario(scenarioId, currentUserId);
+      console.log(`✅ API Response received for scenario ${scenarioId}:`, JSON.stringify(result, null, 2));
+      
       const loadedWorkspace = result.workspace as WorkspaceModel;
       const scenario = result.scenario;
+      
+      console.log(`📦 Workspace from API:`, {
+        id: loadedWorkspace.id,
+        componentCount: loadedWorkspace.components?.length,
+        connectionCount: loadedWorkspace.connections?.length,
+        components: loadedWorkspace.components?.map(c => ({ id: c.id, type: c.type, componentKey: c.componentKey }))
+      });
       
       // Build components from component keys if scenario provides them
       let componentsToLoad: Component[] = [];
       
       // First, try to use components from loaded workspace
       if (loadedWorkspace.components && loadedWorkspace.components.length > 0) {
-        componentsToLoad = loadedWorkspace.components.map((comp: any) => {
+        console.log(`🔧 Processing ${loadedWorkspace.components.length} components from workspace...`);
+        componentsToLoad = loadedWorkspace.components.map((comp: any, idx: number) => {
           // If component has componentKey, create it from component library
           if (comp.componentKey && comp.type) {
+            console.log(`  [${idx + 1}] Creating ${comp.type} (key: ${comp.componentKey})...`);
             const libraryComponent = componentLibrary.createComponent(
               comp.componentKey,
               comp.type,
@@ -498,15 +573,19 @@ export const Workspace: React.FC = () => {
               comp.configuration
             );
             if (libraryComponent) {
+              console.log(`    ✅ Successfully created ${comp.componentKey}`);
               // Preserve the original ID if provided, and position
               return { 
                 ...libraryComponent, 
                 id: comp.id || libraryComponent.id,
                 position: comp.position || libraryComponent.position
               };
+            } else {
+              console.warn(`    ❌ Failed to create component from library for key: ${comp.componentKey}`);
             }
           }
           // Otherwise use component as-is, ensuring it has required fields
+          console.log(`  [${idx + 1}] Using component as-is (no componentKey): ${comp.type}`);
           return {
             ...comp,
             id: comp.id || `component-${Date.now()}-${Math.random()}`,
@@ -517,9 +596,11 @@ export const Workspace: React.FC = () => {
       }
       // If no components in workspace, try scenario's initialWorkspace
       else if (scenario?.initialWorkspace?.components && scenario.initialWorkspace.components.length > 0) {
+        console.log(`🔧 Processing ${scenario.initialWorkspace.components.length} components from scenario initialWorkspace...`);
         componentsToLoad = scenario.initialWorkspace.components.map((comp: any, index: number) => {
           // If component has componentKey, create it from component library
           if (comp.componentKey && comp.type) {
+            console.log(`  [${index + 1}] Creating ${comp.type} (key: ${comp.componentKey})...`);
             const libraryComponent = componentLibrary.createComponent(
               comp.componentKey,
               comp.type,
@@ -527,11 +608,14 @@ export const Workspace: React.FC = () => {
               comp.configuration
             );
             if (libraryComponent) {
+              console.log(`    ✅ Successfully created ${comp.componentKey}`);
               return { 
                 ...libraryComponent, 
                 id: comp.id || libraryComponent.id,
                 position: comp.position || libraryComponent.position
               };
+            } else {
+              console.warn(`    ❌ Failed to create component from library for key: ${comp.componentKey}`);
             }
           }
           // Otherwise create a basic component
@@ -554,8 +638,11 @@ export const Workspace: React.FC = () => {
           // Generate a new UUID for non-UUID IDs
           const newId = crypto.randomUUID();
           componentIdMap.set(oldId, newId);
+          console.log(`  ID mapping: ${oldId} → ${newId}`);
         }
       });
+      
+      console.log(`📊 Component ID Map:`, Object.fromEntries(componentIdMap));
       
       // Ensure all components have proper UUID IDs and positions
       // Use the mapping we just created to preserve ID relationships
@@ -584,33 +671,43 @@ export const Workspace: React.FC = () => {
         };
       });
       
+      console.log(`✨ Final components to load (${componentsToLoad.length}):`, 
+        componentsToLoad.map(c => ({ id: c.id, type: c.type, name: c.metadata?.name }))
+      );
+      
       // Ensure connections reference valid component IDs and have UUID IDs
       // Use the componentIdMap to translate old IDs to new UUIDs
       const validComponentIds = new Set(componentsToLoad.map(c => c.id));
+      console.log(`🔗 Valid component IDs for connections:`, Array.from(validComponentIds));
+      
       const connectionsToLoad = (loadedWorkspace.connections || scenario?.initialWorkspace?.connections || [])
-        .map((conn: Connection) => {
+        .map((conn: Connection, idx: number) => {
+          console.log(`  [${idx + 1}] Connection: ${conn.sourceComponentId} → ${conn.targetComponentId}`);
           // Map old component IDs to new UUIDs using the componentIdMap
           let sourceId = conn.sourceComponentId;
           let targetId = conn.targetComponentId;
           
           // Check if the connection references an old ID that needs mapping
           if (componentIdMap.has(sourceId)) {
+            console.log(`    Source remapped: ${sourceId} → ${componentIdMap.get(sourceId)}`);
             sourceId = componentIdMap.get(sourceId)!;
           }
           if (componentIdMap.has(targetId)) {
+            console.log(`    Target remapped: ${targetId} → ${componentIdMap.get(targetId)}`);
             targetId = componentIdMap.get(targetId)!;
           }
           
           // Ensure both IDs are valid UUIDs (should be after mapping)
           if (!isValidUUID(sourceId)) {
-            console.warn(`Connection source ID ${sourceId} is not a valid UUID, skipping connection`);
+            console.warn(`    ❌ Source ID ${sourceId} is not a valid UUID, skipping connection`);
             return null;
           }
           if (!isValidUUID(targetId)) {
-            console.warn(`Connection target ID ${targetId} is not a valid UUID, skipping connection`);
+            console.warn(`    ❌ Target ID ${targetId} is not a valid UUID, skipping connection`);
             return null;
           }
           
+          console.log(`    ✅ Connection valid: ${sourceId} → ${targetId}`);
           return {
             ...conn,
             id: (conn.id && isValidUUID(conn.id)) ? conn.id : crypto.randomUUID(),
@@ -624,9 +721,19 @@ export const Workspace: React.FC = () => {
           validComponentIds.has(conn.targetComponentId)
         );
       
+      console.log(`🎯 Final connections to load (${connectionsToLoad.length}):`, 
+        connectionsToLoad.map(c => ({ sourceComponentId: c.sourceComponentId, targetComponentId: c.targetComponentId }))
+      );
+      
       // When loading a scenario, always create a new workspace (don't use the UUID from the scenario)
       // Scenarios are templates - they should always result in new workspace creation
       const workspaceId = 'demo-workspace-id';
+      
+      console.log(`🏗️ Setting workspace state:`, {
+        workspaceId,
+        componentCount: componentsToLoad.length,
+        connectionCount: connectionsToLoad.length
+      });
       
       setCurrentWorkspaceId(workspaceId);
       setWorkspaceComponents(componentsToLoad);
@@ -639,6 +746,8 @@ export const Workspace: React.FC = () => {
       
       // Close scenario library panel
       setActiveInsightsTab('scenarios');
+      
+      console.log(`✅ Workspace state updated successfully`);
       
       // Save the workspace immediately so user can start experimenting
       if (componentsToLoad.length > 0) {
@@ -659,7 +768,8 @@ export const Workspace: React.FC = () => {
     } catch (error) {
       console.error('Failed to load scenario into workspace:', error);
       setIsSaving(false);
-      alert('Failed to load scenario. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load scenario. Please try again.';
+      setWorkspaceLoadError(`Unable to load workspace from scenario library: ${errorMessage}`);
     }
   };
 
@@ -1172,9 +1282,72 @@ export const Workspace: React.FC = () => {
 
   return (
     <DndProviderFixed backend={HTML5Backend}>
-      <div className="flex h-screen bg-gray-50">
-        {/* Left Sidebar - Component Palette */}
-        <aside
+      {workspaceLoadError && (
+        <div className="flex items-center justify-center h-screen bg-gray-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
+              Unable to Load Workspace
+            </h1>
+            <p className="text-gray-600 text-center mb-6">
+              {workspaceLoadError}
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`${API_BASE_URL}/workspaces`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        name: 'Untitled Workspace',
+                        description: 'A new system design workspace',
+                        userId: currentUserId,
+                        components: [],
+                        connections: [],
+                        configuration: {}
+                      }),
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Failed to create workspace');
+                    }
+
+                    const result = await response.json();
+                    const newWorkspace = result.data;
+                    navigate(`/workspace/${newWorkspace.id}`);
+                  } catch (err) {
+                    console.error('Error creating workspace:', err);
+                    setWorkspaceLoadError('Failed to create new workspace. Please try again.');
+                  }
+                }}
+                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Create New Workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!workspaceLoadError && (
+        <div className="flex h-screen bg-gray-50">
+          {/* Left Sidebar - Component Palette */}
+          <aside
           className="bg-white border-r border-gray-200 flex flex-col"
           style={{ width: leftSidebarWidth }}
         >
@@ -1217,7 +1390,47 @@ export const Workspace: React.FC = () => {
                 <span className="font-medium text-gray-700">Workspace</span>
               </div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-gray-800">System Design Workspace</h1>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      autoFocus
+                      className="px-2 py-1 border border-blue-500 rounded font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          renameWorkspace(editedName);
+                        } else if (e.key === 'Escape') {
+                          setIsEditingName(false);
+                          setEditedName('');
+                        }
+                      }}
+                      onBlur={() => {
+                        if (editedName.trim() && editedName !== workspaceMeta?.name) {
+                          renameWorkspace(editedName);
+                        } else {
+                          setIsEditingName(false);
+                          setEditedName('');
+                        }
+                      }}
+                    />
+                    {isSavingName && (
+                      <span className="text-xs text-gray-500">Saving...</span>
+                    )}
+                  </div>
+                ) : (
+                  <h1
+                    className="text-xl font-bold text-gray-800 cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                    onClick={() => {
+                      setIsEditingName(true);
+                      setEditedName(workspaceMeta?.name || 'Untitled Workspace');
+                    }}
+                    title="Click to rename workspace"
+                  >
+                    {workspaceMeta?.name || 'Untitled Workspace'}
+                  </h1>
+                )}
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <span className="px-2 py-1 bg-gray-100 rounded">
                     {componentCount} components
@@ -1841,6 +2054,7 @@ export const Workspace: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Modals and collaboration */}
       <WorkspaceImportModal
