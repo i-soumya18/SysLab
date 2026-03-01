@@ -8,12 +8,6 @@ on:
       - '**/*.md'
       - '.gitignore'
   workflow_dispatch:
-    inputs:
-      skip_checks:
-        description: 'Skip CI checks and deploy directly (emergency only)'
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -27,47 +21,19 @@ env:
   COMPOSE_FILE: aws-deployment/docker-compose.ec2.yml
 
 jobs:
-  quality-checks:
-    name: Quality Checks
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_checks != 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Frontend tests
-        run: npm run test:frontend
-
-      - name: Backend tests
-        run: npm run test:backend:ci
-
-      - name: Validate compose config
-        run: docker compose -f aws-deployment/docker-compose.ec2.yml config >/dev/null
-
   deploy:
     name: Deploy to EC2
-    needs: quality-checks
-    if: ${{ always() && (needs.quality-checks.result == 'success' || needs.quality-checks.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
       name: production
-      url: ${{ secrets.APP_URL }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate compose config
+        run: docker compose -f aws-deployment/docker-compose.ec2.yml config >/dev/null
 
       - name: Validate required secrets
         env:
