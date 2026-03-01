@@ -13,15 +13,36 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    strictPort: true,
+    strictPort: false, // Allow fallback to other ports if 5173 is in use
+    middlewareMode: false,
     hmr: {
-      clientPort: 8080,  // Use the gateway port for HMR
+      // Gateway proxies HMR through localhost:8080
+      host: 'localhost',
+      port: 8080,
       protocol: 'ws',
-      host: 'localhost'
     },
     watch: {
-      usePolling: true,  // Required for Docker volume watching
-      interval: 1000
+      // Polling required for Docker volumes
+      usePolling: true,
+      interval: 500, // Reduced from 1000 for faster reload
+      binaryInterval: 1000
+    },
+    // Chrome DevTools friendly
+    fs: {
+      allow: ['..']
+    }
+  },
+  build: {
+    sourcemap: false,
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'dnd-vendor': ['react-dnd', 'react-dnd-html5-backend']
+        }
+      }
     }
   }
 })
+

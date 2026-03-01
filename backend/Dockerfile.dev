@@ -1,22 +1,22 @@
-# Development Dockerfile for Backend with Hot Reload
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files for faster install
+# Install dependencies efficiently
 COPY package.json package-lock.json* ./
+RUN npm install --no-audit 2>&1 | grep -v "npm warn" || true
 
-# Install dependencies (use ci if lock file exists, includes tsx for watch mode)
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-# Copy TypeScript configuration
+# Copy TypeScript config for compilation
 COPY tsconfig.json ./
 
-# Copy source code
-COPY src ./src
+# Update PATH to ensure node_modules/.bin is available
+ENV PATH="/app/node_modules/.bin:$PATH"
 
-# Expose backend port
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)}).on('error', () => { process.exit(1) })" || exit 1
+
 EXPOSE 3000
 
-# Start backend with tsx watch for hot reload
+# Start with tsx watch for hot reload with inotify optimization
 CMD ["npm", "run", "dev"]

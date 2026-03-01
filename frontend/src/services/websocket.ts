@@ -175,6 +175,14 @@ export class WebSocketService {
    * Join a workspace for real-time updates
    */
   async joinWorkspace(workspaceId: string, userId?: string): Promise<void> {
+    // Wait for socket to be fully connected with retry
+    let retries = 0;
+    const maxRetries = 10;
+    while (!this.socket?.connected && retries < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries++;
+    }
+
     if (!this.socket?.connected) {
       throw new Error('WebSocket not connected');
     }

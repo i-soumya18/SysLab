@@ -14,6 +14,15 @@ export const ComponentTypeSchema = z.enum([
   'message-queue',
   'cdn',
   'proxy',
+  'api-gateway',
+  'search-engine',
+  'object-storage',
+  'service-mesh',
+  'rate-limiter',
+  'circuit-breaker',
+  'auth-service',
+  'monitoring',
+  'logging',
   // Frontend-only visual components that still participate in the graph
   // are mapped to valid backend types. Allow "client" so workspaces
   // containing client nodes can be persisted and simulated.

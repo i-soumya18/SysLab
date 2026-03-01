@@ -26,8 +26,12 @@ import { useCollaboration } from '../hooks/useCollaboration';
 import useWebSocket from '../hooks/useWebSocket';
 import { WorkspaceApiService } from '../services/workspaceApi';
 import { scenarioApi } from '../services/scenarioApi';
+import { generateUUID } from '../utils/uuid';
 import { CostDashboard } from './CostDashboard';
 import { ScalabilityDashboard } from './ScalabilityDashboard';
+import { ComponentConfigPanel } from './ComponentConfigPanel';
+import { ResizableCard } from './ResizableCard';
+import { componentLibrary } from './ComponentLibrary';
 import type {
   BottleneckInfo,
   Component,
@@ -42,6 +46,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/
 
 // Fix React types compatibility with react-dnd
 const DndProviderFixed = DndProvider as any;
+
+// Helper function to check if a string is a valid UUID
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
 
 export const Workspace: React.FC = () => {
   const { id: routeWorkspaceId } = useParams<{ id?: string }>();
@@ -67,10 +77,12 @@ export const Workspace: React.FC = () => {
   const [componentMetrics, setComponentMetrics] = useState<Map<string, ComponentMetrics>>(new Map());
   const [bottlenecksMap, setBottlenecksMap] = useState<Map<string, BottleneckInfo>>(new Map());
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const [collapseEvents] = useState<CollapseEvent[]>([]);
-  const [recoveryEvents] = useState<RecoveryEvent[]>([]);
+  const [collapseEvents, setCollapseEvents] = useState<CollapseEvent[]>([]);
+  const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([]);
+  const [loadPattern, setLoadPattern] = useState<{ currentLoad: number; pattern: string } | null>(null);
   const [completedScenarios] = useState<string[]>([]);
   const [activeInsightsTab, setActiveInsightsTab] = useState<'scenarios' | 'progress' | 'health'>('scenarios');
+  const [currentScenarioId, setCurrentScenarioId] = useState<string | null>(null);
 
   // Learning panels state (SRS FR-9.2, FR-9.3, FR-6)
   const [showHintsPanel, setShowHintsPanel] = useState<boolean>(false);
@@ -87,7 +99,28 @@ export const Workspace: React.FC = () => {
   // Layout sizing state
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(256);
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(320);
+
+  // Workspace name editing state
+  const [isEditingName, setIsEditingName] = useState<boolean>(false);
+  const [editedName, setEditedName] = useState<string>('');
+  const [isSavingName, setIsSavingName] = useState<boolean>(false);
+
+  // Workspace load error state
+  const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null);
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState<boolean>(false);
   const [insightsHeight, setInsightsHeight] = useState<number>(240);
+  const [showConfigPanel, setShowConfigPanel] = useState<boolean>(false);
+  
+  // Individual card heights for right sidebar
+  const [propertiesPanelHeight, setPropertiesPanelHeight] = useState<number>(300);
+  const [scaleControlHeight, setScaleControlHeight] = useState<number>(340);
+  const [simulationTimeHeight, setSimulationTimeHeight] = useState<number>(80);
+  const [metricsPanelHeight, setMetricsPanelHeight] = useState<number>(250);
+  const [costPanelHeight, setCostPanelHeight] = useState<number>(200);
+  const [scalabilityPanelHeight, setScalabilityPanelHeight] = useState<number>(250);
+  const [hintsPanelHeight, setHintsPanelHeight] = useState<number>(200);
+  const [constraintsPanelHeight, setConstraintsPanelHeight] = useState<number>(200);
+  const [failurePanelHeight, setFailurePanelHeight] = useState<number>(200);
 
   const minLeftSidebarWidth = 200;
   const maxLeftSidebarWidth = 400;
@@ -127,6 +160,15 @@ export const Workspace: React.FC = () => {
 
   const loadWorkspaceById = async (workspaceId: string, userId: string): Promise<void> => {
     try {
+      // Validate workspace ID format first
+      if (!isValidUUID(workspaceId)) {
+        // Not a valid UUID - skip loading and use demo workspace
+        return;
+      }
+
+      setIsLoadingWorkspace(true);
+      setWorkspaceLoadError(null);
+
       const url = new URL(`${API_BASE_URL}/workspaces/${workspaceId}`);
       if (userId) {
         url.searchParams.append('userId', userId);
@@ -141,15 +183,21 @@ export const Workspace: React.FC = () => {
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => null);
-        const message =
-          (errorBody && errorBody.error && errorBody.error.message) ||
-          `Failed to load workspace: ${response.statusText}`;
-        throw new Error(message);
+        if (response.status === 404) {
+          setWorkspaceLoadError('Workspace not found. It may have been deleted or the link is invalid.');
+        } else {
+          const message =
+            (errorBody && errorBody.error && errorBody.error.message) ||
+            `Failed to load workspace: ${response.statusText}`;
+          setWorkspaceLoadError(message);
+        }
+        return;
       }
 
       const body: { success?: boolean; data?: WorkspaceModel } = await response.json();
       if (!body.data) {
-        throw new Error('Workspace data is missing in the response');
+        setWorkspaceLoadError('Workspace data is missing in the response');
+        return;
       }
 
       const loadedWorkspace = body.data;
@@ -157,16 +205,55 @@ export const Workspace: React.FC = () => {
       setWorkspaceComponents(loadedWorkspace.components || []);
       setWorkspaceConnections(loadedWorkspace.connections || []);
       setWorkspaceMeta(loadedWorkspace);
+      // Clear scenario ID when loading a regular workspace (not from scenario)
+      setCurrentScenarioId(null);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to load workspace from route:', error);
       if (error instanceof Error) {
-        alert(
-          `Unable to load workspace. Please check the link or choose another workspace. Details: ${error.message}`
-        );
+        setWorkspaceLoadError(`Error: ${error.message}`);
       } else {
-        alert('Unable to load workspace. Please check the link or choose another workspace.');
+        setWorkspaceLoadError('Failed to load workspace. Please try again.');
       }
+    } finally {
+      setIsLoadingWorkspace(false);
+    }
+  };
+
+  const renameWorkspace = async (newName: string): Promise<void> => {
+    if (!currentWorkspaceId || !currentUserId || !newName.trim()) {
+      return;
+    }
+
+    try {
+      setIsSavingName(true);
+      
+      const response = await fetch(`${API_BASE_URL}/workspaces/${currentWorkspaceId}?userId=${currentUserId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newName.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to rename workspace');
+      }
+
+      const body = await response.json();
+      if (body.data) {
+        setWorkspaceMeta(body.data);
+      }
+
+      setIsEditingName(false);
+      setEditedName('');
+    } catch (error) {
+      console.error('Error renaming workspace:', error);
+      alert('Failed to rename workspace. Please try again.');
+    } finally {
+      setIsSavingName(false);
     }
   };
 
@@ -178,7 +265,8 @@ export const Workspace: React.FC = () => {
 
   useEffect(() => {
     // Don't attempt to load workspace if user is not authenticated
-    if (routeWorkspaceId && currentUserId && currentUserId !== 'anonymous-user' && routeWorkspaceId !== currentWorkspaceId) {
+    // Also skip if routeWorkspaceId is not a valid UUID (e.g., demo workspace or invalid IDs)
+    if (routeWorkspaceId && isValidUUID(routeWorkspaceId) && currentUserId && currentUserId !== 'anonymous-user' && routeWorkspaceId !== currentWorkspaceId) {
       void loadWorkspaceById(routeWorkspaceId, currentUserId);
     }
   }, [routeWorkspaceId, currentUserId]);
@@ -216,8 +304,11 @@ export const Workspace: React.FC = () => {
     }
   }, [wsSimulationMetrics]);
 
+  // Subscribe to bottleneck events
   useEffect(() => {
-    const unsubscribe = subscribe('simulation:bottleneck', (payload: { data?: BottleneckInfo[] | BottleneckInfo }) => {
+    if (!subscribe) return;
+    
+    const unsubscribe = subscribe('simulation:bottleneck', (payload: { data?: BottleneckInfo[] | BottleneckInfo; type?: string }) => {
       const data = payload?.data;
       if (!data) {
         return;
@@ -226,9 +317,19 @@ export const Workspace: React.FC = () => {
       const list = Array.isArray(data) ? data : [data];
       const next = new Map<string, BottleneckInfo>();
       list.forEach(bottleneck => {
-        next.set(bottleneck.componentId, bottleneck);
+        if (bottleneck && bottleneck.componentId) {
+          next.set(bottleneck.componentId, bottleneck);
+        }
       });
-      setBottlenecksMap(next);
+      
+      // Only update if bottlenecks actually changed
+      setBottlenecksMap(prev => {
+        if (prev.size === next.size && 
+            Array.from(prev.keys()).every(id => next.has(id) && prev.get(id) === next.get(id))) {
+          return prev; // No change
+        }
+        return next;
+      });
 
       // Auto-show hints panel when bottlenecks are detected
       if (list.length > 0 && isSimulationRunning && !showHintsPanel) {
@@ -241,6 +342,114 @@ export const Workspace: React.FC = () => {
     };
   }, [subscribe, isSimulationRunning, showHintsPanel]);
 
+  // Subscribe to load pattern events
+  useEffect(() => {
+    if (!subscribe) return;
+    
+    const unsubscribe = subscribe('simulation:load', (payload: { type?: string; data?: any }) => {
+      if (!payload?.data) return;
+      
+      if (payload.type === 'load_changed') {
+        const patternData = payload.data.pattern || payload.data.type;
+        const patternString = typeof patternData === 'string' 
+          ? patternData 
+          : (patternData?.type || 'unknown');
+        const currentLoad = payload.data.currentLoad || payload.data.load || patternData?.baseLoad || 0;
+        
+        setLoadPattern(prev => {
+          const newPattern = {
+            currentLoad: typeof currentLoad === 'number' ? currentLoad : 0,
+            pattern: patternString
+          };
+          // Only update if values actually changed
+          if (prev?.currentLoad === newPattern.currentLoad && prev?.pattern === newPattern.pattern) {
+            return prev;
+          }
+          return newPattern;
+        });
+      } else if (payload.type === 'load_pattern_scheduled') {
+        const patternData = payload.data.pattern || payload.data.type;
+        const patternString = typeof patternData === 'string' 
+          ? patternData 
+          : (patternData?.type || 'scheduled');
+        const expectedLoad = payload.data.expectedLoad || patternData?.baseLoad || 0;
+        
+        setLoadPattern(prev => {
+          const newPattern = {
+            currentLoad: typeof expectedLoad === 'number' ? expectedLoad : 0,
+            pattern: patternString
+          };
+          // Only update if values actually changed
+          if (prev?.currentLoad === newPattern.currentLoad && prev?.pattern === newPattern.pattern) {
+            return prev;
+          }
+          return newPattern;
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribe]);
+
+  // Subscribe to collapse and recovery events
+  useEffect(() => {
+    const unsubscribeFailure = subscribe('simulation:failure', (payload: { type?: string; data?: any }) => {
+      if (payload?.type === 'random_failure_occurred' || payload?.type === 'failure_injected') {
+        const failureData = payload.data;
+        if (failureData?.componentId) {
+          const collapseEvent: CollapseEvent = {
+            id: `collapse-${Date.now()}-${Math.random()}`,
+            componentId: failureData.componentId,
+            componentType: failureData.componentType || 'unknown',
+            timestamp: failureData.timestamp || Date.now(),
+            reason: failureData.reason || failureData.type || 'Component failure',
+            severity: failureData.severity || 'high',
+            impact: failureData.impact || { affectedComponents: [], systemWide: false }
+          };
+          setCollapseEvents(prev => [...prev.slice(-49), collapseEvent]); // Keep last 50 events
+        }
+      }
+    });
+
+    const unsubscribeEvent = subscribe('simulation:event', (payload: { type?: string; data?: any }) => {
+      if (payload?.type === 'component_failed') {
+        const failureData = payload.data;
+        if (failureData?.componentId) {
+          const collapseEvent: CollapseEvent = {
+            id: `collapse-${Date.now()}-${Math.random()}`,
+            componentId: failureData.componentId,
+            componentType: failureData.componentType || 'unknown',
+            timestamp: failureData.timestamp || Date.now(),
+            reason: 'Component failure detected',
+            severity: 'high',
+            impact: { affectedComponents: [failureData.componentId], systemWide: false }
+          };
+          setCollapseEvents(prev => [...prev.slice(-49), collapseEvent]);
+        }
+      } else if (payload?.type === 'component_recovered') {
+        const recoveryData = payload.data;
+        if (recoveryData?.componentId) {
+          const recoveryEvent: RecoveryEvent = {
+            id: `recovery-${Date.now()}-${Math.random()}`,
+            componentId: recoveryData.componentId,
+            componentType: recoveryData.componentType || 'unknown',
+            timestamp: recoveryData.timestamp || Date.now(),
+            recoveryTime: recoveryData.recoveryTime || 0,
+            strategy: recoveryData.strategy || 'automatic'
+          };
+          setRecoveryEvents(prev => [...prev.slice(-49), recoveryEvent]); // Keep last 50 events
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeFailure();
+      unsubscribeEvent();
+    };
+  }, [subscribe]);
+
   const handleComponentAdd = (component: Component) => {
     console.log('Component added:', component);
     setWorkspaceComponents(prev => [...prev, component]);
@@ -248,8 +457,18 @@ export const Workspace: React.FC = () => {
 
   const handleComponentSelect = (component: Component | null) => {
     setSelectedComponent(component);
+    // Don't auto-open config panel - user must click "Configure" from menu
+    if (!component) {
+      setShowConfigPanel(false);
+    }
     console.log('Component selected:', component);
   };
+
+  const handleComponentConfigure = useCallback(() => {
+    if (selectedComponent) {
+      setShowConfigPanel(true);
+    }
+  }, [selectedComponent]);
 
   const handleComponentUpdate = (component: Component) => {
     console.log('Component updated:', component);
@@ -317,15 +536,241 @@ export const Workspace: React.FC = () => {
 
   const handleScenarioLoad = async (scenarioId: string) => {
     try {
+      // Show loading state
+      setIsSaving(true);
+      setWorkspaceLoadError(null); // Clear any previous workspace load errors
+      
+      // Store the current scenario ID
+      setCurrentScenarioId(scenarioId);
+      
+      console.log(`📋 Loading scenario: ${scenarioId}`);
       const result = await scenarioApi.loadScenario(scenarioId, currentUserId);
+      console.log(`✅ API Response received for scenario ${scenarioId}:`, JSON.stringify(result, null, 2));
+      
       const loadedWorkspace = result.workspace as WorkspaceModel;
-      setCurrentWorkspaceId(loadedWorkspace.id);
-      setWorkspaceComponents(loadedWorkspace.components || []);
-      setWorkspaceConnections(loadedWorkspace.connections || []);
-      setWorkspaceMeta(loadedWorkspace);
+      const scenario = result.scenario;
+      
+      console.log(`📦 Workspace from API:`, {
+        id: loadedWorkspace.id,
+        componentCount: loadedWorkspace.components?.length,
+        connectionCount: loadedWorkspace.connections?.length,
+        components: loadedWorkspace.components?.map(c => ({ id: c.id, type: c.type, componentKey: c.componentKey }))
+      });
+      
+      // Build components from component keys if scenario provides them
+      let componentsToLoad: Component[] = [];
+      
+      // First, try to use components from loaded workspace
+      if (loadedWorkspace.components && loadedWorkspace.components.length > 0) {
+        console.log(`🔧 Processing ${loadedWorkspace.components.length} components from workspace...`);
+        componentsToLoad = loadedWorkspace.components.map((comp: any, idx: number) => {
+          // If component has componentKey, create it from component library
+          if (comp.componentKey && comp.type) {
+            console.log(`  [${idx + 1}] Creating ${comp.type} (key: ${comp.componentKey})...`);
+            const libraryComponent = componentLibrary.createComponent(
+              comp.componentKey,
+              comp.type,
+              comp.position || { x: 100, y: 100 },
+              comp.configuration
+            );
+            if (libraryComponent) {
+              console.log(`    ✅ Successfully created ${comp.componentKey}`);
+              // Preserve the original ID if provided, and position
+              return { 
+                ...libraryComponent, 
+                id: comp.id || libraryComponent.id,
+                position: comp.position || libraryComponent.position
+              };
+            } else {
+              console.warn(`    ❌ Failed to create component from library for key: ${comp.componentKey}`);
+            }
+          }
+          // Otherwise use component as-is, ensuring it has required fields
+          console.log(`  [${idx + 1}] Using component as-is (no componentKey): ${comp.type}`);
+          return {
+            ...comp,
+            id: comp.id || `component-${Date.now()}-${Math.random()}`,
+            position: comp.position || { x: 100, y: 100 },
+            metadata: comp.metadata || { name: comp.type, version: '1.0' }
+          } as Component;
+        });
+      }
+      // If no components in workspace, try scenario's initialWorkspace
+      else if (scenario?.initialWorkspace?.components && scenario.initialWorkspace.components.length > 0) {
+        console.log(`🔧 Processing ${scenario.initialWorkspace.components.length} components from scenario initialWorkspace...`);
+        componentsToLoad = scenario.initialWorkspace.components.map((comp: any, index: number) => {
+          // If component has componentKey, create it from component library
+          if (comp.componentKey && comp.type) {
+            console.log(`  [${index + 1}] Creating ${comp.type} (key: ${comp.componentKey})...`);
+            const libraryComponent = componentLibrary.createComponent(
+              comp.componentKey,
+              comp.type,
+              comp.position || { x: 100 + (index % 4) * 200, y: 100 + Math.floor(index / 4) * 150 },
+              comp.configuration
+            );
+            if (libraryComponent) {
+              console.log(`    ✅ Successfully created ${comp.componentKey}`);
+              return { 
+                ...libraryComponent, 
+                id: comp.id || libraryComponent.id,
+                position: comp.position || libraryComponent.position
+              };
+            } else {
+              console.warn(`    ❌ Failed to create component from library for key: ${comp.componentKey}`);
+            }
+          }
+          // Otherwise create a basic component
+          return {
+            id: comp.id || `component-${Date.now()}-${index}`,
+            type: comp.type,
+            position: comp.position || { x: 100 + (index % 4) * 200, y: 100 + Math.floor(index / 4) * 150 },
+            configuration: comp.configuration || { capacity: 1000, latency: 50, failureRate: 0.01 },
+            metadata: comp.metadata || { name: comp.type, version: '1.0' }
+          } as Component;
+        });
+      }
+      
+      // Build a mapping from old component IDs to new UUID IDs BEFORE converting
+      // This ensures connections can reference the correct component IDs
+      const componentIdMap = new Map<string, string>();
+      componentsToLoad.forEach(comp => {
+        const oldId = comp.id;
+        if (oldId && !isValidUUID(oldId)) {
+          // Generate a new UUID for non-UUID IDs
+          const newId = generateUUID();
+          componentIdMap.set(oldId, newId);
+          console.log(`  ID mapping: ${oldId} → ${newId}`);
+        }
+      });
+      
+      console.log(`📊 Component ID Map:`, Object.fromEntries(componentIdMap));
+      
+      // Ensure all components have proper UUID IDs and positions
+      // Use the mapping we just created to preserve ID relationships
+      componentsToLoad = componentsToLoad.map((comp: Component, index: number) => {
+        const oldId = comp.id;
+        let newId: string;
+        
+        if (oldId && isValidUUID(oldId)) {
+          // Already a UUID, keep it
+          newId = oldId;
+        } else if (oldId && componentIdMap.has(oldId)) {
+          // Use the mapped UUID
+          newId = componentIdMap.get(oldId)!;
+        } else {
+          // Generate a new UUID if somehow missing
+          newId = generateUUID();
+          if (oldId) {
+            componentIdMap.set(oldId, newId);
+          }
+        }
+        
+        return {
+          ...comp,
+          id: newId,
+          position: comp.position || { x: 100 + (index % 4) * 200, y: 100 + Math.floor(index / 4) * 150 }
+        };
+      });
+      
+      console.log(`✨ Final components to load (${componentsToLoad.length}):`, 
+        componentsToLoad.map(c => ({ id: c.id, type: c.type, name: c.metadata?.name }))
+      );
+      
+      // Ensure connections reference valid component IDs and have UUID IDs
+      // Use the componentIdMap to translate old IDs to new UUIDs
+      const validComponentIds = new Set(componentsToLoad.map(c => c.id));
+      console.log(`🔗 Valid component IDs for connections:`, Array.from(validComponentIds));
+      
+      const connectionsToLoad = (loadedWorkspace.connections || scenario?.initialWorkspace?.connections || [])
+        .map((conn: Connection, idx: number) => {
+          console.log(`  [${idx + 1}] Connection: ${conn.sourceComponentId} → ${conn.targetComponentId}`);
+          // Map old component IDs to new UUIDs using the componentIdMap
+          let sourceId = conn.sourceComponentId;
+          let targetId = conn.targetComponentId;
+          
+          // Check if the connection references an old ID that needs mapping
+          if (componentIdMap.has(sourceId)) {
+            console.log(`    Source remapped: ${sourceId} → ${componentIdMap.get(sourceId)}`);
+            sourceId = componentIdMap.get(sourceId)!;
+          }
+          if (componentIdMap.has(targetId)) {
+            console.log(`    Target remapped: ${targetId} → ${componentIdMap.get(targetId)}`);
+            targetId = componentIdMap.get(targetId)!;
+          }
+          
+          // Ensure both IDs are valid UUIDs (should be after mapping)
+          if (!isValidUUID(sourceId)) {
+            console.warn(`    ❌ Source ID ${sourceId} is not a valid UUID, skipping connection`);
+            return null;
+          }
+          if (!isValidUUID(targetId)) {
+            console.warn(`    ❌ Target ID ${targetId} is not a valid UUID, skipping connection`);
+            return null;
+          }
+          
+          console.log(`    ✅ Connection valid: ${sourceId} → ${targetId}`);
+          return {
+            ...conn,
+            id: (conn.id && isValidUUID(conn.id)) ? conn.id : generateUUID(),
+            sourceComponentId: sourceId,
+            targetComponentId: targetId
+          };
+        })
+        .filter((conn: Connection | null): conn is Connection => 
+          conn !== null && 
+          validComponentIds.has(conn.sourceComponentId) && 
+          validComponentIds.has(conn.targetComponentId)
+        );
+      
+      console.log(`🎯 Final connections to load (${connectionsToLoad.length}):`, 
+        connectionsToLoad.map(c => ({ sourceComponentId: c.sourceComponentId, targetComponentId: c.targetComponentId }))
+      );
+      
+      // When loading a scenario, always create a new workspace (don't use the UUID from the scenario)
+      // Scenarios are templates - they should always result in new workspace creation
+      const workspaceId = 'demo-workspace-id';
+      
+      console.log(`🏗️ Setting workspace state:`, {
+        workspaceId,
+        componentCount: componentsToLoad.length,
+        connectionCount: connectionsToLoad.length
+      });
+      
+      setCurrentWorkspaceId(workspaceId);
+      setWorkspaceComponents(componentsToLoad);
+      setWorkspaceConnections(connectionsToLoad);
+      setWorkspaceMeta({
+        ...loadedWorkspace,
+        id: workspaceId,
+        configuration: loadedWorkspace.configuration || scenario?.initialWorkspace?.configuration || buildSimulationConfig()
+      });
+      
+      // Close scenario library panel
+      setActiveInsightsTab('scenarios');
+      
+      console.log(`✅ Workspace state updated successfully`);
+      
+      // Save the workspace immediately so user can start experimenting
+      if (componentsToLoad.length > 0) {
+        // Trigger save after state updates - this will create a new workspace if ID is invalid
+        setTimeout(async () => {
+          try {
+            await saveWorkspace({ silent: true });
+          } catch (error) {
+            console.error('Failed to save scenario workspace:', error);
+            // Don't show error to user if silent save fails - they can still use the workspace
+          } finally {
+            setIsSaving(false);
+          }
+        }, 200);
+      } else {
+        setIsSaving(false);
+      }
     } catch (error) {
       console.error('Failed to load scenario into workspace:', error);
-      alert('Failed to load scenario. Please try again.');
+      setIsSaving(false);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load scenario. Please try again.';
+      setWorkspaceLoadError(`Unable to load workspace from scenario library: ${errorMessage}`);
     }
   };
 
@@ -387,10 +832,20 @@ export const Workspace: React.FC = () => {
   };
 
   const handleStopSimulation = () => {
+    if (!isSimulationRunning) {
+      // No simulation running, nothing to stop
+      return;
+    }
+    
     setIsSimulationRunning(false);
     wsStopSimulation().catch(error => {
       // eslint-disable-next-line no-console
       console.error('Failed to stop simulation via WebSocket:', error);
+      // Don't show error to user if simulation wasn't actually running
+      if (error.message && error.message.includes('No running simulation')) {
+        // Silently ignore - simulation was already stopped
+        return;
+      }
     });
   };
 
@@ -558,19 +1013,84 @@ export const Workspace: React.FC = () => {
       setIsSaving(true);
       setSaveError(null);
 
+      // Clean components - remove any extra fields like componentKey that aren't in the schema
+      // Ensure all IDs are valid UUIDs
+      const cleanedComponents = workspaceComponents.map(comp => {
+        const compId = isValidUUID(comp.id) ? comp.id : generateUUID();
+        return {
+          id: compId,
+          type: comp.type,
+          position: comp.position,
+          configuration: comp.configuration,
+          metadata: comp.metadata
+        };
+      });
+
+      // Create a mapping for component ID updates
+      const componentIdUpdateMap = new Map<string, string>();
+      workspaceComponents.forEach((comp, idx) => {
+        if (!isValidUUID(comp.id)) {
+          componentIdUpdateMap.set(comp.id, cleanedComponents[idx].id);
+        }
+      });
+
+      // Clean connections - ensure all required fields are present and IDs are UUIDs
+      const cleanedConnections = workspaceConnections.map(conn => {
+        const connId = isValidUUID(conn.id) ? conn.id : generateUUID();
+        let sourceId = conn.sourceComponentId;
+        let targetId = conn.targetComponentId;
+        
+        // Update component IDs if they were changed
+        if (componentIdUpdateMap.has(sourceId)) {
+          sourceId = componentIdUpdateMap.get(sourceId)!;
+        }
+        if (componentIdUpdateMap.has(targetId)) {
+          targetId = componentIdUpdateMap.get(targetId)!;
+        }
+        
+        // Ensure source and target IDs are valid UUIDs
+        if (!isValidUUID(sourceId)) {
+          sourceId = generateUUID();
+        }
+        if (!isValidUUID(targetId)) {
+          targetId = generateUUID();
+        }
+        
+        return {
+          id: connId,
+          sourceComponentId: sourceId,
+          targetComponentId: targetId,
+          sourcePort: conn.sourcePort,
+          targetPort: conn.targetPort,
+          configuration: conn.configuration
+        };
+      }).filter(conn => {
+        // Ensure both source and target components exist
+        const sourceExists = cleanedComponents.some(c => c.id === conn.sourceComponentId);
+        const targetExists = cleanedComponents.some(c => c.id === conn.targetComponentId);
+        return sourceExists && targetExists;
+      });
+
       const payload = {
         name: workspaceMeta?.name ?? 'New Workspace',
         description: workspaceMeta?.description ?? 'A system design workspace',
         userId: currentUserId,
-        components: workspaceComponents,
-        connections: workspaceConnections,
+        components: cleanedComponents,
+        connections: cleanedConnections,
         configuration: workspaceMeta?.configuration ?? buildSimulationConfig()
       };
 
       let nextWorkspaceId = currentWorkspaceId;
       let response: Response;
 
-      if (currentWorkspaceId === 'demo-workspace-id' && !routeWorkspaceId) {
+      // Create new workspace if:
+      // 1. It's a demo workspace ID
+      // 2. It's not a valid UUID format (e.g., scenario-generated IDs)
+      // 3. No route workspace ID exists
+      if (
+        (currentWorkspaceId === 'demo-workspace-id' || !isValidUUID(currentWorkspaceId)) &&
+        !routeWorkspaceId
+      ) {
         // Create a new workspace on first save
         response = await fetch(`${API_BASE_URL}/workspaces`, {
           method: 'POST',
@@ -580,14 +1100,40 @@ export const Workspace: React.FC = () => {
           body: JSON.stringify(payload)
         });
       } else {
-        // Update existing workspace
-        response = await fetch(`${API_BASE_URL}/workspaces/${encodeURIComponent(currentWorkspaceId)}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
+        // Update existing workspace (only if it's a valid UUID)
+        if (!isValidUUID(currentWorkspaceId)) {
+          // If somehow we have an invalid UUID, create a new workspace instead
+          response = await fetch(`${API_BASE_URL}/workspaces`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          // Try to update existing workspace
+          response = await fetch(`${API_BASE_URL}/workspaces/${encodeURIComponent(currentWorkspaceId)}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          // If workspace doesn't exist (404), fall back to creating a new one
+          if (response.status === 404) {
+            console.warn(`Workspace ${currentWorkspaceId} not found, creating new workspace instead`);
+            response = await fetch(`${API_BASE_URL}/workspaces`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload)
+            });
+            // Reset workspace ID so we use the new one from the response
+            nextWorkspaceId = 'demo-workspace-id';
+          }
+        }
       }
 
       if (!response.ok) {
@@ -737,18 +1283,85 @@ export const Workspace: React.FC = () => {
 
   return (
     <DndProviderFixed backend={HTML5Backend}>
-      <div className="flex h-screen bg-gray-50">
-        {/* Left Sidebar - Component Palette */}
-        <aside
+      {workspaceLoadError && (
+        <div className="flex items-center justify-center h-screen bg-gray-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
+              Unable to Load Workspace
+            </h1>
+            <p className="text-gray-600 text-center mb-6">
+              {workspaceLoadError}
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`${API_BASE_URL}/workspaces`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        name: 'Untitled Workspace',
+                        description: 'A new system design workspace',
+                        userId: currentUserId,
+                        components: [],
+                        connections: [],
+                        configuration: {}
+                      }),
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Failed to create workspace');
+                    }
+
+                    const result = await response.json();
+                    const newWorkspace = result.data;
+                    navigate(`/workspace/${newWorkspace.id}`);
+                  } catch (err) {
+                    console.error('Error creating workspace:', err);
+                    setWorkspaceLoadError('Failed to create new workspace. Please try again.');
+                  }
+                }}
+                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Create New Workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!workspaceLoadError && (
+        <div className="flex h-screen bg-gray-50">
+          {/* Left Sidebar - Component Palette */}
+          <aside
           className="bg-white border-r border-gray-200 flex flex-col"
           style={{ width: leftSidebarWidth }}
         >
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
             <h2 className="text-lg font-semibold text-gray-800">Components</h2>
             <p className="text-xs text-gray-500 mt-1">Drag to canvas</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            <ComponentPalette />
+          <div className="flex-1 overflow-hidden p-3" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <ComponentPalette 
+              width={leftSidebarWidth - 24} 
+              height={undefined}
+              onWidthChange={setLeftSidebarWidth}
+            />
           </div>
         </aside>
 
@@ -778,7 +1391,47 @@ export const Workspace: React.FC = () => {
                 <span className="font-medium text-gray-700">Workspace</span>
               </div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-gray-800">System Design Workspace</h1>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      autoFocus
+                      className="px-2 py-1 border border-blue-500 rounded font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          renameWorkspace(editedName);
+                        } else if (e.key === 'Escape') {
+                          setIsEditingName(false);
+                          setEditedName('');
+                        }
+                      }}
+                      onBlur={() => {
+                        if (editedName.trim() && editedName !== workspaceMeta?.name) {
+                          renameWorkspace(editedName);
+                        } else {
+                          setIsEditingName(false);
+                          setEditedName('');
+                        }
+                      }}
+                    />
+                    {isSavingName && (
+                      <span className="text-xs text-gray-500">Saving...</span>
+                    )}
+                  </div>
+                ) : (
+                  <h1
+                    className="text-xl font-bold text-gray-800 cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                    onClick={() => {
+                      setIsEditingName(true);
+                      setEditedName(workspaceMeta?.name || 'Untitled Workspace');
+                    }}
+                    title="Click to rename workspace"
+                  >
+                    {workspaceMeta?.name || 'Untitled Workspace'}
+                  </h1>
+                )}
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <span className="px-2 py-1 bg-gray-100 rounded">
                     {componentCount} components
@@ -971,10 +1624,11 @@ export const Workspace: React.FC = () => {
             {/* Canvas Section */}
             <div className="flex-1 flex flex-col gap-4 min-w-0 pr-4">
               {/* Canvas Container */}
-              <div className="flex-1 bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-center overflow-hidden">
-                <Canvas
-                  width={1000}
-                  height={600}
+              <div className="flex-1 bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-center overflow-auto min-h-0">
+                <div className="w-full h-full min-w-[800px] min-h-[500px]">
+                  <Canvas
+                    width={1000}
+                    height={600}
                   initialComponents={workspaceComponents}
                   initialConnections={workspaceConnections}
                   onComponentAdd={handleComponentAdd}
@@ -982,10 +1636,12 @@ export const Workspace: React.FC = () => {
                   onComponentUpdate={handleComponentUpdate}
                   onComponentDelete={handleComponentDelete}
                   onComponentCountChange={handleComponentCountChange}
+                  onComponentConfigure={handleComponentConfigure}
                   onConnectionCreate={handleConnectionCreate}
                   onConnectionDelete={handleConnectionDelete}
-                  bottlenecks={bottlenecksMap}
-                />
+                    bottlenecks={bottlenecksMap}
+                  />
+                </div>
               </div>
 
               {/* Status Bar */}
@@ -1102,68 +1758,126 @@ export const Workspace: React.FC = () => {
 
             {/* Right Sidebar - Properties & Controls */}
             <aside
-              className="flex flex-col gap-4"
-              style={{ width: rightSidebarWidth }}
+              className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden"
+              style={{ width: rightSidebarWidth, maxHeight: 'calc(100vh - 80px)' }}
             >
-              {/* Component Properties */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h3 className="text-base font-semibold text-gray-800 mb-3">Properties</h3>
-
+              {/* Component Properties / Configuration Panel */}
+              <ResizableCard
+                minHeight={150}
+                maxHeight={600}
+                defaultHeight={propertiesPanelHeight}
+                onResize={setPropertiesPanelHeight}
+                className="flex-shrink-0"
+                header={
+                  selectedComponent ? (
+                    showConfigPanel ? (
+                      <div className="flex items-center justify-between w-full">
+                        <h3 className="text-base font-semibold text-gray-800">Configuration</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowConfigPanel(false)}
+                          className="text-sm text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100"
+                        >
+                          View Properties
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between w-full">
+                        <h3 className="text-base font-semibold text-gray-800">Properties</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowConfigPanel(true)}
+                          className="text-sm text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                        >
+                          Configure
+                        </button>
+                      </div>
+                    )
+                  ) : (
+                    <h3 className="text-base font-semibold text-gray-800">Properties</h3>
+                  )
+                }
+                onClose={selectedComponent ? () => {
+                  setShowConfigPanel(false);
+                  setSelectedComponent(null);
+                } : undefined}
+              >
                 {selectedComponent ? (
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm text-gray-600 mb-2">Component Details</h4>
-                      <p className="text-base font-semibold text-gray-900 mb-1">
-                        {selectedComponent.metadata.name}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {selectedComponent.metadata.description}
-                      </p>
+                  showConfigPanel ? (
+                    <div className="p-4">
+                      <ComponentConfigPanel
+                        component={selectedComponent}
+                        onUpdate={handleComponentUpdate}
+                        onClose={() => {
+                          setShowConfigPanel(false);
+                          setSelectedComponent(null);
+                        }}
+                      />
                     </div>
+                  ) : (
+                    <div className="p-4 space-y-4">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-sm text-gray-600 mb-2">Component Details</h4>
+                          <p className="text-base font-semibold text-gray-900 mb-1">
+                            {selectedComponent.metadata.name}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {selectedComponent.metadata.description}
+                          </p>
+                        </div>
 
-                    <div>
-                      <h4 className="text-sm text-gray-600 mb-2">Configuration</h4>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Capacity:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.configuration.capacity}</span>
+                        <div>
+                          <h4 className="text-sm text-gray-600 mb-2">Configuration</h4>
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Capacity:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.configuration.capacity}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Latency:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.configuration.latency}ms</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Failure Rate:</span>
+                              <span className="font-medium text-gray-900">
+                                {(selectedComponent.configuration.failureRate * 100).toFixed(3)}%
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Latency:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.configuration.latency}ms</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Failure Rate:</span>
-                          <span className="font-medium text-gray-900">
-                            {(selectedComponent.configuration.failureRate * 100).toFixed(3)}%
-                          </span>
+
+                        <div>
+                          <h4 className="text-sm text-gray-600 mb-2">Position</h4>
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">X:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.position.x}px</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Y:</span>
+                              <span className="font-medium text-gray-900">{selectedComponent.position.y}px</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    <div>
-                      <h4 className="text-sm text-gray-600 mb-2">Position</h4>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">X:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.position.x}px</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Y:</span>
-                          <span className="font-medium text-gray-900">{selectedComponent.position.y}px</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  )
                 ) : (
                   <p className="text-sm text-gray-500 italic">
                     Select a component to view its properties
                   </p>
                 )}
-              </div>
+              </ResizableCard>
 
               {/* Scale Control */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <ResizableCard
+                minHeight={280}
+                maxHeight={500}
+                defaultHeight={scaleControlHeight}
+                onResize={setScaleControlHeight}
+                className="flex-shrink-0"
+              >
                 <ScaleControl
                   currentScale={currentScale}
                   onScaleChange={handleScaleChange}
@@ -1171,32 +1885,36 @@ export const Workspace: React.FC = () => {
                   onStartSimulation={handleStartSimulation}
                   onStopSimulation={handleStopSimulation}
                 />
-              </div>
+              </ResizableCard>
 
               {/* Simulation Time */}
               {isSimulationRunning && (
-                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                <ResizableCard
+                  minHeight={60}
+                  maxHeight={150}
+                  defaultHeight={simulationTimeHeight}
+                  onResize={setSimulationTimeHeight}
+                  className="flex-shrink-0 bg-blue-50 border-blue-200"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-blue-900">Elapsed Time</span>
                     <span className="text-2xl font-bold text-blue-600">{elapsedTime}s</span>
                   </div>
-                </div>
+                </ResizableCard>
               )}
 
               {/* Metrics Dashboard (docked) */}
-              {showMetricsPanel && isSimulationRunning && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Metrics Dashboard</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowMetricsPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+              {showMetricsPanel && (
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={metricsPanelHeight}
+                  onResize={setMetricsPanelHeight}
+                  title="Metrics Dashboard"
+                  onClose={() => setShowMetricsPanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <div className="h-full overflow-hidden">
                   <MetricsDashboard
                     isVisible={true}
                     systemMetrics={systemMetrics}
@@ -1204,108 +1922,96 @@ export const Workspace: React.FC = () => {
                     bottlenecks={Array.from(bottlenecksMap.values())}
                     simulationStatus={isSimulationRunning ? 'running' : 'idle'}
                     elapsedTime={elapsedTime}
+                    loadPattern={loadPattern}
                   />
-                </div>
+                  </div>
+                </ResizableCard>
               )}
 
               {/* Cost Dashboard (docked) */}
               {showCostPanel && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Cost Dashboard</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowCostPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={costPanelHeight}
+                  onResize={setCostPanelHeight}
+                  title="Cost Dashboard"
+                  onClose={() => setShowCostPanel(false)}
+                  className="flex-shrink-0"
+                >
                   <CostDashboard
                     components={workspaceComponents}
                     userCount={currentScale}
                   />
-                </div>
+                </ResizableCard>
               )}
 
               {/* Scalability Dashboard (docked) */}
               {showScalabilityPanel && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Scalability Dashboard</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowScalabilityPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={scalabilityPanelHeight}
+                  onResize={setScalabilityPanelHeight}
+                  title="Scalability Dashboard"
+                  onClose={() => setShowScalabilityPanel(false)}
+                  className="flex-shrink-0"
+                >
                   <ScalabilityDashboard apiBaseUrl={API_BASE_URL} />
-                </div>
+                </ResizableCard>
               )}
 
               {/* Learning Panels (docked) */}
               {showHintsPanel && isSimulationRunning && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Hints</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowHintsPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="max-h-56 overflow-auto">
-                    <HintsPanel
-                      context={{
-                        userId: currentUserId,
-                        scenarioId: 'demo-scenario',
-                        currentTime: elapsedTime,
-                        userPerformance: {
-                          latency: systemMetrics?.averageLatency || 0,
-                          throughput: systemMetrics?.totalThroughput || 0,
-                          errorRate: systemMetrics?.systemErrorRate || 0
-                        },
-                        recentActions: [],
-                        componentsAdded: workspaceComponents.map(c => c.type),
-                        connectionsCreated: workspaceConnections.length,
-                        errorsEncountered: [],
-                        timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
-                      }}
-                      currentDifficulty="beginner"
-                      isActive={true}
-                      onHintInteraction={(hintId, action) => {
-                        console.log('Hint interaction:', hintId, action);
-                      }}
-                      onExplanationRequested={(concept) => {
-                        console.log('Explanation requested:', concept);
-                      }}
-                    />
-                  </div>
-                </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={hintsPanelHeight}
+                  onResize={setHintsPanelHeight}
+                  title="Hints"
+                  onClose={() => setShowHintsPanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <HintsPanel
+                    context={{
+                      userId: currentUserId,
+                      scenarioId: currentScenarioId || 'demo-scenario',
+                      currentTime: elapsedTime,
+                      userPerformance: {
+                        latency: systemMetrics?.averageLatency || 0,
+                        throughput: systemMetrics?.totalThroughput || 0,
+                        errorRate: systemMetrics?.systemErrorRate || 0
+                      },
+                      recentActions: [],
+                      componentsAdded: workspaceComponents.map(c => c.type),
+                      connectionsCreated: workspaceConnections.length,
+                      errorsEncountered: [],
+                      timeStuckOnCurrentStep: bottlenecksMap.size > 0 ? elapsedTime : 0
+                    }}
+                    currentDifficulty="beginner"
+                    isActive={true}
+                    onHintInteraction={(hintId, action) => {
+                      console.log('Hint interaction:', hintId, action);
+                    }}
+                    onExplanationRequested={(concept) => {
+                      console.log('Explanation requested:', concept);
+                    }}
+                  />
+                </ResizableCard>
               )}
 
               {showConstraintsPanel && isSimulationRunning && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Progressive Constraints</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowConstraintsPanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={constraintsPanelHeight}
+                  onResize={setConstraintsPanelHeight}
+                  title="Progressive Constraints"
+                  onClose={() => setShowConstraintsPanel(false)}
+                  className="flex-shrink-0"
+                >
                   <ProgressiveConstraintsPanel
-                    scenarioId="demo-scenario"
+                    scenarioId={currentScenarioId || 'demo-scenario'}
                     sessionId={constraintSessionId}
                     userId={currentUserId}
                     currentTime={elapsedTime}
@@ -1317,23 +2023,20 @@ export const Workspace: React.FC = () => {
                       console.log('Performance updated:', metrics);
                     }}
                   />
-                </div>
+                </ResizableCard>
               )}
 
               {/* Failure Injection Panel (docked) */}
               {showFailurePanel && (
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Failure Injection</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowFailurePanel(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Close"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                <ResizableCard
+                  minHeight={150}
+                  maxHeight={500}
+                  defaultHeight={failurePanelHeight}
+                  onResize={setFailurePanelHeight}
+                  title="Failure Injection"
+                  onClose={() => setShowFailurePanel(false)}
+                  className="flex-shrink-0"
+                >
                   <FailureInjectionPanel
                     isVisible={true}
                     components={workspaceComponents.map(c => ({
@@ -1346,12 +2049,13 @@ export const Workspace: React.FC = () => {
                     onRemoveFailure={handleRemoveFailure}
                     simulationRunning={isSimulationRunning}
                   />
-                </div>
+                </ResizableCard>
               )}
             </aside>
           </div>
         </div>
       </div>
+      )}
 
       {/* Modals and collaboration */}
       <WorkspaceImportModal

@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { Scenario, Workspace, UserProgress } from '../types';
 
 /**
@@ -44,8 +45,113 @@ export class ScenarioService {
         initialWorkspace: {
           name: 'Basic Web App Scenario',
           description: 'Learn to design a basic web application architecture',
-          components: [],
-          connections: [],
+          components: [
+            {
+              id: 'client-1',
+              type: 'client',
+              componentKey: 'client-web',
+              position: { x: 100, y: 300 },
+              configuration: {
+                capacity: 1000,
+                latency: 50,
+                failureRate: 0.001
+              },
+              metadata: {
+                name: 'Web Client',
+                description: 'Users accessing the web application',
+                version: '1.0'
+              }
+            },
+            {
+              id: 'load-balancer-1',
+              type: 'load-balancer',
+              componentKey: 'load-balancer-nginx',
+              position: { x: 300, y: 300 },
+              configuration: {
+                capacity: 10000,
+                latency: 1,
+                failureRate: 0.0001
+              },
+              metadata: {
+                name: 'Nginx Load Balancer',
+                description: 'Load balancer distributing traffic',
+                version: '1.24'
+              }
+            },
+            {
+              id: 'web-server-1',
+              type: 'web-server',
+              componentKey: 'web-server-nodejs',
+              position: { x: 500, y: 300 },
+              configuration: {
+                capacity: 3000,
+                latency: 8,
+                failureRate: 0.0015
+              },
+              metadata: {
+                name: 'Node.js Server',
+                description: 'Application server',
+                version: '18.0'
+              }
+            },
+            {
+              id: 'database-1',
+              type: 'database',
+              componentKey: 'database-mysql',
+              position: { x: 700, y: 300 },
+              configuration: {
+                capacity: 1000,
+                latency: 5,
+                failureRate: 0.001
+              },
+              metadata: {
+                name: 'MySQL Database',
+                description: 'Data storage',
+                version: '8.0'
+              }
+            }
+          ],
+          connections: [
+            {
+              id: 'conn-1',
+              sourceComponentId: 'client-1',
+              targetComponentId: 'load-balancer-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 10,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-2',
+              sourceComponentId: 'load-balancer-1',
+              targetComponentId: 'web-server-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-3',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'database-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'DATABASE',
+                reliability: 0.99
+              }
+            }
+          ],
           configuration: {
             duration: 300,
             loadPattern: {
@@ -105,7 +211,8 @@ export class ScenarioService {
           components: [
             {
               id: 'web-server-1',
-              type: 'service',
+              type: 'web-server',
+              componentKey: 'web-server-nodejs',
               position: { x: 200, y: 200 },
               configuration: {
                 capacity: 1000,
@@ -121,6 +228,7 @@ export class ScenarioService {
             {
               id: 'database-1',
               type: 'database',
+              componentKey: 'database-mysql',
               position: { x: 400, y: 200 },
               configuration: {
                 capacity: 500,
@@ -133,9 +241,51 @@ export class ScenarioService {
                 description: 'Main data store',
                 version: '1.0.0'
               }
+            },
+            {
+              id: 'cache-1',
+              type: 'cache',
+              componentKey: 'cache-redis',
+              position: { x: 300, y: 350 },
+              configuration: {
+                capacity: 8000,
+                latency: 0.8,
+                failureRate: 0.0002
+              },
+              metadata: {
+                name: 'Redis Cache',
+                description: 'Cache layer for performance',
+                version: '7.0'
+              }
             }
           ],
           connections: [
+            {
+              id: 'web-to-cache',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'cache-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 1,
+                protocol: 'TCP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'cache-to-db',
+              sourceComponentId: 'cache-1',
+              targetComponentId: 'database-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'DATABASE',
+                reliability: 0.99
+              }
+            },
             {
               id: 'web-to-db',
               sourceComponentId: 'web-server-1',
@@ -546,6 +696,1164 @@ export class ScenarioService {
           'Cross-region failover working correctly',
           'System performance degrades gracefully, not catastrophically'
         ]
+      },
+
+      // NEW SCENARIOS USING RECENTLY ADDED COMPONENTS
+      {
+        id: 'ecommerce-platform',
+        name: 'E-Commerce Platform',
+        description: 'Design a complete e-commerce platform with product search, image storage, authentication, and order processing. Learn to integrate multiple modern components.',
+        difficulty: 'intermediate',
+        category: 'full-stack',
+        prerequisites: ['simple-caching'],
+        estimatedTimeMinutes: 90,
+        tags: ['ecommerce', 'api-gateway', 'search-engine', 'object-storage', 'auth-service', 'message-queue'],
+        learningOutcomes: [
+          'Understand API Gateway patterns',
+          'Learn search engine integration',
+          'Configure object storage for media',
+          'Implement authentication services',
+          'Design async order processing'
+        ],
+        objectives: [
+          'Add API Gateway for request routing',
+          'Integrate search engine for product search',
+          'Configure object storage for product images',
+          'Add authentication service for user management',
+          'Implement message queue for order processing',
+          'Add monitoring and logging services',
+          'Test system under realistic e-commerce load'
+        ],
+        initialWorkspace: {
+          name: 'E-Commerce Platform Scenario',
+          description: 'Build a complete e-commerce platform',
+          components: [
+            {
+              id: 'client-1',
+              type: 'client',
+              componentKey: 'client-web',
+              position: { x: 100, y: 300 },
+              configuration: {
+                capacity: 1000,
+                latency: 50,
+                failureRate: 0.001
+              },
+              metadata: {
+                name: 'Web Client',
+                description: 'Users browsing the e-commerce site',
+                version: '1.0'
+              }
+            },
+            {
+              id: 'api-gateway-1',
+              type: 'api-gateway',
+              componentKey: 'api-gateway-kong',
+              position: { x: 300, y: 300 },
+              configuration: {
+                capacity: 10000,
+                latency: 5,
+                failureRate: 0.0001
+              },
+              metadata: {
+                name: 'Kong API Gateway',
+                description: 'API Gateway for request routing',
+                version: '3.0'
+              }
+            },
+            {
+              id: 'web-server-1',
+              type: 'web-server',
+              componentKey: 'web-server-nodejs',
+              position: { x: 500, y: 300 },
+              configuration: {
+                capacity: 3000,
+                latency: 8,
+                failureRate: 0.0015
+              },
+              metadata: {
+                name: 'Node.js Server',
+                description: 'Application server',
+                version: '18.0'
+              }
+            },
+            {
+              id: 'search-engine-1',
+              type: 'search-engine',
+              componentKey: 'search-engine-elasticsearch',
+              position: { x: 500, y: 150 },
+              configuration: {
+                capacity: 5000,
+                latency: 10,
+                failureRate: 0.001
+              },
+              metadata: {
+                name: 'Elasticsearch',
+                description: 'Product search engine',
+                version: '8.0'
+              }
+            },
+            {
+              id: 'object-storage-1',
+              type: 'object-storage',
+              componentKey: 'object-storage-awsS3',
+              position: { x: 500, y: 450 },
+              configuration: {
+                capacity: 1000000,
+                latency: 50,
+                failureRate: 0.00001
+              },
+              metadata: {
+                name: 'AWS S3',
+                description: 'Product images storage',
+                version: 'latest'
+              }
+            },
+            {
+              id: 'auth-service-1',
+              type: 'auth-service',
+              componentKey: 'auth-service-jwt',
+              position: { x: 700, y: 200 },
+              configuration: {
+                capacity: 8000,
+                latency: 5,
+                failureRate: 0.0003
+              },
+              metadata: {
+                name: 'JWT Auth Service',
+                description: 'User authentication',
+                version: '9.0'
+              }
+            },
+            {
+              id: 'message-queue-1',
+              type: 'message-queue',
+              componentKey: 'message-queue-kafka',
+              position: { x: 700, y: 400 },
+              configuration: {
+                capacity: 100000,
+                latency: 2,
+                failureRate: 0.0001
+              },
+              metadata: {
+                name: 'Apache Kafka',
+                description: 'Order processing queue',
+                version: '3.5'
+              }
+            },
+            {
+              id: 'database-1',
+              type: 'database',
+              componentKey: 'database-mysql',
+              position: { x: 900, y: 300 },
+              configuration: {
+                capacity: 1000,
+                latency: 5,
+                failureRate: 0.001
+              },
+              metadata: {
+                name: 'MySQL Database',
+                description: 'Product and order data',
+                version: '8.0'
+              }
+            },
+            {
+              id: 'monitoring-1',
+              type: 'monitoring',
+              componentKey: 'monitoring-prometheus',
+              position: { x: 300, y: 150 },
+              configuration: {
+                capacity: 10000,
+                latency: 10,
+                failureRate: 0.0002
+              },
+              metadata: {
+                name: 'Prometheus',
+                description: 'Metrics collection',
+                version: '2.45'
+              }
+            },
+            {
+              id: 'logging-1',
+              type: 'logging',
+              componentKey: 'logging-elasticsearch',
+              position: { x: 300, y: 450 },
+              configuration: {
+                capacity: 8000,
+                latency: 8,
+                failureRate: 0.0003
+              },
+              metadata: {
+                name: 'Elasticsearch Logging',
+                description: 'Centralized logging',
+                version: '8.0'
+              }
+            }
+          ],
+          connections: [
+            {
+              id: 'conn-1',
+              sourceComponentId: 'client-1',
+              targetComponentId: 'api-gateway-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 10,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-2',
+              sourceComponentId: 'api-gateway-1',
+              targetComponentId: 'web-server-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-3',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'search-engine-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.98
+              }
+            },
+            {
+              id: 'conn-4',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'object-storage-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 20,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-5',
+              sourceComponentId: 'api-gateway-1',
+              targetComponentId: 'auth-service-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-6',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'message-queue-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 2,
+                protocol: 'TCP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-7',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'database-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'DATABASE',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-8',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'monitoring-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 100,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.95
+              }
+            },
+            {
+              id: 'conn-9',
+              sourceComponentId: 'web-server-1',
+              targetComponentId: 'logging-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 200,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.95
+              }
+            }
+          ],
+          configuration: {
+            duration: 900,
+            loadPattern: {
+              type: 'realistic',
+              baseLoad: 500,
+              peakLoad: 5000
+            },
+            failureScenarios: [
+              {
+                componentId: 'search-engine',
+                failureType: 'degradation',
+                startTime: 400,
+                duration: 120,
+                severity: 0.5
+              }
+            ],
+            metricsCollection: {
+              collectionInterval: 1000,
+              retentionPeriod: 3600,
+              enabledMetrics: ['latency', 'throughput', 'errors', 'cache-hits', 'search-latency', 'auth-latency']
+            }
+          }
+        },
+        hints: [
+          'Start with API Gateway as the entry point',
+          'Add search engine for product search functionality',
+          'Use object storage for product images and media',
+          'Integrate authentication service for user sessions',
+          'Add message queue for asynchronous order processing',
+          'Configure monitoring to track all services',
+          'Set up logging for debugging and analytics'
+        ],
+        evaluationCriteria: [
+          'API Gateway configured and routing requests',
+          'Search engine integrated and responding',
+          'Object storage handling image requests',
+          'Authentication service protecting endpoints',
+          'Message queue processing orders asynchronously',
+          'Monitoring and logging services active',
+          'System handles peak load gracefully',
+          'Search latency <100ms for typical queries'
+        ]
+      },
+      {
+        id: 'social-media-platform',
+        name: 'Social Media Platform',
+        description: 'Design a social media platform handling millions of posts, real-time feeds, media uploads, and user interactions. Learn to scale social features.',
+        difficulty: 'advanced',
+        category: 'social-platform',
+        prerequisites: ['ecommerce-platform'],
+        estimatedTimeMinutes: 120,
+        tags: ['social-media', 'real-time', 'feed-generation', 'media-processing', 'service-mesh'],
+        learningOutcomes: [
+          'Understand feed generation at scale',
+          'Learn service mesh patterns',
+          'Configure rate limiting for API protection',
+          'Implement circuit breakers for resilience',
+          'Design media processing pipelines'
+        ],
+        objectives: [
+          'Add service mesh for microservices communication',
+          'Configure rate limiters to prevent abuse',
+          'Implement circuit breakers for fault tolerance',
+          'Set up object storage for user media',
+          'Add message queues for feed generation',
+          'Configure monitoring for all services',
+          'Test system under viral traffic spikes'
+        ],
+        initialWorkspace: {
+          name: 'Social Media Platform Scenario',
+          description: 'Build a scalable social media platform',
+          components: [],
+          connections: [],
+          configuration: {
+            duration: 1200,
+            loadPattern: {
+              type: 'spike',
+              baseLoad: 2000,
+              peakLoad: 50000
+            },
+            failureScenarios: [
+              {
+                componentId: 'feed-service',
+                failureType: 'overload',
+                startTime: 600,
+                duration: 180,
+                severity: 0.8
+              },
+              {
+                componentId: 'media-storage',
+                failureType: 'capacity-exceeded',
+                startTime: 900,
+                duration: 120,
+                severity: 0.6
+              }
+            ],
+            metricsCollection: {
+              collectionInterval: 500,
+              retentionPeriod: 7200,
+              enabledMetrics: ['latency', 'throughput', 'errors', 'rate-limit-hits', 'circuit-breaker-state', 'queue-depth']
+            }
+          }
+        },
+        hints: [
+          'Use service mesh to manage microservices communication',
+          'Add rate limiters to protect APIs from abuse',
+          'Implement circuit breakers between services',
+          'Use object storage for user-uploaded media',
+          'Configure message queues for feed generation',
+          'Set up comprehensive monitoring',
+          'Test rate limiting under high traffic',
+          'Observe circuit breaker behavior during failures'
+        ],
+        evaluationCriteria: [
+          'Service mesh managing inter-service communication',
+          'Rate limiters protecting APIs effectively',
+          'Circuit breakers preventing cascading failures',
+          'Object storage handling media uploads',
+          'Message queues processing feeds asynchronously',
+          'System handles viral traffic spikes',
+          'Rate limiting prevents system overload',
+          'Circuit breakers recover gracefully'
+        ]
+      },
+      {
+        id: 'observable-microservices',
+        name: 'Observable Microservices System',
+        description: 'Build a fully observable microservices system with comprehensive monitoring, logging, and distributed tracing. Learn observability best practices.',
+        difficulty: 'intermediate',
+        category: 'observability',
+        prerequisites: ['microservices-basics'],
+        estimatedTimeMinutes: 75,
+        tags: ['monitoring', 'logging', 'observability', 'distributed-tracing', 'metrics'],
+        learningOutcomes: [
+          'Understand observability pillars (metrics, logs, traces)',
+          'Configure monitoring dashboards',
+          'Set up centralized logging',
+          'Learn distributed tracing patterns',
+          'Implement alerting strategies'
+        ],
+        objectives: [
+          'Add monitoring service for metrics collection',
+          'Configure logging service for centralized logs',
+          'Set up monitoring for all microservices',
+          'Configure log aggregation and search',
+          'Create monitoring dashboards',
+          'Test observability under failure scenarios',
+          'Verify distributed tracing works correctly'
+        ],
+        initialWorkspace: {
+          name: 'Observable Microservices Scenario',
+          description: 'Learn observability in microservices',
+          components: [
+            {
+              id: 'user-service',
+              type: 'web-server',
+              componentKey: 'web-server-nodejs',
+              position: { x: 200, y: 200 },
+              configuration: {
+                capacity: 1000,
+                latency: 50,
+                failureRate: 0.01
+              },
+              metadata: {
+                name: 'User Service',
+                description: 'User management service',
+                version: '1.0.0'
+              }
+            },
+            {
+              id: 'order-service',
+              type: 'web-server',
+              componentKey: 'web-server-nodejs',
+              position: { x: 400, y: 200 },
+              configuration: {
+                capacity: 800,
+                latency: 60,
+                failureRate: 0.01
+              },
+              metadata: {
+                name: 'Order Service',
+                description: 'Order processing service',
+                version: '1.0.0'
+              }
+            },
+            {
+              id: 'monitoring-1',
+              type: 'monitoring',
+              componentKey: 'monitoring-prometheus',
+              position: { x: 300, y: 50 },
+              configuration: {
+                capacity: 10000,
+                latency: 10,
+                failureRate: 0.0002
+              },
+              metadata: {
+                name: 'Prometheus',
+                description: 'Metrics collection',
+                version: '2.45'
+              }
+            },
+            {
+              id: 'logging-1',
+              type: 'logging',
+              componentKey: 'logging-elasticsearch',
+              position: { x: 300, y: 350 },
+              configuration: {
+                capacity: 8000,
+                latency: 8,
+                failureRate: 0.0003
+              },
+              metadata: {
+                name: 'Elasticsearch Logging',
+                description: 'Centralized logging',
+                version: '8.0'
+              }
+            }
+          ],
+          connections: [
+            {
+              id: 'conn-1',
+              sourceComponentId: 'user-service',
+              targetComponentId: 'monitoring-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 100,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.95
+              }
+            },
+            {
+              id: 'conn-2',
+              sourceComponentId: 'order-service',
+              targetComponentId: 'monitoring-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 100,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.95
+              }
+            },
+            {
+              id: 'conn-3',
+              sourceComponentId: 'user-service',
+              targetComponentId: 'logging-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 200,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.95
+              }
+            },
+            {
+              id: 'conn-4',
+              sourceComponentId: 'order-service',
+              targetComponentId: 'logging-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 200,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.95
+              }
+            }
+          ],
+          configuration: {
+            duration: 600,
+            loadPattern: {
+              type: 'ramp',
+              baseLoad: 300,
+              peakLoad: 1500
+            },
+            failureScenarios: [
+              {
+                componentId: 'order-service',
+                failureType: 'latency-spike',
+                startTime: 300,
+                duration: 60,
+                severity: 0.7
+              }
+            ],
+            metricsCollection: {
+              collectionInterval: 1000,
+              retentionPeriod: 3600,
+              enabledMetrics: ['latency', 'throughput', 'errors', 'cpu', 'memory', 'request-trace']
+            }
+          }
+        },
+        hints: [
+          'Add monitoring service (Prometheus/Grafana)',
+          'Configure logging service (Elasticsearch)',
+          'Connect all services to monitoring',
+          'Set up log aggregation from all services',
+          'Configure alerting thresholds',
+          'Monitor service dependencies',
+          'Observe distributed traces across services'
+        ],
+        evaluationCriteria: [
+          'Monitoring service collecting metrics from all services',
+          'Logging service aggregating logs',
+          'Metrics dashboards showing service health',
+          'Logs searchable and indexed',
+          'Distributed tracing working across services',
+          'Alerts configured for critical metrics',
+          'Observability helps identify bottlenecks quickly'
+        ]
+      },
+      {
+        id: 'secure-api-platform',
+        name: 'Secure API Platform',
+        description: 'Design a secure API platform with authentication, rate limiting, and circuit breakers. Learn API security and resilience patterns.',
+        difficulty: 'intermediate',
+        category: 'security',
+        prerequisites: ['load-balanced-system'],
+        estimatedTimeMinutes: 80,
+        tags: ['api-security', 'authentication', 'rate-limiting', 'circuit-breaker', 'api-gateway'],
+        learningOutcomes: [
+          'Understand API security best practices',
+          'Learn authentication patterns',
+          'Configure rate limiting strategies',
+          'Implement circuit breakers',
+          'Design secure API gateways'
+        ],
+        objectives: [
+          'Add API Gateway as entry point',
+          'Configure authentication service',
+          'Implement rate limiters',
+          'Add circuit breakers for resilience',
+          'Test API under attack scenarios',
+          'Verify rate limiting prevents abuse',
+          'Test circuit breaker behavior'
+        ],
+        initialWorkspace: {
+          name: 'Secure API Platform Scenario',
+          description: 'Build a secure and resilient API platform',
+          components: [
+            {
+              id: 'client-1',
+              type: 'client',
+              componentKey: 'client-api',
+              position: { x: 100, y: 300 },
+              configuration: {
+                capacity: 2000,
+                latency: 20,
+                failureRate: 0.0005
+              },
+              metadata: {
+                name: 'API Client',
+                description: 'API consumers',
+                version: '1.0'
+              }
+            },
+            {
+              id: 'api-gateway-1',
+              type: 'api-gateway',
+              componentKey: 'api-gateway-kong',
+              position: { x: 300, y: 300 },
+              configuration: {
+                capacity: 15000,
+                latency: 3,
+                failureRate: 0.0002
+              },
+              metadata: {
+                name: 'Kong API Gateway',
+                description: 'API Gateway for routing',
+                version: '3.0'
+              }
+            },
+            {
+              id: 'rate-limiter-1',
+              type: 'rate-limiter',
+              componentKey: 'rate-limiter-redisRateLimiter',
+              position: { x: 500, y: 200 },
+              configuration: {
+                capacity: 50000,
+                latency: 0.5,
+                failureRate: 0.0001
+              },
+              metadata: {
+                name: 'Redis Rate Limiter',
+                description: 'Rate limiting protection',
+                version: '7.0'
+              }
+            },
+            {
+              id: 'auth-service-1',
+              type: 'auth-service',
+              componentKey: 'auth-service-jwt',
+              position: { x: 500, y: 400 },
+              configuration: {
+                capacity: 8000,
+                latency: 5,
+                failureRate: 0.0003
+              },
+              metadata: {
+                name: 'JWT Auth Service',
+                description: 'Authentication service',
+                version: '9.0'
+              }
+            },
+            {
+              id: 'circuit-breaker-1',
+              type: 'circuit-breaker',
+              componentKey: 'circuit-breaker-resilience4j',
+              position: { x: 700, y: 200 },
+              configuration: {
+                capacity: 12000,
+                latency: 0.15,
+                failureRate: 0.00008
+              },
+              metadata: {
+                name: 'Resilience4j Circuit Breaker',
+                description: 'Fault tolerance',
+                version: '1.17'
+              }
+            },
+            {
+              id: 'backend-service-1',
+              type: 'web-server',
+              componentKey: 'web-server-nodejs',
+              position: { x: 900, y: 300 },
+              configuration: {
+                capacity: 3000,
+                latency: 8,
+                failureRate: 0.0015
+              },
+              metadata: {
+                name: 'Backend Service',
+                description: 'API backend service',
+                version: '18.0'
+              }
+            }
+          ],
+          connections: [
+            {
+              id: 'conn-1',
+              sourceComponentId: 'client-1',
+              targetComponentId: 'api-gateway-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 10,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-2',
+              sourceComponentId: 'api-gateway-1',
+              targetComponentId: 'rate-limiter-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 1,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-3',
+              sourceComponentId: 'api-gateway-1',
+              targetComponentId: 'auth-service-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-4',
+              sourceComponentId: 'rate-limiter-1',
+              targetComponentId: 'circuit-breaker-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 1,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-5',
+              sourceComponentId: 'circuit-breaker-1',
+              targetComponentId: 'backend-service-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            }
+          ],
+          configuration: {
+            duration: 900,
+            loadPattern: {
+              type: 'spike',
+              baseLoad: 500,
+              peakLoad: 10000
+            },
+            failureScenarios: [
+              {
+                componentId: 'backend-service',
+                failureType: 'overload',
+                startTime: 400,
+                duration: 120,
+                severity: 0.9
+              }
+            ],
+            metricsCollection: {
+              collectionInterval: 1000,
+              retentionPeriod: 3600,
+              enabledMetrics: ['latency', 'throughput', 'errors', 'rate-limit-hits', 'auth-failures', 'circuit-breaker-state']
+            }
+          }
+        },
+        hints: [
+          'Start with API Gateway for request routing',
+          'Add authentication service for API keys/tokens',
+          'Configure rate limiters to prevent abuse',
+          'Add circuit breakers between gateway and services',
+          'Test rate limiting with high request rates',
+          'Simulate backend failures to test circuit breakers',
+          'Monitor authentication and rate limit metrics'
+        ],
+        evaluationCriteria: [
+          'API Gateway routing requests correctly',
+          'Authentication service validating requests',
+          'Rate limiters preventing abuse',
+          'Circuit breakers protecting backend services',
+          'System handles attack scenarios gracefully',
+          'Rate limiting metrics visible',
+          'Circuit breakers recover automatically'
+        ]
+      },
+      {
+        id: 'search-powered-app',
+        name: 'Search-Powered Application',
+        description: 'Build an application with powerful search capabilities using Elasticsearch. Learn search indexing, query optimization, and search scaling.',
+        difficulty: 'intermediate',
+        category: 'search',
+        prerequisites: ['simple-caching'],
+        estimatedTimeMinutes: 70,
+        tags: ['search-engine', 'elasticsearch', 'full-text-search', 'indexing', 'query-optimization'],
+        learningOutcomes: [
+          'Understand search engine architecture',
+          'Learn indexing strategies',
+          'Configure search clusters',
+          'Optimize search queries',
+          'Handle search at scale'
+        ],
+        objectives: [
+          'Add search engine component',
+          'Configure search indexing',
+          'Set up search cluster with replicas',
+          'Optimize search query performance',
+          'Add caching for popular searches',
+          'Test search under high query load',
+          'Monitor search latency and throughput'
+        ],
+        initialWorkspace: {
+          name: 'Search-Powered Application Scenario',
+          description: 'Build an application with search capabilities',
+          components: [
+            {
+              id: 'client-1',
+              type: 'client',
+              componentKey: 'client-web',
+              position: { x: 100, y: 300 },
+              configuration: {
+                capacity: 1000,
+                latency: 50,
+                failureRate: 0.001
+              },
+              metadata: {
+                name: 'Web Client',
+                description: 'Users searching the application',
+                version: '1.0'
+              }
+            },
+            {
+              id: 'app-server',
+              type: 'web-server',
+              componentKey: 'web-server-nodejs',
+              position: { x: 300, y: 300 },
+              configuration: {
+                capacity: 2000,
+                latency: 40,
+                failureRate: 0.01
+              },
+              metadata: {
+                name: 'Application Server',
+                description: 'Main application server',
+                version: '1.0.0'
+              }
+            },
+            {
+              id: 'search-engine-1',
+              type: 'search-engine',
+              componentKey: 'search-engine-elasticsearch',
+              position: { x: 500, y: 200 },
+              configuration: {
+                capacity: 5000,
+                latency: 10,
+                failureRate: 0.001
+              },
+              metadata: {
+                name: 'Elasticsearch',
+                description: 'Search engine for full-text search',
+                version: '8.0'
+              }
+            },
+            {
+              id: 'cache-1',
+              type: 'cache',
+              componentKey: 'cache-redis',
+              position: { x: 500, y: 400 },
+              configuration: {
+                capacity: 8000,
+                latency: 0.8,
+                failureRate: 0.0002
+              },
+              metadata: {
+                name: 'Redis Cache',
+                description: 'Cache for popular search queries',
+                version: '7.0'
+              }
+            },
+            {
+              id: 'database',
+              type: 'database',
+              componentKey: 'database-mysql',
+              position: { x: 700, y: 300 },
+              configuration: {
+                capacity: 1000,
+                latency: 10,
+                failureRate: 0.005
+              },
+              metadata: {
+                name: 'Primary Database',
+                description: 'Main data store',
+                version: '1.0.0'
+              }
+            }
+          ],
+          connections: [
+            {
+              id: 'conn-1',
+              sourceComponentId: 'client-1',
+              targetComponentId: 'app-server',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 10,
+                protocol: 'HTTP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-2',
+              sourceComponentId: 'app-server',
+              targetComponentId: 'search-engine-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'HTTP',
+                reliability: 0.98
+              }
+            },
+            {
+              id: 'conn-3',
+              sourceComponentId: 'app-server',
+              targetComponentId: 'cache-1',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 1,
+                protocol: 'TCP',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-4',
+              sourceComponentId: 'app-server',
+              targetComponentId: 'database',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 1000,
+                latency: 5,
+                protocol: 'DATABASE',
+                reliability: 0.99
+              }
+            },
+            {
+              id: 'conn-5',
+              sourceComponentId: 'cache-1',
+              targetComponentId: 'database',
+              sourcePort: 'out',
+              targetPort: 'in',
+              configuration: {
+                bandwidth: 500,
+                latency: 5,
+                protocol: 'DATABASE',
+                reliability: 0.99
+              }
+            }
+          ],
+          configuration: {
+            duration: 600,
+            loadPattern: {
+              type: 'realistic',
+              baseLoad: 800,
+              peakLoad: 3000
+            },
+            failureScenarios: [
+              {
+                componentId: 'search-engine',
+                failureType: 'index-corruption',
+                startTime: 300,
+                duration: 60,
+                severity: 0.5
+              }
+            ],
+            metricsCollection: {
+              collectionInterval: 1000,
+              retentionPeriod: 3600,
+              enabledMetrics: ['latency', 'throughput', 'errors', 'search-latency', 'index-size', 'query-performance']
+            }
+          }
+        },
+        hints: [
+          'Add search engine component',
+          'Configure search with appropriate shards and replicas',
+          'Connect application server to search engine',
+          'Add cache for frequently searched queries',
+          'Monitor search query latency',
+          'Test search performance under load',
+          'Optimize search queries for better performance'
+        ],
+        evaluationCriteria: [
+          'Search engine component added and configured',
+          'Search cluster with proper sharding',
+          'Search queries responding quickly (<100ms)',
+          'Cache improving search performance',
+          'Search handles high query load',
+          'Search latency metrics visible',
+          'System scales search effectively'
+        ]
+      },
+      {
+        id: 'media-streaming-platform',
+        name: 'Media Streaming Platform',
+        description: 'Design a platform for streaming video and audio content with CDN, object storage, and efficient content delivery. Learn media distribution patterns.',
+        difficulty: 'advanced',
+        category: 'media',
+        prerequisites: ['global-cdn-system'],
+        estimatedTimeMinutes: 100,
+        tags: ['streaming', 'cdn', 'object-storage', 'media-delivery', 'content-distribution'],
+        learningOutcomes: [
+          'Understand media streaming architecture',
+          'Learn CDN optimization for media',
+          'Configure object storage for large files',
+          'Design efficient content delivery',
+          'Handle streaming at scale'
+        ],
+        objectives: [
+          'Add CDN for global content delivery',
+          'Configure object storage for media files',
+          'Set up multiple CDN edge locations',
+          'Optimize cache strategies for media',
+          'Add monitoring for streaming metrics',
+          'Test streaming under global load',
+          'Handle media file failures gracefully'
+        ],
+        initialWorkspace: {
+          name: 'Media Streaming Platform Scenario',
+          description: 'Build a scalable media streaming platform',
+          components: [],
+          connections: [],
+          configuration: {
+            duration: 1200,
+            loadPattern: {
+              type: 'geographic',
+              baseLoad: 2000,
+              peakLoad: 50000
+            },
+            failureScenarios: [
+              {
+                componentId: 'cdn-region-asia',
+                failureType: 'regional-outage',
+                startTime: 600,
+                duration: 180,
+                severity: 1.0
+              },
+              {
+                componentId: 'media-storage',
+                failureType: 'capacity-exceeded',
+                startTime: 900,
+                duration: 120,
+                severity: 0.7
+              }
+            ],
+            metricsCollection: {
+              collectionInterval: 1000,
+              retentionPeriod: 7200,
+              enabledMetrics: ['latency', 'throughput', 'errors', 'cache-hits', 'bandwidth', 'stream-quality']
+            }
+          }
+        },
+        hints: [
+          'Add CDN components in multiple regions',
+          'Configure object storage for media files',
+          'Set up origin servers for CDN',
+          'Optimize cache TTL for media content',
+          'Add monitoring for streaming performance',
+          'Test content delivery from different regions',
+          'Handle CDN failures with origin fallback'
+        ],
+        evaluationCriteria: [
+          'CDN configured in multiple regions',
+          'Object storage handling media files',
+          'Cache hit ratios >90% for popular content',
+          'Streaming latency optimized globally',
+          'System handles regional CDN failures',
+          'Media delivery metrics tracked',
+          'Content scales efficiently'
+        ]
       }
     ];
 
@@ -578,8 +1886,11 @@ export class ScenarioService {
     }
 
     // Create a new workspace based on the scenario's initial workspace
+    // Generate a proper UUID for the workspace ID
+    const workspaceId = uuidv4();
+    
     const workspace: Workspace = {
-      id: `scenario-${scenarioId}-${Date.now()}`,
+      id: workspaceId,
       name: scenario.initialWorkspace.name || scenario.name,
       description: scenario.initialWorkspace.description || scenario.description,
       userId,

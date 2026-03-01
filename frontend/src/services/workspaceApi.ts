@@ -111,8 +111,8 @@ export interface WorkspaceSummary {
   userId: string;
   createdAt: string;
   updatedAt: string;
-  components?: unknown[];
-  connections?: unknown[];
+  componentCount: number;
+  connectionCount: number;
 }
 
 export interface WorkspaceListResponse {
@@ -179,6 +179,39 @@ export class WorkspaceApiService {
       const errorData = await response.json().catch(() => null);
       throw new Error(errorData?.error?.message ?? 'Failed to delete workspace');
     }
+  }
+
+  /**
+   * Rename a workspace
+   */
+  static async renameWorkspace(
+    workspaceId: string,
+    newName: string,
+    userId?: string
+  ): Promise<WorkspaceSummary> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.append('userId', userId);
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/workspaces/${encodeURIComponent(workspaceId)}?${params.toString()}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: newName })
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error?.message ?? 'Failed to rename workspace');
+    }
+
+    const data = await response.json();
+    return data.data;
   }
 
   /**

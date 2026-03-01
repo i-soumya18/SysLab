@@ -13,7 +13,7 @@ import { ConnectionWire } from './ConnectionWire';
 import { useConnectionManager } from './ConnectionManager';
 import { ConnectionConfigPanel } from './ConnectionConfigPanel';
 import { ConnectionContextMenu } from './ConnectionContextMenu';
-import { ComponentConfigPanel } from './ComponentConfigPanel';
+import { generateUUID } from '../utils/uuid';
 
 // Drag item type for React DnD
 export interface DragItem {
@@ -44,6 +44,7 @@ interface CanvasProps {
   onComponentUpdate?: (component: Component) => void;
   onComponentDelete?: (componentId: string) => void;
   onComponentCountChange?: (count: number) => void;
+  onComponentConfigure?: (component: Component) => void;
   onConnectionCreate?: (connection: Connection) => void;
   onConnectionDelete?: (connectionId: string) => void;
   onConnectionSelect?: (connection: Connection | null) => void;
@@ -66,6 +67,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onComponentUpdate,
   onComponentDelete,
   onComponentCountChange,
+  onComponentConfigure,
   onConnectionCreate,
   onConnectionDelete,
   onConnectionSelect,
@@ -81,7 +83,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [showConnectionConfig, setShowConnectionConfig] = useState(false);
-  const [showComponentConfig, setShowComponentConfig] = useState(false);
   const [connectionContextMenu, setConnectionContextMenu] = useState<{
     connection: Connection;
     position: { x: number; y: number };
@@ -134,12 +135,24 @@ export const Canvas: React.FC<CanvasProps> = ({
   });
 
   // Initialize from parent-provided workspace state when present (e.g. loaded or imported workspace)
+  // Compare component IDs to avoid unnecessary updates
+  const prevInitialComponentsRef = useRef<string>('');
   useEffect(() => {
-    if (initialComponents && initialComponents.length > 0) {
-      setComponents(initialComponents);
-      onComponentCountChange?.(initialComponents.length);
+    if (!initialComponents || initialComponents.length === 0) {
+      return;
     }
-  }, [initialComponents, onComponentCountChange]);
+    
+    // Create a signature from component IDs to detect actual changes
+    const componentIds = initialComponents.map(c => c.id).sort().join(',');
+    if (componentIds === prevInitialComponentsRef.current) {
+      // Components haven't actually changed, skip update
+      return;
+    }
+    
+    prevInitialComponentsRef.current = componentIds;
+    setComponents(initialComponents);
+    // Don't call onComponentCountChange here - it will be called by the effect that watches components.length
+  }, [initialComponents]);
 
   useEffect(() => {
     if (initialConnections && initialConnections.length > 0) {
@@ -157,6 +170,67 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, [enableGridSnapping, gridSize]);
 
+  // Check if a position overlaps with existing components
+  const checkCollision = useCallback((position: Position, excludeId?: string): boolean => {
+    const componentWidth = 100;
+    const componentHeight = 80;
+    const padding = 20; // Minimum spacing between components
+
+    return components.some(comp => {
+      if (excludeId && comp.id === excludeId) return false;
+      
+      const compRight = comp.position.x + componentWidth + padding;
+      const compBottom = comp.position.y + componentHeight + padding;
+      const newRight = position.x + componentWidth + padding;
+      const newBottom = position.y + componentHeight + padding;
+
+      return (
+        position.x < compRight &&
+        newRight > comp.position.x &&
+        position.y < compBottom &&
+        newBottom > comp.position.y
+      );
+    });
+  }, [components]);
+
+  // Find next available position without collision
+  const findAvailablePosition = useCallback((startPosition: Position): Position => {
+    const componentWidth = 100;
+    const componentHeight = 80;
+    const spacing = 120; // Grid spacing for new components
+    let currentPos = { ...startPosition };
+    let attempts = 0;
+    const maxAttempts = 200; // Increased attempts for larger canvases
+
+    // Try to find a nearby position that doesn't collide
+    while (checkCollision(currentPos) && attempts < maxAttempts) {
+      // Try moving right first
+      currentPos.x += spacing;
+      if (currentPos.x + componentWidth + 20 > width) {
+        // Move to next row
+        currentPos.x = 20; // Start with some padding from left
+        currentPos.y += spacing;
+        if (currentPos.y + componentHeight + 20 > height) {
+          // Wrap around to top, but shift right
+          currentPos.y = 20;
+          currentPos.x += spacing * 2; // Try a different column
+          if (currentPos.x + componentWidth > width) {
+            currentPos.x = 20; // Reset to start
+          }
+        }
+      }
+      attempts++;
+    }
+
+    // Ensure position is within bounds
+    const finalPos = {
+      x: Math.max(0, Math.min(width - componentWidth - 20, currentPos.x)),
+      y: Math.max(0, Math.min(height - componentHeight - 20, currentPos.y))
+    };
+
+    return snapToGrid(finalPos);
+  }, [checkCollision, snapToGrid, width, height]);
+
   // Convert screen coordinates to canvas coordinates
   const screenToCanvas = useCallback((screenX: number, screenY: number): Position => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -168,29 +242,41 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, [pan, zoom]);
 
-  // Zoom handling
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!enableZoom) return;
-    
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * delta));
-    
-    // Zoom towards mouse position
-    const canvasRect = canvasRef.current?.getBoundingClientRect();
-    if (canvasRect) {
-      const mouseX = e.clientX - canvasRect.left;
-      const mouseY = e.clientY - canvasRect.top;
+  // Zoom handling with non-passive event listener to allow preventDefault
+  useEffect(() => {
+    const canvasElement = canvasRef.current;
+    if (!canvasElement || !enableZoom) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
       
-      const zoomRatio = newZoom / zoom;
-      const newPan = {
-        x: mouseX - (mouseX - pan.x) * zoomRatio,
-        y: mouseY - (mouseY - pan.y) * zoomRatio
-      };
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * delta));
       
-      setZoom(newZoom);
-      setPan(newPan);
-    }
+      // Zoom towards mouse position
+      const canvasRect = canvasElement.getBoundingClientRect();
+      if (canvasRect) {
+        const mouseX = e.clientX - canvasRect.left;
+        const mouseY = e.clientY - canvasRect.top;
+        
+        const zoomRatio = newZoom / zoom;
+        const newPan = {
+          x: mouseX - (mouseX - pan.x) * zoomRatio,
+          y: mouseY - (mouseY - pan.y) * zoomRatio
+        };
+        
+        setZoom(newZoom);
+        setPan(newPan);
+      }
+    };
+
+    // Add event listener with passive: false to allow preventDefault
+    canvasElement.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      canvasElement.removeEventListener('wheel', handleWheel);
+    };
   }, [enableZoom, zoom, minZoom, maxZoom, pan]);
 
   // Selection box handling
@@ -286,7 +372,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const maxY = Math.max(...groupComponents.map(comp => comp.position.y + 80));
     
     const newGroup: ComponentGroup = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       name,
       componentIds,
       color: `hsl(${Math.random() * 360}, 70%, 85%)`,
@@ -324,15 +410,20 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       if (offset && canvasRect) {
         const canvasPosition = screenToCanvas(offset.x, offset.y);
-        const snappedPosition = snapToGrid({
+        const initialPosition = snapToGrid({
           x: Math.max(0, Math.min(width - 100, canvasPosition.x)),
           y: Math.max(0, Math.min(height - 100, canvasPosition.y))
         });
 
+        // Find a position without collision
+        const finalPosition = checkCollision(initialPosition)
+          ? findAvailablePosition(initialPosition)
+          : initialPosition;
+
         const newComponent = componentLibrary.createComponent(
           item.componentKey,
           item.componentType,
-          snappedPosition
+          finalPosition
         );
 
         if (newComponent) {
@@ -346,36 +437,41 @@ export const Canvas: React.FC<CanvasProps> = ({
     })
   });
 
-  // Handle component selection
+  // Handle component selection (without auto-opening config panel)
   const handleComponentSelect = useCallback((component: Component | null) => {
     setSelectedComponent(component);
     onComponentSelect?.(component);
-    if (component) {
-      setShowComponentConfig(true);
-    } else {
-      setShowComponentConfig(false);
-    }
+    // Don't auto-open config panel - user must click "Configure" from menu
   }, [onComponentSelect]);
 
   // Handle component position updates
   const handleComponentMove = useCallback((componentId: string, newPosition: Position) => {
     const snappedPosition = snapToGrid(newPosition);
     
+    // Check for collision, but allow slight overlap during drag (user can adjust)
+    // Only prevent if there's significant overlap
+    const hasCollision = checkCollision(snappedPosition, componentId);
+    
+    // If collision detected, try to find nearby available position
+    const finalPosition = hasCollision
+      ? findAvailablePosition(snappedPosition)
+      : snappedPosition;
+    
     setComponents(prev => 
       prev.map(comp => 
         comp.id === componentId 
-          ? { ...comp, position: snappedPosition }
+          ? { ...comp, position: finalPosition }
           : comp
       )
     );
 
     // Update the selected component if it's the one being moved
     if (selectedComponent?.id === componentId) {
-      const updatedComponent = { ...selectedComponent, position: snappedPosition };
+      const updatedComponent = { ...selectedComponent, position: finalPosition };
       setSelectedComponent(updatedComponent);
       onComponentUpdate?.(updatedComponent);
     }
-  }, [selectedComponent, onComponentUpdate, snapToGrid]);
+  }, [selectedComponent, onComponentUpdate, snapToGrid, checkCollision, findAvailablePosition]);
 
   // Handle component configuration updates
   const handleComponentUpdate = useCallback((updatedComponent: Component) => {
@@ -421,7 +517,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       handleComponentSelect(null);
       setSelectedConnection(null);
       setShowConnectionConfig(false);
-      setShowComponentConfig(false);
       setConnectionContextMenu(null);
       onConnectionSelect?.(null);
       setContextMenu(null);
@@ -429,8 +524,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     connectionManager.handleCanvasClick(e);
   }, [handleComponentSelect, onConnectionSelect, connectionManager]);
 
-  // Handle context menu
+  // Handle context menu (for both left-click and right-click)
   const handleContextMenu = useCallback((component: Component, position: { x: number; y: number }) => {
+    setContextMenu({ component, position });
+    handleComponentSelect(component);
+  }, [handleComponentSelect]);
+
+  // Handle component click - show menu instead of opening config panel
+  const handleComponentClick = useCallback((component: Component, position: { x: number; y: number }) => {
     setContextMenu({ component, position });
     handleComponentSelect(component);
   }, [handleComponentSelect]);
@@ -438,7 +539,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Keep parent informed of component count without mutating it during render
   useEffect(() => {
     onComponentCountChange?.(components.length);
-  }, [components.length, onComponentCountChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [components.length]);
 
   // Handle component deletion
   const handleComponentDelete = useCallback((componentId: string) => {
@@ -462,7 +564,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleComponentDuplicate = useCallback((component: Component) => {
     const duplicatedComponent = {
       ...component,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       position: {
         x: component.position.x + 20,
         y: component.position.y + 20
@@ -477,12 +579,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     setContextMenu(null);
   }, [onComponentAdd, onComponentCountChange]);
 
-  // Handle component configuration
+  // Handle component configuration - delegate to parent
   const handleComponentConfigure = useCallback((component: Component) => {
     handleComponentSelect(component);
-    setShowComponentConfig(true);
+    onComponentConfigure?.(component);
     setContextMenu(null);
-  }, [handleComponentSelect]);
+  }, [handleComponentSelect, onComponentConfigure]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -504,7 +606,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             handleComponentSelect(null);
             setSelectedConnection(null);
             setShowConnectionConfig(false);
-            setShowComponentConfig(false);
             setConnectionContextMenu(null);
             onConnectionSelect?.(null);
             setContextMenu(null);
@@ -521,7 +622,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           case 'Escape':
             setSelectedConnection(null);
             setShowConnectionConfig(false);
-            setShowComponentConfig(false);
             setConnectionContextMenu(null);
             onConnectionSelect?.(null);
             break;
@@ -585,7 +685,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      onWheel={handleWheel}
     >
       {/* Canvas content with zoom and pan transform */}
       <div
@@ -756,13 +855,18 @@ export const Canvas: React.FC<CanvasProps> = ({
               key={component.id}
               component={component}
               isSelected={selectedComponent?.id === component.id || selectedComponents.includes(component.id)}
-              onSelect={(comp) => {
+              onSelect={(comp, event) => {
                 if (comp && selectedComponents.length > 0) {
                   // If we have multiple selected and clicking on one, select just that one
                   setSelectedComponents([]);
-                  handleComponentSelect(comp);
-                } else {
-                  handleComponentSelect(comp);
+                }
+                // Show context menu on click instead of opening config panel
+                if (comp && event) {
+                  handleComponentClick(comp, { x: event.clientX, y: event.clientY });
+                } else if (!comp) {
+                  // Deselect if clicking on nothing
+                  handleComponentSelect(null);
+                  setContextMenu(null);
                 }
               }}
               onMove={handleComponentMove}
@@ -1077,18 +1181,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         />
       )}
       
-      {/* Component Configuration Panel */}
-      {showComponentConfig && selectedComponent && (
-        <ComponentConfigPanel
-          component={selectedComponent}
-          onUpdate={handleComponentUpdate}
-          onClose={() => {
-            setShowComponentConfig(false);
-            setSelectedComponent(null);
-            onComponentSelect?.(null);
-          }}
-        />
-      )}
     </div>
   );
 };
