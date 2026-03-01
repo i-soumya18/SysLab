@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+const LOCAL_STORAGE_KEY = 'syslab:user-preferences';
 
-interface UserPreferences {
+// Frontend preferences interface (includes UI-only settings)
+interface FrontendPreferences {
   theme: 'light' | 'dark' | 'system';
   notifications: {
     email: boolean;
     inApp: boolean;
+    productUpdates?: boolean;
+    learningReminders?: boolean;
   };
   learningPace: 'slow' | 'medium' | 'fast';
   difficulty: 'beginner' | 'intermediate' | 'advanced';
@@ -20,11 +24,25 @@ interface UserPreferences {
   };
 }
 
-const DEFAULT_PREFERENCES: UserPreferences = {
+// Backend preferences interface (what gets saved to database)
+interface BackendPreferences {
+  theme: 'light' | 'dark' | 'system';
+  learningPace: 'slow' | 'normal' | 'fast';
+  difficultyPreference: 'beginner' | 'intermediate' | 'advanced';
+  notifications: {
+    email: boolean;
+    productUpdates: boolean;
+    learningReminders: boolean;
+  };
+}
+
+const DEFAULT_PREFERENCES: FrontendPreferences = {
   theme: 'system',
   notifications: {
     email: true,
     inApp: true,
+    productUpdates: true,
+    learningReminders: true,
   },
   learningPace: 'medium',
   difficulty: 'beginner',
@@ -40,15 +58,46 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
 
-  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
-  const [initialPreferences, setInitialPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
+  const [preferences, setPreferences] = useState<FrontendPreferences>(DEFAULT_PREFERENCES);
+  const [initialPreferences, setInitialPreferences] = useState<FrontendPreferences>(DEFAULT_PREFERENCES);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Fetch user preferences
+  // Apply theme to document
+  const applyTheme = useCallback((theme: 'light' | 'dark' | 'system') => {
+    const root = document.documentElement;
+    
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.classList.toggle('dark', prefersDark);
+    } else {
+      root.classList.toggle('dark', theme === 'dark');
+    }
+    
+    // Store theme preference in localStorage for persistence
+    localStorage.setItem('theme', theme);
+  }, []);
+
+  // Load preferences from localStorage on mount (runs once)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as FrontendPreferences;
+        setPreferences(parsed);
+        setInitialPreferences(parsed);
+        applyTheme(parsed.theme);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error loading preferences from localStorage:', error);
+    }
+  }, [applyTheme]);
+
+  // Fetch user preferences from backend (best-effort)
   useEffect(() => {
     if (!user) return;
 
@@ -56,7 +105,7 @@ export function SettingsPage() {
       try {
         setIsLoading(true);
         const token = await user.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/users/preferences`, {
+        const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -64,11 +113,43 @@ export function SettingsPage() {
 
         if (response.ok) {
           const result = await response.json();
-          const prefs = result.data || DEFAULT_PREFERENCES;
-          setPreferences(prefs);
-          setInitialPreferences(prefs);
+          const backendPrefs = result.data as BackendPreferences;
+          
+          // Convert backend format to frontend format
+          const frontendPrefs: FrontendPreferences = {
+            theme: backendPrefs.theme,
+            notifications: {
+              email: backendPrefs.notifications.email,
+              inApp: backendPrefs.notifications.email, // Map email to inApp for now
+              productUpdates: backendPrefs.notifications.productUpdates,
+              learningReminders: backendPrefs.notifications.learningReminders,
+            },
+            learningPace: backendPrefs.learningPace === 'normal' ? 'medium' : backendPrefs.learningPace,
+            difficulty: backendPrefs.difficultyPreference,
+            language: 'en', // Language not stored in backend yet
+            privacySettings: {
+              shareProgress: true, // Privacy settings not stored in backend yet
+              showInLeaderboard: true,
+              allowAnalytics: true,
+            },
+          };
+          
+          setPreferences(frontendPrefs);
+          setInitialPreferences(frontendPrefs);
+          
+          // Apply theme immediately after loading preferences
+          applyTheme(frontendPrefs.theme);
+          // Persist merged prefs locally as well
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(frontendPrefs));
+        } else if (response.status === 401) {
+          // If unauthorized, silently fall back to locally stored preferences
+          // This usually means the backend session is not established yet.
+          // We keep whatever is already in state/localStorage so settings still "work" for the user.
+          // eslint-disable-next-line no-console
+          console.warn('User preferences API returned 401. Falling back to local preferences only.');
         }
       } catch (err) {
+        // eslint-disable-next-line no-console
         console.error('Error fetching preferences:', err);
       } finally {
         setIsLoading(false);
@@ -76,7 +157,7 @@ export function SettingsPage() {
     };
 
     fetchPreferences();
-  }, [user]);
+  }, [user, applyTheme]);
 
   // Check for changes
   useEffect(() => {
@@ -92,31 +173,79 @@ export function SettingsPage() {
     setErrorMessage('');
 
     try {
-      const token = await user.getIdToken();
-      const response = await fetch(`${API_BASE_URL}/users/preferences`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(preferences),
-      });
+      // Always persist to localStorage so settings feel responsive even if backend auth is missing
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(preferences));
 
-      if (!response.ok) {
-        throw new Error('Failed to save preferences');
+      if (user) {
+        const token = await user.getIdToken();
+
+        // Convert frontend format to backend format
+        const backendPrefs: BackendPreferences = {
+          theme: preferences.theme,
+          learningPace: preferences.learningPace === 'medium' ? 'normal' : preferences.learningPace,
+          difficultyPreference: preferences.difficulty,
+          notifications: {
+            email: preferences.notifications.email,
+            productUpdates: preferences.notifications.productUpdates ?? true,
+            learningReminders: preferences.notifications.learningReminders ?? true,
+          },
+        };
+
+        const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(backendPrefs),
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            // If unauthorized, treat as local-only settings but do not show a scary error
+            // eslint-disable-next-line no-console
+            console.warn('Saving preferences unauthorized (401). Falling back to local-only storage.');
+          } else {
+            const errorData = await response.json().catch(() => null);
+            throw new Error(errorData?.error?.message || 'Failed to save preferences');
+          }
+        } else {
+          const result = await response.json();
+          const savedBackendPrefs = result.data as BackendPreferences;
+
+          // Convert back to frontend format
+          const savedFrontendPrefs: FrontendPreferences = {
+            ...preferences,
+            theme: savedBackendPrefs.theme,
+            learningPace: savedBackendPrefs.learningPace === 'normal' ? 'medium' : savedBackendPrefs.learningPace,
+            difficulty: savedBackendPrefs.difficultyPreference,
+            notifications: {
+              ...preferences.notifications,
+              email: savedBackendPrefs.notifications.email,
+              productUpdates: savedBackendPrefs.notifications.productUpdates,
+              learningReminders: savedBackendPrefs.notifications.learningReminders,
+            },
+          };
+
+          setPreferences(savedFrontendPrefs);
+          setInitialPreferences(savedFrontendPrefs);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(savedFrontendPrefs));
+        }
       }
 
-      const result = await response.json();
-      setPreferences(result.data);
-      setInitialPreferences(result.data);
       setSuccessMessage('Settings saved successfully!');
       setHasChanges(false);
+
+      // Apply theme immediately
+      applyTheme(preferences.theme);
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Error saving preferences:', err);
-      setErrorMessage('Failed to save settings. Please try again.');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to save settings. Please try again.';
+      setErrorMessage(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -125,23 +254,33 @@ export function SettingsPage() {
   const handleResetPreferences = () => {
     setPreferences(initialPreferences);
     setHasChanges(false);
+    applyTheme(initialPreferences.theme);
   };
 
-  const updatePreference = <K extends keyof UserPreferences>(
+  const updatePreference = <K extends keyof FrontendPreferences>(
     key: K,
-    value: UserPreferences[K]
+    value: FrontendPreferences[K]
   ) => {
-    setPreferences((prev) => ({ ...prev, [key]: value }));
+    setPreferences((prev) => {
+      const updated = { ...prev, [key]: value };
+      
+      // Apply theme immediately when changed
+      if (key === 'theme') {
+        applyTheme(value as 'light' | 'dark' | 'system');
+      }
+      
+      return updated;
+    });
   };
 
-  const updateNotification = (key: keyof UserPreferences['notifications'], value: boolean) => {
+  const updateNotification = (key: keyof FrontendPreferences['notifications'], value: boolean) => {
     setPreferences((prev) => ({
       ...prev,
       notifications: { ...prev.notifications, [key]: value },
     }));
   };
 
-  const updatePrivacySetting = (key: keyof UserPreferences['privacySettings'], value: boolean) => {
+  const updatePrivacySetting = (key: keyof FrontendPreferences['privacySettings'], value: boolean) => {
     setPreferences((prev) => ({
       ...prev,
       privacySettings: { ...prev.privacySettings, [key]: value },
@@ -268,21 +407,25 @@ export function SettingsPage() {
               Learning Pace
             </label>
             <div className="grid grid-cols-3 gap-3">
-              {(['slow', 'medium', 'fast'] as const).map((pace) => (
-                <button
-                  key={pace}
-                  onClick={() => updatePreference('learningPace', pace)}
-                  className={`rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all ${
-                    preferences.learningPace === pace
-                      ? 'border-blue-600 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {pace === 'slow' && '🐢 Slow'}
-                  {pace === 'medium' && '🚶 Medium'}
-                  {pace === 'fast' && '🏃 Fast'}
-                </button>
-              ))}
+              {(['slow', 'medium', 'fast'] as const).map((pace) => {
+                // Map 'medium' to display but use 'normal' for backend
+                const displayPace = pace;
+                return (
+                  <button
+                    key={pace}
+                    onClick={() => updatePreference('learningPace', pace)}
+                    className={`rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all ${
+                      preferences.learningPace === pace
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {pace === 'slow' && '🐢 Slow'}
+                    {pace === 'medium' && '🚶 Medium'}
+                    {pace === 'fast' && '🏃 Fast'}
+                  </button>
+                );
+              })}
             </div>
             <p className="mt-2 text-xs text-gray-500">
               Adjust how quickly new concepts and challenges are introduced

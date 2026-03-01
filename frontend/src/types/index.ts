@@ -12,7 +12,16 @@ export type ComponentType =
   | 'cache' 
   | 'message-queue' 
   | 'cdn' 
-  | 'proxy';
+  | 'proxy'
+  | 'api-gateway'
+  | 'search-engine'
+  | 'object-storage'
+  | 'service-mesh'
+  | 'rate-limiter'
+  | 'circuit-breaker'
+  | 'auth-service'
+  | 'monitoring'
+  | 'logging';
 
 // Position interface for canvas positioning
 export interface Position {

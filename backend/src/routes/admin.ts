@@ -27,10 +27,12 @@ router.get('/users', adminAuth, async (req: Request, res: Response) => {
       data: result
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
+    const message = error instanceof Error ? error.message : 'Failed to fetch users';
+    const details = error instanceof Error ? error.stack : String(error);
+    console.error('Error fetching users:', details);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch users'
+      error: message
     });
   }
 });

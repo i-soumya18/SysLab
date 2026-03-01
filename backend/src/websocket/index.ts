@@ -628,4 +628,29 @@ function setupSimulationEventHandlers(simulation: SimulationEngine, workspaceId:
       lastEventUpdate = now;
     }
   });
+  
+  // System collapse and recovery events
+  simulation.on('system_collapse', (data) => {
+    io.to(`workspace-${workspaceId}`).emit('simulation:collapse', {
+      type: 'system_collapse',
+      data,
+      timestamp: new Date().toISOString()
+    });
+  });
+  
+  simulation.on('system_recovery', (data) => {
+    io.to(`workspace-${workspaceId}`).emit('simulation:recovery', {
+      type: 'system_recovery',
+      data,
+      timestamp: new Date().toISOString()
+    });
+  });
+  
+  simulation.on('request_dropped', (data) => {
+    io.to(`workspace-${workspaceId}`).emit('simulation:event', {
+      type: 'request_dropped',
+      data,
+      timestamp: new Date().toISOString()
+    });
+  });
 }

@@ -79,45 +79,43 @@ export class AdminService {
     const offset = (page - 1) * limit;
     let query = `
       SELECT 
-        u.id, u.email, u.first_name, u.last_name, u.subscription_tier, 
-        u.is_admin, u.email_verified, u.created_at, u.updated_at, u.last_login,
-        COUNT(DISTINCT w.id) as workspace_count
-      FROM users u
-      LEFT JOIN workspaces w ON w.user_id = u.id
+        id, email, first_name, last_name, subscription_tier,
+        COALESCE(is_admin, false) AS is_admin,
+        email_verified, created_at, updated_at, last_login,
+        (SELECT COUNT(*) FROM workspaces w WHERE w.user_id::text = users.id::text) AS workspace_count
+      FROM users
     `;
-    const params: any[] = [];
+    const params: (string | number)[] = [];
     
     if (search) {
-      query += ` WHERE u.email ILIKE $1 OR u.first_name ILIKE $1 OR u.last_name ILIKE $1`;
+      query += ` WHERE email ILIKE $1 OR first_name ILIKE $1 OR last_name ILIKE $1`;
       params.push(`%${search}%`);
     }
     
-    query += ` GROUP BY u.id, u.email, u.first_name, u.last_name, u.subscription_tier, 
-                u.is_admin, u.email_verified, u.created_at, u.updated_at, u.last_login 
-                ORDER BY u.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
     const result = await this.db.query(query, params);
     
-    const countQuery = search 
+    const countQuery = search
       ? `SELECT COUNT(*) FROM users WHERE email ILIKE $1 OR first_name ILIKE $1 OR last_name ILIKE $1`
       : `SELECT COUNT(*) FROM users`;
     const countParams = search ? [`%${search}%`] : [];
     const countResult = await this.db.query(countQuery, countParams);
-    const total = parseInt(countResult.rows[0].count, 10);
+    const total = parseInt(String(countResult.rows[0].count), 10);
 
-    const users: AdminUser[] = result.rows.map(row => ({
-      id: row.id,
-      email: row.email,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      subscriptionTier: row.subscription_tier,
-      isAdmin: row.is_admin || false,
-      emailVerified: row.email_verified,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      lastLogin: row.last_login,
-      workspaceCount: parseInt(row.workspace_count, 10) || 0
+    const users: AdminUser[] = result.rows.map((row: Record<string, unknown>) => ({
+      id: String(row.id),
+      email: String(row.email),
+      firstName: row.first_name != null ? String(row.first_name) : undefined,
+      lastName: row.last_name != null ? String(row.last_name) : undefined,
+      subscriptionTier: String(row.subscription_tier ?? 'free'),
+      isAdmin: Boolean(row.is_admin),
+      emailVerified: Boolean(row.email_verified),
+      createdAt: row.created_at as Date,
+      updatedAt: row.updated_at as Date,
+      lastLogin: row.last_login != null ? (row.last_login as Date) : undefined,
+      workspaceCount: parseInt(String(row.workspace_count), 10) || 0
     }));
 
     return { users, total, page, limit };
@@ -127,37 +125,34 @@ export class AdminService {
    * Get user by ID
    */
   async getUserById(userId: string): Promise<AdminUser | null> {
-    const query = `
-      SELECT 
-        u.id, u.email, u.first_name, u.last_name, u.subscription_tier, 
-        u.is_admin, u.email_verified, u.created_at, u.updated_at, u.last_login,
-        COUNT(DISTINCT w.id) as workspace_count
-      FROM users u
-      LEFT JOIN workspaces w ON w.user_id = u.id
-      WHERE u.id = $1
-      GROUP BY u.id, u.email, u.first_name, u.last_name, u.subscription_tier, 
-               u.is_admin, u.email_verified, u.created_at, u.updated_at, u.last_login
-    `;
-    
-    const result = await this.db.query(query, [userId]);
+    const result = await this.db.query(
+      `SELECT 
+        id, email, first_name, last_name, subscription_tier,
+        COALESCE(is_admin, false) AS is_admin,
+        email_verified, created_at, updated_at, last_login,
+        (SELECT COUNT(*) FROM workspaces w WHERE w.user_id::text = users.id::text) AS workspace_count
+       FROM users
+       WHERE id = $1`,
+      [userId]
+    );
     
     if (result.rows.length === 0) {
       return null;
     }
 
-    const row = result.rows[0];
+    const row = result.rows[0] as Record<string, unknown>;
     return {
-      id: row.id,
-      email: row.email,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      subscriptionTier: row.subscription_tier,
-      isAdmin: row.is_admin || false,
-      emailVerified: row.email_verified,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      lastLogin: row.last_login,
-      workspaceCount: parseInt(row.workspace_count, 10) || 0
+      id: String(row.id),
+      email: String(row.email),
+      firstName: row.first_name != null ? String(row.first_name) : undefined,
+      lastName: row.last_name != null ? String(row.last_name) : undefined,
+      subscriptionTier: String(row.subscription_tier ?? 'free'),
+      isAdmin: Boolean(row.is_admin),
+      emailVerified: Boolean(row.email_verified),
+      createdAt: row.created_at as Date,
+      updatedAt: row.updated_at as Date,
+      lastLogin: row.last_login != null ? (row.last_login as Date) : undefined,
+      workspaceCount: parseInt(String(row.workspace_count), 10) || 0
     };
   }
 

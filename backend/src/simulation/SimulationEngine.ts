@@ -26,6 +26,18 @@ export class SimulationEngine extends EventEmitter {
   private bottleneckReporter: BottleneckReporter;
   private performanceOptimizer: PerformanceOptimizer;
   private performanceMonitoring: PerformanceMonitoringService;
+  
+  // Real-time metrics tracking
+  private requestTracking: Map<string, {
+    arrivals: number[];
+    completions: number[];
+    failures: number[];
+    latencies: number[];
+    lastUpdateTime: number;
+  }> = new Map();
+  
+  private realtimeMetricsInterval: NodeJS.Timeout | null = null;
+  private bottleneckAnalysisInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
@@ -92,6 +104,15 @@ export class SimulationEngine extends EventEmitter {
 
       // Initialize failure management for each component
       this.failureManager.initializeComponent(component.id, component.type);
+      
+      // Initialize request tracking for real-time metrics
+      this.requestTracking.set(component.id, {
+        arrivals: [],
+        completions: [],
+        failures: [],
+        latencies: [],
+        lastUpdateTime: Date.now()
+      });
     });
 
     this.emit('initialized', { workspace: workspace.id });
@@ -128,6 +149,12 @@ export class SimulationEngine extends EventEmitter {
 
     // Start simulation loop
     this.runSimulationLoop();
+    
+    // Start real-time metrics streaming (sub-100ms updates per SRS NFR-1)
+    this.startRealtimeMetricsStreaming();
+    
+    // Start continuous bottleneck analysis
+    this.startContinuousBottleneckAnalysis();
 
     this.emit('started', { 
       workspaceId: this.workspace.id,
@@ -150,6 +177,12 @@ export class SimulationEngine extends EventEmitter {
       clearTimeout(this.intervalId);
       this.intervalId = null;
     }
+
+    // Stop real-time metrics streaming
+    this.stopRealtimeMetricsStreaming();
+    
+    // Stop continuous bottleneck analysis
+    this.stopContinuousBottleneckAnalysis();
 
     // Stop background services while paused
     this.metricsCollector.stop();
@@ -182,6 +215,12 @@ export class SimulationEngine extends EventEmitter {
     this.metricsCollector.start();
     this.bottleneckReporter.start();
     this.performanceMonitoring.startMonitoring(1000);
+    
+    // Restart real-time metrics streaming
+    this.startRealtimeMetricsStreaming();
+    
+    // Restart continuous bottleneck analysis
+    this.startContinuousBottleneckAnalysis();
 
     // Continue processing remaining scheduled events
     this.runSimulationLoop();
@@ -202,6 +241,12 @@ export class SimulationEngine extends EventEmitter {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    
+    // Stop real-time metrics streaming
+    this.stopRealtimeMetricsStreaming();
+    
+    // Stop continuous bottleneck analysis
+    this.stopContinuousBottleneckAnalysis();
 
     // Stop metrics collection
     this.metricsCollector.stop();
@@ -325,10 +370,10 @@ export class SimulationEngine extends EventEmitter {
     const rawMetrics = new Map<string, ComponentMetrics[]>();
     
     // Collect raw metrics for all components
-    for (const [componentId] of this.state.components) {
+    this.state.components.forEach((_, componentId) => {
       const metrics = this.state.metrics.get(componentId) || [];
       rawMetrics.set(componentId, metrics);
-    }
+    });
     
     // Use performance optimizer for sub-100ms updates
     return await this.performanceOptimizer.optimizeSimulationUpdate(
@@ -394,7 +439,8 @@ export class SimulationEngine extends EventEmitter {
       endTime: 0,
       eventCount: 0,
       components: new Map(),
-      metrics: new Map()
+      metrics: new Map(),
+      isCollapsed: false
     };
   }
 
@@ -601,13 +647,61 @@ export class SimulationEngine extends EventEmitter {
     const component = this.state.components.get(event.componentId);
     if (!component) return;
 
+    // Check if component is at capacity - reject requests if so
+    const isAtCapacity = component.currentLoad >= component.configuration.capacity;
+    const queueFull = component.queueDepth >= (component.configuration.capacity * 2);
+    
+    if (queueFull) {
+      // Request dropped due to queue overflow
+      const tracking = this.requestTracking.get(event.componentId);
+      if (tracking) {
+        tracking.failures.push(event.timestamp);
+      }
+      this.emit('request_dropped', { 
+        componentId: event.componentId, 
+        reason: 'queue_full',
+        timestamp: event.timestamp 
+      });
+      return;
+    }
+
     component.currentLoad++;
     component.queueDepth++;
 
-    // Schedule request completion based on component processing time
+    // Track arrival
+    const tracking = this.requestTracking.get(event.componentId);
+    if (tracking) {
+      tracking.arrivals.push(event.timestamp);
+    }
+
+    // Calculate processing time based on current load and capacity
     const processingTime = this.calculateProcessingTime(component);
-    this.scheduleEvent('request_completion', event.componentId, 
-      event.timestamp + processingTime, { requestId: event.id });
+    
+    // Check for errors based on capacity and health
+    const errorProbability = this.calculateErrorProbability(component);
+    const willFail = Math.random() < errorProbability;
+    
+    if (willFail || !component.isHealthy) {
+      // Schedule immediate failure
+      this.scheduleEvent('request_completion', event.componentId, 
+        event.timestamp + processingTime * 0.1, { 
+          requestId: event.id,
+          failed: true,
+          errorReason: !component.isHealthy ? 'component_unhealthy' : 'capacity_exceeded'
+        });
+      
+      if (tracking) {
+        tracking.failures.push(event.timestamp);
+      }
+    } else {
+      // Schedule successful completion
+      this.scheduleEvent('request_completion', event.componentId, 
+        event.timestamp + processingTime, { 
+          requestId: event.id,
+          failed: false,
+          arrivalTime: event.timestamp
+        });
+    }
 
     this.emit('request_arrived', { componentId: event.componentId, timestamp: event.timestamp });
   }
@@ -619,13 +713,35 @@ export class SimulationEngine extends EventEmitter {
     const component = this.state.components.get(event.componentId);
     if (!component) return;
 
+    const wasFailure = event.data?.failed === true;
+    const arrivalTime = event.data?.arrivalTime || event.timestamp;
+    const processingLatency = event.timestamp - arrivalTime;
+
     component.currentLoad = Math.max(0, component.currentLoad - 1);
     component.queueDepth = Math.max(0, component.queueDepth - 1);
 
-    // Route request to connected components
-    this.routeRequestToNextComponents(event.componentId, event.timestamp);
+    // Track completion and latency
+    const tracking = this.requestTracking.get(event.componentId);
+    if (tracking) {
+      if (wasFailure) {
+        tracking.failures.push(event.timestamp);
+      } else {
+        tracking.completions.push(event.timestamp);
+        tracking.latencies.push(processingLatency);
+      }
+    }
 
-    this.emit('request_completed', { componentId: event.componentId, timestamp: event.timestamp });
+    // Only route to next components if request succeeded
+    if (!wasFailure) {
+      this.routeRequestToNextComponents(event.componentId, event.timestamp);
+    }
+
+    this.emit('request_completed', { 
+      componentId: event.componentId, 
+      timestamp: event.timestamp,
+      success: !wasFailure,
+      latency: processingLatency
+    });
   }
 
   /**
@@ -718,27 +834,74 @@ export class SimulationEngine extends EventEmitter {
 
   /**
    * Handle metrics collection
+   * Enhanced to compute metrics based on actual request processing (SRS FR-4, FR-5, FR-7)
    */
   private handleMetricsCollection(event: SimulationEvent): void {
     const component = this.state.components.get(event.componentId);
     if (!component) return;
 
+    const tracking = this.requestTracking.get(event.componentId);
+    if (!tracking) return;
+
+    const now = event.timestamp;
+    const windowMs = 1000; // 1 second window for RPS calculation
+    const windowStart = now - windowMs;
+
+    // Calculate actual throughput based on completed requests
+    const recentCompletions = tracking.completions.filter(t => t >= windowStart);
+    const recentFailures = tracking.failures.filter(t => t >= windowStart);
+    const recentArrivals = tracking.arrivals.filter(t => t >= windowStart);
+    
+    const totalRequests = recentCompletions.length + recentFailures.length;
+    const requestsPerSecond = totalRequests; // Already filtered to 1-second window
+    
+    // Calculate actual error rate
+    const errorRate = totalRequests > 0 ? recentFailures.length / totalRequests : 0;
+    
+    // Calculate actual latency from tracked latencies
+    const recentLatencies = tracking.latencies.filter((_, idx) => {
+      const completionTime = tracking.completions[idx];
+      return completionTime >= windowStart;
+    });
+    const averageLatency = recentLatencies.length > 0
+      ? recentLatencies.reduce((sum, lat) => sum + lat, 0) / recentLatencies.length
+      : component.configuration.latency;
+    
+    // Calculate percentiles for latency
+    const sortedLatencies = [...recentLatencies].sort((a, b) => a - b);
+    const p50Latency = sortedLatencies.length > 0 
+      ? sortedLatencies[Math.floor(sortedLatencies.length * 0.5)] 
+      : averageLatency;
+    const p95Latency = sortedLatencies.length > 0 
+      ? sortedLatencies[Math.floor(sortedLatencies.length * 0.95)] 
+      : averageLatency;
+    const p99Latency = sortedLatencies.length > 0 
+      ? sortedLatencies[Math.floor(sortedLatencies.length * 0.99)] 
+      : averageLatency;
+
     // Get failure impact on performance
     const failureImpact = this.failureManager.getFailureImpact(event.componentId);
     const failureStats = this.failureManager.getFailureStatistics(event.componentId);
 
-    const baseLatency = component.configuration.latency;
-    const adjustedLatency = baseLatency / failureImpact.performanceMultiplier;
-    const adjustedErrorRate = (component.isHealthy ? 0 : 0.1) * failureImpact.errorRateMultiplier;
+    // Calculate resource utilization based on actual load
+    const capacity = component.configuration.capacity;
+    const utilization = Math.min(1.0, component.currentLoad / capacity);
+    const cpuUtilization = utilization * (1.0 / failureImpact.performanceMultiplier);
+    const memoryUtilization = Math.min(1.0, component.queueDepth / (capacity * 2));
+
+    // Adjust metrics based on failure impact
+    const adjustedLatency = averageLatency * (1.0 / failureImpact.performanceMultiplier);
+    const adjustedErrorRate = Math.min(1.0, errorRate * failureImpact.errorRateMultiplier);
+    const adjustedThroughput = requestsPerSecond * failureImpact.availabilityMultiplier;
 
     const metrics: ComponentMetrics = {
       componentId: event.componentId,
       timestamp: event.timestamp,
-      requestsPerSecond: component.currentLoad * failureImpact.availabilityMultiplier,
+      requestsPerSecond: adjustedThroughput,
       averageLatency: adjustedLatency,
-      errorRate: Math.min(1.0, adjustedErrorRate),
-      cpuUtilization: Math.min(0.9, (component.currentLoad / component.configuration.capacity) / failureImpact.performanceMultiplier),
-      memoryUtilization: Math.min(0.8, (component.queueDepth / (component.configuration.capacity * 2)) / failureImpact.performanceMultiplier),
+      errorRate: adjustedErrorRate,
+      cpuUtilization: Math.min(0.99, cpuUtilization),
+      memoryUtilization: Math.min(0.99, memoryUtilization),
       queueDepth: component.queueDepth
     };
 
@@ -753,9 +916,19 @@ export class SimulationEngine extends EventEmitter {
 
     this.emit('metrics_collected', {
       ...metrics,
+      p50Latency,
+      p95Latency,
+      p99Latency,
       failureImpact,
       failureStats
     });
+    
+    // Cleanup old tracking data (keep last 10 seconds)
+    const cleanupThreshold = now - 10000;
+    tracking.arrivals = tracking.arrivals.filter(t => t >= cleanupThreshold);
+    tracking.completions = tracking.completions.filter(t => t >= cleanupThreshold);
+    tracking.failures = tracking.failures.filter(t => t >= cleanupThreshold);
+    tracking.latencies = tracking.latencies.slice(-1000); // Keep last 1000 latencies
   }
 
   /**
@@ -768,17 +941,79 @@ export class SimulationEngine extends EventEmitter {
 
   /**
    * Calculate processing time for a component based on its configuration and current load
+   * Implements realistic latency degradation under load (SRS FR-4, FR-5)
    */
   private calculateProcessingTime(component: any): number {
     const baseLatency = component.configuration.latency;
-    const loadFactor = Math.max(1, component.currentLoad / component.configuration.capacity);
-    const randomFactor = 0.8 + Math.random() * 0.4; // ±20% variation
+    const capacity = component.configuration.capacity;
+    const currentLoad = component.currentLoad;
+    
+    // Calculate utilization ratio
+    const utilization = Math.min(1.0, currentLoad / capacity);
+    
+    // Latency increases exponentially as utilization approaches capacity
+    // This models realistic queueing behavior
+    let loadFactor = 1.0;
+    if (utilization < 0.5) {
+      // Low load: minimal impact
+      loadFactor = 1.0 + (utilization * 0.2);
+    } else if (utilization < 0.8) {
+      // Medium load: moderate degradation
+      loadFactor = 1.1 + ((utilization - 0.5) * 0.3) * 2;
+    } else if (utilization < 0.95) {
+      // High load: significant degradation
+      loadFactor = 1.3 + ((utilization - 0.8) * 0.15) * 5;
+    } else {
+      // Critical load: severe degradation
+      loadFactor = 2.0 + ((utilization - 0.95) * 0.05) * 20;
+    }
+    
+    // Add queue depth impact
+    const queueImpact = Math.min(0.5, component.queueDepth / (capacity * 2));
+    loadFactor += queueImpact;
+    
+    const randomFactor = 0.9 + Math.random() * 0.2; // ±10% variation
     
     // Apply failure impact
     const failureImpact = this.failureManager.getFailureImpact(component.id);
     const failureMultiplier = 1.0 / failureImpact.performanceMultiplier;
     
     return baseLatency * loadFactor * randomFactor * failureMultiplier;
+  }
+  
+  /**
+   * Calculate error probability based on component state and load
+   * Implements realistic error rates when capacity is exceeded (SRS FR-4, FR-5)
+   */
+  private calculateErrorProbability(component: any): number {
+    const baseErrorRate = component.configuration.failureRate || 0.001;
+    const capacity = component.configuration.capacity;
+    const currentLoad = component.currentLoad;
+    const utilization = Math.min(1.0, currentLoad / capacity);
+    
+    // Error rate increases significantly when capacity is exceeded
+    let errorMultiplier = 1.0;
+    if (utilization >= 1.0) {
+      // Over capacity: high error rate
+      errorMultiplier = 10.0 + (utilization - 1.0) * 50;
+    } else if (utilization >= 0.95) {
+      // Near capacity: moderate error rate
+      errorMultiplier = 2.0 + ((utilization - 0.95) / 0.05) * 8;
+    } else if (utilization >= 0.8) {
+      // High load: slight increase
+      errorMultiplier = 1.2 + ((utilization - 0.8) / 0.15) * 0.8;
+    }
+    
+    // Component health impact
+    if (!component.isHealthy) {
+      errorMultiplier *= 10;
+    }
+    
+    // Apply failure impact
+    const failureImpact = this.failureManager.getFailureImpact(component.id);
+    errorMultiplier *= failureImpact.errorRateMultiplier;
+    
+    return Math.min(0.95, baseErrorRate * errorMultiplier);
   }
 
   /**
@@ -796,5 +1031,288 @@ export class SimulationEngine extends EventEmitter {
       const arrivalTime = timestamp + connection.configuration.latency;
       this.scheduleEvent('request_arrival', connection.targetComponentId, arrivalTime);
     });
+  }
+  
+  /**
+   * Start real-time metrics streaming (sub-100ms updates per SRS NFR-1)
+   */
+  private startRealtimeMetricsStreaming(): void {
+    if (this.realtimeMetricsInterval) return;
+    
+    // Stream metrics every 100ms for real-time updates
+    this.realtimeMetricsInterval = setInterval(() => {
+      if (!this.workspace || !this.state.isRunning) return;
+      
+      // Compute and emit metrics for all components
+      this.workspace.components.forEach(component => {
+        const tracking = this.requestTracking.get(component.id);
+        if (!tracking) return;
+        
+        const now = Date.now();
+        const windowMs = 1000;
+        const windowStart = now - windowMs;
+        
+        // Calculate real-time metrics
+        const recentCompletions = tracking.completions.filter(t => t >= windowStart);
+        const recentFailures = tracking.failures.filter(t => t >= windowStart);
+        const recentLatencies = tracking.latencies.filter((_, idx) => {
+          const completionTime = tracking.completions[idx];
+          return completionTime >= windowStart;
+        });
+        
+        const totalRequests = recentCompletions.length + recentFailures.length;
+        const requestsPerSecond = totalRequests;
+        const errorRate = totalRequests > 0 ? recentFailures.length / totalRequests : 0;
+        const avgLatency = recentLatencies.length > 0
+          ? recentLatencies.reduce((sum, lat) => sum + lat, 0) / recentLatencies.length
+          : component.configuration.latency;
+        
+        const compState = this.state.components.get(component.id);
+        if (!compState) return;
+        
+        const capacity = component.configuration.capacity;
+        const cpuUtilization = Math.min(1.0, compState.currentLoad / capacity);
+        const memoryUtilization = Math.min(1.0, compState.queueDepth / (capacity * 2));
+        
+        const metrics: ComponentMetrics = {
+          componentId: component.id,
+          timestamp: now,
+          requestsPerSecond,
+          averageLatency: avgLatency,
+          errorRate,
+          cpuUtilization,
+          memoryUtilization,
+          queueDepth: compState.queueDepth
+        };
+        
+        // Emit real-time component metrics
+        this.emit('metrics_collected', metrics);
+      });
+      
+      // Compute and emit system-wide metrics
+      const systemMetrics = this.computeSystemMetrics();
+      if (systemMetrics) {
+        this.metricsCollector.emit('metrics_aggregated', {
+          timestamp: Date.now(),
+          componentCount: this.workspace.components.length,
+          systemMetrics
+        });
+      }
+      
+      // Check for system collapse
+      this.detectSystemCollapse();
+      
+    }, 100); // 100ms interval for sub-100ms updates
+  }
+  
+  /**
+   * Stop real-time metrics streaming
+   */
+  private stopRealtimeMetricsStreaming(): void {
+    if (this.realtimeMetricsInterval) {
+      clearInterval(this.realtimeMetricsInterval);
+      this.realtimeMetricsInterval = null;
+    }
+  }
+  
+  /**
+   * Start continuous bottleneck analysis
+   */
+  private startContinuousBottleneckAnalysis(): void {
+    if (this.bottleneckAnalysisInterval) return;
+    
+    // Run bottleneck analysis every 2 seconds
+    this.bottleneckAnalysisInterval = setInterval(() => {
+      if (!this.workspace || !this.state.isRunning) return;
+      this.performBottleneckAnalysis();
+    }, 2000);
+  }
+  
+  /**
+   * Stop continuous bottleneck analysis
+   */
+  private stopContinuousBottleneckAnalysis(): void {
+    if (this.bottleneckAnalysisInterval) {
+      clearInterval(this.bottleneckAnalysisInterval);
+      this.bottleneckAnalysisInterval = null;
+    }
+  }
+  
+  /**
+   * Compute system-wide metrics from component metrics
+   */
+  private computeSystemMetrics(): SystemMetrics | null {
+    if (!this.workspace) return null;
+    
+    const componentMetricsMap = new Map<string, ComponentMetrics>();
+    let totalThroughput = 0;
+    let totalLatency = 0;
+    let totalErrors = 0;
+    let totalRequests = 0;
+    let totalQueueDepth = 0;
+    let healthyComponents = 0;
+    
+    this.workspace.components.forEach(component => {
+      const compState = this.state.components.get(component.id);
+      if (!compState) return;
+      
+      const tracking = this.requestTracking.get(component.id);
+      if (!tracking) return;
+      
+      const now = Date.now();
+      const windowMs = 1000;
+      const windowStart = now - windowMs;
+      
+      const recentCompletions = tracking.completions.filter(t => t >= windowStart);
+      const recentFailures = tracking.failures.filter(t => t >= windowStart);
+      const recentLatencies = tracking.latencies.filter((_, idx) => {
+        const completionTime = tracking.completions[idx];
+        return completionTime >= windowStart;
+      });
+      
+      const componentRequests = recentCompletions.length + recentFailures.length;
+      const componentThroughput = componentRequests;
+      const componentLatency = recentLatencies.length > 0
+        ? recentLatencies.reduce((sum, lat) => sum + lat, 0) / recentLatencies.length
+        : component.configuration.latency;
+      
+      totalThroughput += componentThroughput;
+      totalLatency += componentLatency;
+      totalErrors += recentFailures.length;
+      totalRequests += componentRequests;
+      totalQueueDepth += compState.queueDepth;
+      
+      if (compState.isHealthy) {
+        healthyComponents++;
+      }
+      
+      const metrics: ComponentMetrics = {
+        componentId: component.id,
+        timestamp: now,
+        requestsPerSecond: componentThroughput,
+        averageLatency: componentLatency,
+        errorRate: componentRequests > 0 ? recentFailures.length / componentRequests : 0,
+        cpuUtilization: Math.min(1.0, compState.currentLoad / component.configuration.capacity),
+        memoryUtilization: Math.min(1.0, compState.queueDepth / (component.configuration.capacity * 2)),
+        queueDepth: compState.queueDepth
+      };
+      
+      componentMetricsMap.set(component.id, metrics);
+    });
+    
+    const componentCount = this.workspace.components.length;
+    const averageLatency = componentCount > 0 ? totalLatency / componentCount : 0;
+    const systemErrorRate = totalRequests > 0 ? totalErrors / totalRequests : 0;
+    
+    // Convert ComponentMetrics to AggregatedMetrics format
+    const aggregatedMetricsMap = new Map<string, AggregatedMetrics>();
+    componentMetricsMap.forEach((metrics, componentId) => {
+      const aggregated: AggregatedMetrics = {
+        componentId,
+        timeWindow: 1000,
+        startTime: Date.now() - 1000,
+        endTime: Date.now(),
+        requestsPerSecond: {
+          min: metrics.requestsPerSecond,
+          max: metrics.requestsPerSecond,
+          avg: metrics.requestsPerSecond,
+          p50: metrics.requestsPerSecond,
+          p95: metrics.requestsPerSecond,
+          p99: metrics.requestsPerSecond
+        },
+        latency: {
+          min: metrics.averageLatency,
+          max: metrics.averageLatency,
+          avg: metrics.averageLatency,
+          p50: metrics.averageLatency,
+          p95: metrics.averageLatency,
+          p99: metrics.averageLatency
+        },
+        errorRate: {
+          min: metrics.errorRate,
+          max: metrics.errorRate,
+          avg: metrics.errorRate
+        },
+        resourceUtilization: {
+          cpu: {
+            min: metrics.cpuUtilization,
+            max: metrics.cpuUtilization,
+            avg: metrics.cpuUtilization
+          },
+          memory: {
+            min: metrics.memoryUtilization,
+            max: metrics.memoryUtilization,
+            avg: metrics.memoryUtilization
+          }
+        },
+        queueDepth: {
+          min: metrics.queueDepth,
+          max: metrics.queueDepth,
+          avg: metrics.queueDepth
+        },
+        totalRequests: Math.round(metrics.requestsPerSecond),
+        totalErrors: Math.round(metrics.requestsPerSecond * metrics.errorRate)
+      };
+      aggregatedMetricsMap.set(componentId, aggregated);
+    });
+    
+    return {
+      timestamp: Date.now(),
+      totalThroughput,
+      averageLatency,
+      systemErrorRate,
+      activeComponents: componentCount,
+      healthyComponents,
+      totalQueueDepth,
+      componentMetrics: aggregatedMetricsMap
+    };
+  }
+  
+  /**
+   * Detect system collapse based on error rates and component failures (SRS FR-5.4)
+   */
+  private detectSystemCollapse(): void {
+    if (!this.workspace) return;
+    
+    const systemMetrics = this.computeSystemMetrics();
+    if (!systemMetrics) return;
+    
+    // System collapse criteria:
+    // 1. System error rate > 50%
+    // 2. More than 50% of components unhealthy
+    // 3. Total queue depth exceeds critical threshold
+    const errorRateThreshold = 0.5;
+    const unhealthyComponentThreshold = 0.5;
+    const criticalQueueDepth = this.workspace.components.reduce((sum, comp) => {
+      const capacity = comp.configuration.capacity;
+      return sum + (capacity * 3); // 3x capacity is critical
+    }, 0);
+    
+    const unhealthyRatio = 1 - (systemMetrics.healthyComponents / systemMetrics.activeComponents);
+    const isCollapsed = 
+      systemMetrics.systemErrorRate > errorRateThreshold ||
+      unhealthyRatio > unhealthyComponentThreshold ||
+      systemMetrics.totalQueueDepth > criticalQueueDepth;
+    
+    if (isCollapsed && !this.state.isCollapsed) {
+      this.state.isCollapsed = true;
+      this.emit('system_collapse', {
+        timestamp: Date.now(),
+        reason: systemMetrics.systemErrorRate > errorRateThreshold 
+          ? 'high_error_rate' 
+          : unhealthyRatio > unhealthyComponentThreshold
+          ? 'component_failures'
+          : 'queue_overflow',
+        systemMetrics,
+        unhealthyComponents: systemMetrics.activeComponents - systemMetrics.healthyComponents,
+        errorRate: systemMetrics.systemErrorRate
+      });
+    } else if (!isCollapsed && this.state.isCollapsed) {
+      this.state.isCollapsed = false;
+      this.emit('system_recovery', {
+        timestamp: Date.now(),
+        systemMetrics
+      });
+    }
   }
 }

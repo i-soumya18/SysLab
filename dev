@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+# Quick start script - one command to get everything running
+
+# Call the proper start script
+exec ./scripts/start-dev.sh

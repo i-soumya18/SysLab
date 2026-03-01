@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Hint, ExplanationContent, HintContext } from '../types';
 import { hintsApi } from '../services/hintsApi';
 import './HintsPanel.css';
@@ -27,14 +27,30 @@ export const HintsPanel: React.FC<HintsPanelProps> = ({
   const [expandedHints, setExpandedHints] = useState<Set<string>>(new Set());
   const [requestedHints, setRequestedHints] = useState<Set<string>>(new Set());
 
+  // Track last context to prevent unnecessary updates
+  const lastContextRef = useRef<string>('');
+  
   // Update hints when context changes
   useEffect(() => {
-    if (isActive) {
-      updateHints();
+    if (!isActive) return;
+    
+    // Create a stable key from context to detect actual changes
+    const contextKey = JSON.stringify({
+      userId: context.userId,
+      scenarioId: context.scenarioId,
+      currentDifficulty
+    });
+    
+    // Only update if context actually changed
+    if (lastContextRef.current === contextKey) {
+      return;
     }
-  }, [context, currentDifficulty, isActive]);
+    
+    lastContextRef.current = contextKey;
+    updateHints();
+  }, [context.userId, context.scenarioId, currentDifficulty, isActive]);
 
-  const updateHints = async () => {
+  const updateHints = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -52,9 +68,14 @@ export const HintsPanel: React.FC<HintsPanelProps> = ({
       setProgressiveHints(progressive);
       setRemedialHints(remedial);
 
-      // Record contextual hints as shown
+      // Record contextual hints as shown (async, don't block)
       contextual.forEach(hint => {
-        recordHintShown(hint.id);
+        // Use setTimeout to avoid blocking the state update
+        setTimeout(() => {
+          recordHintShown(hint.id).catch(err => {
+            console.error('Failed to record hint shown:', err);
+          });
+        }, 0);
       });
 
     } catch (err) {
@@ -62,9 +83,9 @@ export const HintsPanel: React.FC<HintsPanelProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [context, currentDifficulty, onHintInteraction]);
 
-  const recordHintShown = async (hintId: string) => {
+  const recordHintShown = useCallback(async (hintId: string) => {
     try {
       await hintsApi.recordHintShown(context.userId, context.scenarioId, hintId);
       if (onHintInteraction) {
@@ -73,7 +94,7 @@ export const HintsPanel: React.FC<HintsPanelProps> = ({
     } catch (err) {
       console.error('Failed to record hint shown:', err);
     }
-  };
+  }, [context.userId, context.scenarioId, onHintInteraction]);
 
   const recordHintRequested = async (hintId: string) => {
     try {

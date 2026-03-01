@@ -1,0 +1,105 @@
+---
+query: "#file:workflow.md #file:SRS.md #file:design.md #file:requirements.md "
+references:
+  - "File: /.kiro/specs/system-design-simulator/requirements.md"
+  - "File: /.kiro/specs/system-design-simulator/design.md"
+  - "File: /.kiro/specs/system-design-simulator/SRS.md"
+  - "File: /.kiro/specs/system-design-simulator/workflow.md"
+generationTime: 2026-02-14T14:50:44.633Z
+---
+flowchart TD
+    Start([User Lands on Platform]) --> Onboard{Choose Mode}
+    
+    Onboard -->|Learn| LearnPath[Learning Path]
+    Onboard -->|Practice| PracticePath[Interview Practice]
+    Onboard -->|Free Play| FreePlay[Open Canvas]
+    
+    LearnPath --> Canvas
+    PracticePath --> Canvas
+    FreePlay --> Canvas
+    
+    Canvas[Visual Canvas Opens] --> BuildPhase[/"BUILD PHASE<br/>Drag Components"/]
+    
+    BuildPhase --> AddClient[Add Client]
+    AddClient --> AddLB[Add Load Balancer]
+    AddLB --> AddService[Add Service]
+    AddService --> AddDB[Add Database]
+    AddDB --> ConnectWires[Connect Components<br/>with Wires]
+    
+    ConnectWires --> ConfigureParams[Configure Parameters<br/>Latency, Bandwidth, Retry]
+    
+    ConfigureParams --> ScalePhase{{"SCALE PHASE<br/>Adjust Traffic Slider"}}
+    
+    ScalePhase --> Traffic100[100 Users<br/>✓ System Stable]
+    Traffic100 --> Traffic10K[10K Users<br/>⚠️ DB Latency Rising]
+    Traffic10K --> Traffic100K[100K Users<br/>❌ Errors Appear]
+    Traffic100K --> Traffic1M[1M Users<br/>💥 System Collapses]
+    
+    Traffic1M --> BreakPhase[/"BREAK PHASE<br/>System Failure"/]
+    
+    BreakPhase --> BottleneckDetect[Bottleneck Visualizer<br/>🔴 Red Indicators]
+    
+    BottleneckDetect --> ObservePhase[/"OBSERVE PHASE<br/>Analyze Metrics"/]
+    
+    ObservePhase --> ViewMetrics[View Real-Time Metrics]
+    ViewMetrics --> Latency[📊 Latency Spikes<br/>p50, p95, p99]
+    ViewMetrics --> Errors[📈 Error Rates Rising]
+    ViewMetrics --> Cost[💰 Cost Explosion]
+    ViewMetrics --> Saturation[⚡ Resource Saturation]
+    
+    Latency --> UnderstandWhy{Understand<br/>WHY it Failed?}
+    Errors --> UnderstandWhy
+    Cost --> UnderstandWhy
+    Saturation --> UnderstandWhy
+    
+    UnderstandWhy -->|Yes| FixPhase[/"FIX PHASE<br/>Architectural Changes"/]
+    UnderstandWhy -->|Need Help| GetHints[Contextual Hints<br/>& Explanations]
+    GetHints --> FixPhase
+    
+    FixPhase --> AddCache[Add Cache Layer]
+    FixPhase --> AddReplicas[Add Read Replicas]
+    FixPhase --> AddQueue[Introduce Message Queue]
+    FixPhase --> ScaleHorizontal[Scale Services Horizontally]
+    
+    AddCache --> ReRun[Re-run Simulation]
+    AddReplicas --> ReRun
+    AddQueue --> ReRun
+    ScaleHorizontal --> ReRun
+    
+    ReRun --> SystemStable{System Stable<br/>at Scale?}
+    
+    SystemStable -->|No| FixPhase
+    SystemStable -->|Yes| AdvancedPhase{Try Advanced<br/>Challenges?}
+    
+    AdvancedPhase -->|Yes| InjectFailures[/"INJECT FAILURES<br/>Chaos Engineering"/]
+    AdvancedPhase -->|No| SaveShare
+    
+    InjectFailures --> DBFailure[DB Node Down]
+    InjectFailures --> NetworkLatency[Network Latency Spike]
+    InjectFailures --> CacheEviction[Cache Eviction Storm]
+    InjectFailures --> CostCeiling[Cost Ceiling Exceeded]
+    
+    DBFailure --> ObserveRecovery[Observe Recovery<br/>Patterns]
+    NetworkLatency --> ObserveRecovery
+    CacheEviction --> ObserveRecovery
+    CostCeiling --> ObserveRecovery
+    
+    ObserveRecovery --> FixPhase
+    
+    SaveShare[/"Save & Share Design"/] --> TrackProgress[Track Learning Progress]
+    TrackProgress --> Achievements[🏆 Unlock Achievements]
+    
+    Achievements --> RepeatLoop{Continue<br/>Learning?}
+    
+    RepeatLoop -->|New Scenario| Canvas
+    RepeatLoop -->|Higher Scale| ScalePhase
+    RepeatLoop -->|Exit| EndState([End State:<br/>"I understand system design -<br/>I don't memorize answers"])
+    
+    style BuildPhase fill:#4CAF50,color:#fff
+    style ScalePhase fill:#2196F3,color:#fff
+    style BreakPhase fill:#f44336,color:#fff
+    style ObservePhase fill:#FF9800,color:#fff
+    style FixPhase fill:#9C27B0,color:#fff
+    style EndState fill:#00BCD4,color:#fff
+    style Traffic1M fill:#f44336,color:#fff
+    style BottleneckDetect fill:#f44336,color:#fff

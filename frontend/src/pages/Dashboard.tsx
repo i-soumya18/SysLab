@@ -12,8 +12,8 @@ interface Workspace {
   userId: string;
   createdAt: string;
   updatedAt: string;
-  components?: any[];
-  connections?: any[];
+  componentCount: number;
+  connectionCount: number;
 }
 
 interface WorkspaceListResponse {
@@ -41,6 +41,8 @@ export function Dashboard() {
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [isDeletingWorkspaceId, setIsDeletingWorkspaceId] = useState<string | null>(null);
+  const [renamingWorkspaceId, setRenamingWorkspaceId] = useState<string | null>(null);
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Fetch user workspaces
@@ -106,7 +108,7 @@ export function Dashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: `New Workspace ${new Date().toLocaleDateString()}`,
+          name: 'Untitled Workspace',
           description: 'A new system design workspace',
           userId: user.uid,
           components: [],
@@ -164,6 +166,54 @@ export function Dashboard() {
     } finally {
       setIsDeletingWorkspaceId(null);
     }
+  };
+
+  const handleRenameWorkspace = async (workspaceId: string, currentName: string): Promise<void> => {
+    if (!user) return;
+
+    setRenamingWorkspaceId(workspaceId);
+    setNewWorkspaceName(currentName);
+  };
+
+  const handleConfirmRename = async (workspaceId: string): Promise<void> => {
+    if (!user || !newWorkspaceName.trim()) return;
+
+    if (newWorkspaceName.trim() === workspaces.find(w => w.id === workspaceId)?.name) {
+      setRenamingWorkspaceId(null);
+      setNewWorkspaceName('');
+      return;
+    }
+
+    try {
+      const updatedWorkspace = await WorkspaceApiService.renameWorkspace(
+        workspaceId,
+        newWorkspaceName.trim(),
+        user.uid
+      );
+
+      // Update the workspace in the list
+      setWorkspaces(prev =>
+        prev.map(w => (w.id === workspaceId ? { ...w, name: updatedWorkspace.name } : w))
+      );
+
+      setRenamingWorkspaceId(null);
+      setNewWorkspaceName('');
+      if (error) {
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Error renaming workspace:', err);
+      if (err instanceof Error) {
+        setError(err.message || 'Failed to rename workspace. Please try again.');
+      } else {
+        setError('Failed to rename workspace. Please try again.');
+      }
+    }
+  };
+
+  const handleCancelRename = (): void => {
+    setRenamingWorkspaceId(null);
+    setNewWorkspaceName('');
   };
 
   const handleLogout = async () => {
@@ -314,10 +364,7 @@ export function Dashboard() {
             <h2 className="text-2xl font-bold text-gray-900">Recent Workspaces</h2>
             {workspaces.length > 0 && (
               <button
-                onClick={() => {
-                  // TODO: Navigate to all workspaces page
-                  alert('View all workspaces coming soon!');
-                }}
+                onClick={() => navigate('/workspaces')}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700"
               >
                 View All →
@@ -386,13 +433,13 @@ export function Dashboard() {
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                           </svg>
-                          {workspace.components?.length || 0} components
+                          {workspace.componentCount || 0} components
                         </span>
                         <span className="flex items-center gap-1">
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                           </svg>
-                          {workspace.connections?.length || 0} connections
+                          {workspace.connectionCount || 0} connections
                         </span>
                       </div>
                     </div>
@@ -402,7 +449,15 @@ export function Dashboard() {
                     </div>
                   </button>
 
-                  <div className="mt-4 flex items-center justify-end">
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRenameWorkspace(workspace.id, workspace.name)}
+                      disabled={isDeletingWorkspaceId === workspace.id}
+                      className="inline-flex items-center rounded-md border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Rename
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteWorkspace(workspace.id, workspace.name)}
@@ -428,54 +483,116 @@ export function Dashboard() {
               </p>
             </div>
             <button
-              onClick={() => {
-                // TODO: Navigate to scenario library
-                alert('Full scenario library coming soon!');
-              }}
+              onClick={() => navigate('/scenarios')}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
               Browse All
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                  Beginner
-                </span>
-              </div>
-              <h3 className="font-semibold text-gray-900">Simple Web App</h3>
-              <p className="mt-1 text-xs text-gray-600">
-                Design a basic web application that can handle 1,000 concurrent users
-              </p>
+          {isLoadingStats ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-lg border border-gray-200 p-4 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-full"></div>
+                </div>
+              ))}
             </div>
-
-            <div className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800">
-                  Intermediate
-                </span>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div 
+                className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => navigate('/scenarios?difficulty=beginner')}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                    Beginner
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Simple Web App</h3>
+                <p className="mt-1 text-xs text-gray-600">
+                  Design a basic web application that can handle 1,000 concurrent users
+                </p>
               </div>
-              <h3 className="font-semibold text-gray-900">Social Media Feed</h3>
-              <p className="mt-1 text-xs text-gray-600">
-                Build a real-time feed system that scales to millions of users
-              </p>
+
+              <div 
+                className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => navigate('/scenarios?difficulty=intermediate')}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800">
+                    Intermediate
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Social Media Feed</h3>
+                <p className="mt-1 text-xs text-gray-600">
+                  Build a real-time feed system that scales to millions of users
+                </p>
+              </div>
+
+              <div 
+                className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => navigate('/scenarios?difficulty=advanced')}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
+                    Advanced
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Global CDN Network</h3>
+                <p className="mt-1 text-xs text-gray-600">
+                  Design a globally distributed content delivery system
+                </p>
+              </div>
             </div>
+          )}
+      </div>
 
-            <div className="rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
-                  Advanced
-                </span>
-              </div>
-              <h3 className="font-semibold text-gray-900">Global CDN Network</h3>
-              <p className="mt-1 text-xs text-gray-600">
-                Design a globally distributed content delivery system
-              </p>
+      {/* Rename Modal */}
+      {renamingWorkspaceId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-xl font-semibold text-gray-900">Rename Workspace</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Enter a new name for your workspace
+            </p>
+            <input
+              type="text"
+              value={newWorkspaceName}
+              onChange={(e) => setNewWorkspaceName(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              placeholder="Workspace name"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleConfirmRename(renamingWorkspaceId);
+                } else if (e.key === 'Escape') {
+                  handleCancelRename();
+                }
+              }}
+            />
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancelRename}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmRename(renamingWorkspaceId)}
+                disabled={!newWorkspaceName.trim()}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Rename
+              </button>
             </div>
           </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
