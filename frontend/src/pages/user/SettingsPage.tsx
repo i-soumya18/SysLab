@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
 import { useSEO } from '../../hooks/useSEO';
 import { settingsPageSEO } from '../../config/seoPages';
@@ -59,7 +58,6 @@ const DEFAULT_PREFERENCES: FrontendPreferences = {
 export function SettingsPage() {
   useSEO(settingsPageSEO);
   
-  const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
 
   const [preferences, setPreferences] = useState<FrontendPreferences>(DEFAULT_PREFERENCES);
@@ -412,8 +410,6 @@ export function SettingsPage() {
             </label>
             <div className="grid grid-cols-3 gap-3">
               {(['slow', 'medium', 'fast'] as const).map((pace) => {
-                // Map 'medium' to display but use 'normal' for backend
-                const displayPace = pace;
                 return (
                   <button
                     key={pace}

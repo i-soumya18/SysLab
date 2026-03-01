@@ -163,12 +163,12 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                 alignItems: 'center'
               }}
             >
-              <div style={{ fontSize: '12px', color: '#333' }}>
-                <div style={{ fontWeight: 'bold' }}>Current Load</div>
-                <div style={{ fontSize: '10px', color: '#666' }}>
-                  Pattern: {typeof loadPattern.pattern === 'string' ? loadPattern.pattern : (loadPattern.pattern?.type || 'unknown')}
+                <div style={{ fontSize: '12px', color: '#333' }}>
+                  <div style={{ fontWeight: 'bold' }}>Current Load</div>
+                  <div style={{ fontSize: '10px', color: '#666' }}>
+                  Pattern: {loadPattern.pattern}
+                  </div>
                 </div>
-              </div>
               <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4CAF50' }}>
                 {typeof loadPattern.currentLoad === 'number' ? loadPattern.currentLoad.toFixed(0) : '0'} req/s
               </div>

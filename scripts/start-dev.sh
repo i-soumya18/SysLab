@@ -23,10 +23,12 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check Docker daemon
+# Check Docker daemon / compose connectivity
 if ! docker info > /dev/null 2>&1; then
-    echo -e "${RED}✗ Docker daemon is not running${NC}"
-    exit 1
+    if ! docker compose $COMPOSE_FILES ps > /dev/null 2>&1; then
+        echo -e "${RED}✗ Docker daemon is not running${NC}"
+        exit 1
+    fi
 fi
 
 echo -e "${GREEN}✓ Docker is running${NC}"
@@ -53,8 +55,8 @@ attempt=0
 
 echo -n "Backend: "
 while [ $attempt -lt $max_attempts ]; do
-    if docker compose $COMPOSE_FILES exec -T backend npm run dev &>/dev/null || \
-       curl -s http://localhost:8080/health > /dev/null 2>&1; then
+    if curl -s http://localhost:8080/health > /dev/null 2>&1 || \
+       curl -s http://localhost:8080/api/v1/health > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC}"
         break
     fi
@@ -96,4 +98,3 @@ echo -e "   Clean:      ${GREEN}docker compose $COMPOSE_FILES down -v${NC}"
 echo ""
 echo -e "${BLUE}✨ Ready to code! Start editing and watch changes live. ✨${NC}"
 echo ""
-

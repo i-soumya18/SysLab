@@ -41,9 +41,17 @@ These tasks represent the absolute minimum to deliver the core "Oh Sh*t" moment:
 - [x] **MVLE-3**: User can set traffic scale (100 to 1M users)
 - [x] **MVLE-4**: User clicks "Run" and simulation executes
 - [x] **MVLE-5**: System visually shows bottleneck (e.g., DB glowing red)
-- [ ] **MVLE-6**: Metrics dashboard shows latency spike
-- [ ] **MVLE-7**: User can add cache/replica to fix issue
-- [ ] **MVLE-8**: Re-run simulation shows improvement
+- [x] **MVLE-6**: Metrics dashboard shows latency spike
+- [x] **MVLE-7**: User can add cache/replica to fix issue
+- [x] **MVLE-8**: Re-run simulation shows improvement
+
+Acceptance evidence (2026-03-01):
+- Strict Step 4-6 acceptance scenario added and passing: `backend/src/test/mvle-6-8-golden-journey.e2e.test.ts`
+- Automated before/after proof added in Workspace: `Before vs After` panel driven by run summaries
+- Deterministic timeline ordering regression added and passing: `frontend/src/test/simulation-timeline-ordering.test.ts`
+- Measurable pass criteria enforced in acceptance flow:
+  - Baseline must show collapse symptoms (bottleneck/overload/high latency or error)
+  - Fixed run must reduce latency and error, and improve sustainable scale score
 
 
 

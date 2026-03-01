@@ -18,17 +18,6 @@ interface Workspace {
   connectionCount: number;
 }
 
-interface WorkspaceListResponse {
-  success: boolean;
-  data: Workspace[];
-  pagination: {
-    total: number;
-    limit: number;
-    offset: number;
-    hasMore: boolean;
-  };
-}
-
 // through the same origin (e.g. the Nginx gateway on :8080 in Docker).
 // Use environment variable for API URL, fallback to relative path
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
@@ -36,7 +25,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
 export function Dashboard() {
   useSEO(dashboardSEO);
   const navigate = useNavigate();
-  const { user, logoutUser } = useFirebaseAuthContext();
+  const { user } = useFirebaseAuthContext();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [progressStats, setProgressStats] = useState<ProgressStats | null>(null);
@@ -218,15 +207,6 @@ export function Dashboard() {
     setNewWorkspaceName('');
   };
 
-  const handleLogout = async () => {
-    try {
-      await logoutUser();
-      navigate('/');
-    } catch (err) {
-      console.error('Error logging out:', err);
-    }
-  };
-
   const formatTimeSpent = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -235,11 +215,6 @@ export function Dashboard() {
       return `${hours}h ${minutes}m`;
     }
     return `${minutes}m`;
-  };
-
-  const getInitials = (name: string | null): string => {
-    if (!name) return 'U';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (

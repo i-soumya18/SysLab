@@ -473,19 +473,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [selectedComponent, onComponentUpdate, snapToGrid, checkCollision, findAvailablePosition]);
 
-  // Handle component configuration updates
-  const handleComponentUpdate = useCallback((updatedComponent: Component) => {
-    setComponents(prev => 
-      prev.map(comp => 
-        comp.id === updatedComponent.id 
-          ? updatedComponent
-          : comp
-      )
-    );
-    setSelectedComponent(updatedComponent);
-    onComponentUpdate?.(updatedComponent);
-  }, [onComponentUpdate]);
-
   // Handle connection context menu
   const handleConnectionContextMenu = useCallback((connection: Connection, position: { x: number; y: number }) => {
     setConnectionContextMenu({ connection, position });

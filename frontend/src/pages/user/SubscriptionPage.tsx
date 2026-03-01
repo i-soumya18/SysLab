@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
 import { useSEO } from '../../hooks/useSEO';
 import { subscriptionPageSEO } from '../../config/seoPages';
@@ -108,7 +107,6 @@ interface UsageStats {
 export function SubscriptionPage() {
   useSEO(subscriptionPageSEO);
   
-  const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
 
   const [currentTier, setCurrentTier] = useState<string>('Free');

@@ -29,6 +29,12 @@ services:
       VITE_HMR_HOST: localhost
       VITE_HMR_CLIENT_PORT: 8080
       VITE_HMR_PATH: /vite-hmr
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5173"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     stdin_open: true
     tty: true
 
@@ -70,3 +76,9 @@ services:
       - ./nginx/gateway.dev.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

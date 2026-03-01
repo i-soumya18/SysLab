@@ -5,8 +5,8 @@
  * Copy this pattern to apply SEO metadata to any page in SysLab.
  */
 
-import { useSEO, createBreadcrumbSchema } from '@/hooks/useSEO';
-import { landingPageSEO } from '@/config/seoPages';
+import { useSEO, createBreadcrumbSchema } from '../hooks/useSEO';
+import { landingPageSEO } from '../config/seoPages';
 
 /**
  * Example 1: Simple Page with Basic SEO

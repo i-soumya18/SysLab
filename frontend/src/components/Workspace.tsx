@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Canvas } from './Canvas';
 import CollaborationPresence from './CollaborationPresence';
 import { ComponentPalette } from './ComponentPalette';
@@ -21,6 +21,8 @@ import { StatusBar } from './StatusBar';
 import { AIInsightsPanel } from './AIInsightsPanel';
 import { SocraticTutorPanel } from './SocraticTutorPanel';
 import { VersionDiffReviewerPanel } from './VersionDiffReviewerPanel';
+import { SimulationTimelinePanel, type SimulationTimelineItem, type TimelineCategory, type TimelineSeverity } from './SimulationTimelinePanel';
+import { SimulationRunComparisonCard, type SimulationRunSummary } from './SimulationRunComparisonCard';
 import { SystemCollapseMonitor, type CollapseEvent, type RecoveryEvent } from './SystemCollapseMonitor';
 import { WorkspaceImportModal } from './WorkspaceImportModal';
 import { BottleneckVisualizer } from './BottleneckVisualizer';
@@ -35,6 +37,7 @@ import { ScalabilityDashboard } from './ScalabilityDashboard';
 import { ComponentConfigPanel } from './ComponentConfigPanel';
 import { ResizableCard } from './ResizableCard';
 import { componentLibrary } from './ComponentLibrary';
+import { mergeTimelineEvents } from '../utils/simulationTimeline';
 import type {
   BottleneckInfo,
   Component,
@@ -60,7 +63,6 @@ export const Workspace: React.FC = () => {
   const { id: routeWorkspaceId } = useParams<{ id?: string }>();
   const { user } = useFirebaseAuthContext();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('demo-workspace-id');
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [componentCount, setComponentCount] = useState<number>(0);
@@ -102,10 +104,17 @@ export const Workspace: React.FC = () => {
   const [showAIInsightsPanel, setShowAIInsightsPanel] = useState<boolean>(false);
   const [showSocraticTutorPanel, setShowSocraticTutorPanel] = useState<boolean>(false);
   const [showVersionDiffReviewerPanel, setShowVersionDiffReviewerPanel] = useState<boolean>(false);
+  const [showTimelinePanel, setShowTimelinePanel] = useState<boolean>(true);
+  const [showRunComparisonPanel, setShowRunComparisonPanel] = useState<boolean>(true);
 
   // Layout sizing state
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(256);
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(320);
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window === 'undefined' ? 1600 : window.innerWidth
+  );
+  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(true);
+  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(true);
 
   // Workspace name editing state
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
@@ -114,7 +123,6 @@ export const Workspace: React.FC = () => {
 
   // Workspace load error state
   const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null);
-  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState<boolean>(false);
   const [insightsHeight, setInsightsHeight] = useState<number>(240);
   const [showConfigPanel, setShowConfigPanel] = useState<boolean>(false);
   
@@ -128,9 +136,13 @@ export const Workspace: React.FC = () => {
   const [aiInsightsPanelHeight, setAIInsightsPanelHeight] = useState<number>(280);
   const [socraticTutorPanelHeight, setSocraticTutorPanelHeight] = useState<number>(320);
   const [versionDiffReviewerPanelHeight, setVersionDiffReviewerPanelHeight] = useState<number>(320);
+  const [timelinePanelHeight, setTimelinePanelHeight] = useState<number>(260);
+  const [runComparisonPanelHeight, setRunComparisonPanelHeight] = useState<number>(230);
   const [hintsPanelHeight, setHintsPanelHeight] = useState<number>(200);
   const [constraintsPanelHeight, setConstraintsPanelHeight] = useState<number>(200);
   const [failurePanelHeight, setFailurePanelHeight] = useState<number>(200);
+  const [timelineEvents, setTimelineEvents] = useState<SimulationTimelineItem[]>([]);
+  const [simulationRunHistory, setSimulationRunHistory] = useState<SimulationRunSummary[]>([]);
 
   const minLeftSidebarWidth = 200;
   const maxLeftSidebarWidth = 400;
@@ -138,6 +150,8 @@ export const Workspace: React.FC = () => {
   const maxRightSidebarWidth = 420;
   const minInsightsHeight = 160;
   const maxInsightsHeight = 400;
+  const compactLayoutBreakpoint = 1480;
+  const narrowLayoutBreakpoint = 1180;
 
   // Save / autosave state
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -146,6 +160,46 @@ export const Workspace: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
   const scaleUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timelineRecoveryLinkRef = useRef<Map<string, string>>(new Map());
+  const lastSimulationRunningRef = useRef<boolean | null>(null);
+  const lastTimelineScaleRef = useRef<string>('');
+  const currentRunRef = useRef<{
+    startedAt: number;
+    sampleCount: number;
+    latencySum: number;
+    throughputSum: number;
+    errorRateSum: number;
+    peakLatency: number;
+    peakErrorRate: number;
+    maxUserCount: number;
+    sustainableUserCount: number;
+    bottleneckCount: number;
+  } | null>(null);
+
+  const appendTimelineEvent = useCallback((event: {
+    category: TimelineCategory;
+    severity: TimelineSeverity;
+    title: string;
+    details?: string;
+    userCount?: number;
+    scaleFactor?: number;
+    timestamp?: number;
+  }): string => {
+    const eventId = `${event.category}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const nextEvent: SimulationTimelineItem = {
+      id: eventId,
+      timestamp: event.timestamp ?? Date.now(),
+      category: event.category,
+      severity: event.severity,
+      title: event.title,
+      details: event.details,
+      userCount: event.userCount,
+      scaleFactor: event.scaleFactor
+    };
+
+    setTimelineEvents(prev => mergeTimelineEvents(prev, nextEvent, 180));
+    return eventId;
+  }, []);
 
   const { collaborationState } = useCollaboration({
     workspaceId: currentWorkspaceId,
@@ -178,7 +232,6 @@ export const Workspace: React.FC = () => {
         return;
       }
 
-      setIsLoadingWorkspace(true);
       setWorkspaceLoadError(null);
 
       const url = new URL(`${API_BASE_URL}/workspaces/${workspaceId}`);
@@ -228,7 +281,7 @@ export const Workspace: React.FC = () => {
         setWorkspaceLoadError('Failed to load workspace. Please try again.');
       }
     } finally {
-      setIsLoadingWorkspace(false);
+      // no-op
     }
   };
 
@@ -276,6 +329,82 @@ export const Workspace: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
+    const handleResize = (): void => {
+      setViewportWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (viewportWidth < narrowLayoutBreakpoint) {
+      setShowLeftSidebar(false);
+      setShowRightSidebar(false);
+      return;
+    }
+
+    if (viewportWidth < compactLayoutBreakpoint) {
+      setShowLeftSidebar(true);
+      setShowRightSidebar(false);
+      return;
+    }
+
+    setShowLeftSidebar(true);
+    setShowRightSidebar(true);
+  }, [viewportWidth]);
+
+  useEffect(() => {
+    const minMainWidth = viewportWidth < narrowLayoutBreakpoint ? 360 : 560;
+    const viewportBudget = Math.max(320, viewportWidth - minMainWidth - 56);
+
+    const leftBudget = showLeftSidebar ? leftSidebarWidth : 0;
+    const rightBudget = showRightSidebar ? rightSidebarWidth : 0;
+    const totalSidebarWidth = leftBudget + rightBudget;
+
+    if (totalSidebarWidth <= viewportBudget) {
+      return;
+    }
+
+    let nextLeft = leftSidebarWidth;
+    let nextRight = rightSidebarWidth;
+    let overflow = totalSidebarWidth - viewportBudget;
+
+    if (showRightSidebar) {
+      const shrinkableRight = Math.max(0, nextRight - minRightSidebarWidth);
+      const rightReduction = Math.min(shrinkableRight, overflow);
+      nextRight -= rightReduction;
+      overflow -= rightReduction;
+    }
+
+    if (overflow > 0 && showLeftSidebar) {
+      const shrinkableLeft = Math.max(0, nextLeft - minLeftSidebarWidth);
+      const leftReduction = Math.min(shrinkableLeft, overflow);
+      nextLeft -= leftReduction;
+    }
+
+    if (nextLeft !== leftSidebarWidth) {
+      setLeftSidebarWidth(nextLeft);
+    }
+
+    if (nextRight !== rightSidebarWidth) {
+      setRightSidebarWidth(nextRight);
+    }
+  }, [
+    viewportWidth,
+    showLeftSidebar,
+    showRightSidebar,
+    leftSidebarWidth,
+    rightSidebarWidth,
+    minLeftSidebarWidth,
+    minRightSidebarWidth
+  ]);
+
+  useEffect(() => {
     // Don't attempt to load workspace if user is not authenticated
     // Also skip if routeWorkspaceId is not a valid UUID (e.g., demo workspace or invalid IDs)
     if (routeWorkspaceId && isValidUUID(routeWorkspaceId) && currentUserId && currentUserId !== 'anonymous-user' && routeWorkspaceId !== currentWorkspaceId) {
@@ -290,11 +419,55 @@ export const Workspace: React.FC = () => {
       if (wsSimulationStatus.isRunning && !showMetricsPanel) {
         setShowMetricsPanel(true);
       }
-      if (!wsSimulationStatus.isRunning) {
-        setLiveScaleRamp(null);
+      if (wsSimulationStatus.isRunning && lastSimulationRunningRef.current !== true) {
+        currentRunRef.current = {
+          startedAt: Date.now(),
+          sampleCount: 0,
+          latencySum: 0,
+          throughputSum: 0,
+          errorRateSum: 0,
+          peakLatency: 0,
+          peakErrorRate: 0,
+          maxUserCount: currentScale,
+          sustainableUserCount: currentScale,
+          bottleneckCount: 0
+        };
+        appendTimelineEvent({
+          category: 'simulation',
+          severity: 'success',
+          title: 'Simulation running',
+          details: 'Realtime events and metrics are now streaming.'
+        });
       }
+      if (!wsSimulationStatus.isRunning && lastSimulationRunningRef.current === true) {
+        setLiveScaleRamp(null);
+        if (currentRunRef.current && currentRunRef.current.sampleCount > 0) {
+          const run = currentRunRef.current;
+          const summary: SimulationRunSummary = {
+            id: `run-${Date.now()}`,
+            completedAt: Date.now(),
+            avgLatency: run.latencySum / run.sampleCount,
+            peakLatency: run.peakLatency,
+            avgThroughput: run.throughputSum / run.sampleCount,
+            avgErrorRate: run.errorRateSum / run.sampleCount,
+            peakErrorRate: run.peakErrorRate,
+            bottleneckCount: run.bottleneckCount,
+            maxUserCount: Math.max(1, Math.floor(run.maxUserCount)),
+            sustainableUserCount: Math.max(1, Math.floor(run.sustainableUserCount))
+          };
+          setSimulationRunHistory(prev => [summary, ...prev].slice(0, 8));
+        }
+        currentRunRef.current = null;
+        appendTimelineEvent({
+          category: 'simulation',
+          severity: 'info',
+          title: 'Simulation stopped',
+          details: 'Realtime stream paused.'
+        });
+      }
+      lastSimulationRunningRef.current = wsSimulationStatus.isRunning;
     }
-  }, [wsSimulationStatus, showMetricsPanel]);
+  }, [wsSimulationStatus, showMetricsPanel, appendTimelineEvent]);
 
   useEffect(() => {
     if (wsSimulationProgress) {
@@ -317,6 +490,26 @@ export const Workspace: React.FC = () => {
 
     if (wsSimulationMetrics.type === 'system_metrics') {
       setSystemMetrics(wsSimulationMetrics.data as SystemMetrics);
+      const run = currentRunRef.current;
+      if (run) {
+        const metrics = wsSimulationMetrics.data as SystemMetrics;
+        const latency = Number(metrics.averageLatency || 0);
+        const throughput = Number(metrics.totalThroughput || 0);
+        const errorRate = Number((metrics as any).systemErrorRate ?? (metrics as any).totalErrorRate ?? 0);
+        const userCount = liveScaleRamp?.userCount ?? currentScale;
+
+        run.sampleCount += 1;
+        run.latencySum += latency;
+        run.throughputSum += throughput;
+        run.errorRateSum += errorRate;
+        run.peakLatency = Math.max(run.peakLatency, latency);
+        run.peakErrorRate = Math.max(run.peakErrorRate, errorRate);
+        run.maxUserCount = Math.max(run.maxUserCount, userCount);
+
+        if (latency <= 300 && errorRate <= 0.02) {
+          run.sustainableUserCount = Math.max(run.sustainableUserCount, userCount);
+        }
+      }
     } else if (wsSimulationMetrics.type === 'component_metrics') {
       const metric = wsSimulationMetrics.data as ComponentMetrics;
       setComponentMetrics(prev => {
@@ -358,12 +551,28 @@ export const Workspace: React.FC = () => {
       if (list.length > 0 && isSimulationRunning && !showHintsPanel) {
         setShowHintsPanel(true);
       }
+
+      list.forEach((bottleneck) => {
+        if (!bottleneck) {
+          return;
+        }
+        if (currentRunRef.current) {
+          currentRunRef.current.bottleneckCount += 1;
+        }
+        appendTimelineEvent({
+          category: 'bottleneck',
+          severity: bottleneck.severity === 'critical' ? 'critical' : 'warning',
+          title: `${bottleneck.componentType || bottleneck.componentId} bottleneck`,
+          details: bottleneck.description || `${bottleneck.type} pressure detected`,
+          timestamp: Date.now()
+        });
+      });
     });
 
     return () => {
       unsubscribe();
     };
-  }, [subscribe, isSimulationRunning, showHintsPanel]);
+  }, [subscribe, isSimulationRunning, showHintsPanel, appendTimelineEvent]);
 
   // Auto-surface AI insights when bottlenecks appear during active simulation
   useEffect(() => {
@@ -421,6 +630,19 @@ export const Workspace: React.FC = () => {
             }
             return { userCount, scaleFactor };
           });
+
+          const scaleKey = `${userCount}-${scaleFactor.toFixed(3)}`;
+          if (lastTimelineScaleRef.current !== scaleKey) {
+            appendTimelineEvent({
+              category: 'load',
+              severity: 'info',
+              title: 'Scale ramp update',
+              details: `${patternString} load at ${Math.round(currentLoad)} req/s`,
+              userCount,
+              scaleFactor
+            });
+            lastTimelineScaleRef.current = scaleKey;
+          }
         }
       } else if (payload.type === 'load_pattern_scheduled') {
         const patternData = payload.data.pattern || payload.data.type;
@@ -440,13 +662,20 @@ export const Workspace: React.FC = () => {
           }
           return newPattern;
         });
+
+        appendTimelineEvent({
+          category: 'load',
+          severity: 'info',
+          title: 'Load pattern scheduled',
+          details: `${patternString} pattern targeting ${Math.round(expectedLoad)} req/s`
+        });
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [subscribe]);
+  }, [subscribe, appendTimelineEvent]);
 
   // Subscribe to collapse and recovery events
   useEffect(() => {
@@ -454,14 +683,28 @@ export const Workspace: React.FC = () => {
       if (payload?.type === 'random_failure_occurred' || payload?.type === 'failure_injected') {
         const failureData = payload.data;
         if (failureData?.componentId) {
+          const collapseEventId = appendTimelineEvent({
+            category: 'failure',
+            severity: 'critical',
+            title: `Failure injected: ${failureData.componentType || failureData.componentId}`,
+            details: failureData.reason || failureData.type || 'Component failure',
+            timestamp: failureData.timestamp || Date.now()
+          });
+          timelineRecoveryLinkRef.current.set(failureData.componentId, collapseEventId);
+
           const collapseEvent: CollapseEvent = {
-            id: `collapse-${Date.now()}-${Math.random()}`,
-            componentId: failureData.componentId,
-            componentType: failureData.componentType || 'unknown',
+            id: collapseEventId,
             timestamp: failureData.timestamp || Date.now(),
-            reason: failureData.reason || failureData.type || 'Component failure',
+            type: failureData.type === 'cascade' || failureData.type === 'total' ? failureData.type : 'partial',
             severity: failureData.severity || 'high',
-            impact: failureData.impact || { affectedComponents: [], systemWide: false }
+            affectedComponents: Array.isArray(failureData.affectedComponents) && failureData.affectedComponents.length > 0
+              ? failureData.affectedComponents
+              : [failureData.componentId],
+            triggerComponent: failureData.componentId,
+            rootCause: failureData.reason || failureData.type || 'Component failure',
+            propagationPath: Array.isArray(failureData.propagationPath) ? failureData.propagationPath : [],
+            estimatedRecoveryTime: Number(failureData.estimatedRecoveryTime ?? 0),
+            confidence: Number(failureData.confidence ?? 0.8)
           };
           setCollapseEvents(prev => [...prev.slice(-49), collapseEvent]); // Keep last 50 events
         }
@@ -472,29 +715,56 @@ export const Workspace: React.FC = () => {
       if (payload?.type === 'component_failed') {
         const failureData = payload.data;
         if (failureData?.componentId) {
+          const collapseEventId = appendTimelineEvent({
+            category: 'component',
+            severity: 'warning',
+            title: `Component failed: ${failureData.componentType || failureData.componentId}`,
+            details: 'Failure detected during simulation.',
+            timestamp: failureData.timestamp || Date.now()
+          });
+          timelineRecoveryLinkRef.current.set(failureData.componentId, collapseEventId);
+
           const collapseEvent: CollapseEvent = {
-            id: `collapse-${Date.now()}-${Math.random()}`,
-            componentId: failureData.componentId,
-            componentType: failureData.componentType || 'unknown',
+            id: collapseEventId,
             timestamp: failureData.timestamp || Date.now(),
-            reason: 'Component failure detected',
+            type: 'partial',
             severity: 'high',
-            impact: { affectedComponents: [failureData.componentId], systemWide: false }
+            affectedComponents: [failureData.componentId],
+            triggerComponent: failureData.componentId,
+            rootCause: 'Component failure detected',
+            propagationPath: [],
+            estimatedRecoveryTime: Number(failureData.recoveryTime ?? 0),
+            confidence: 0.9
           };
           setCollapseEvents(prev => [...prev.slice(-49), collapseEvent]);
         }
       } else if (payload?.type === 'component_recovered') {
         const recoveryData = payload.data;
         if (recoveryData?.componentId) {
+          appendTimelineEvent({
+            category: 'recovery',
+            severity: 'success',
+            title: `Component recovered: ${recoveryData.componentType || recoveryData.componentId}`,
+            details: `${recoveryData.strategy || 'automatic'} recovery complete`,
+            timestamp: recoveryData.timestamp || Date.now()
+          });
+
+          const collapseEventId = timelineRecoveryLinkRef.current.get(recoveryData.componentId)
+            ?? `collapse-for-${recoveryData.componentId}`;
+          const recoveryMethod = recoveryData.strategy === 'manual' || recoveryData.strategy === 'partial'
+            ? recoveryData.strategy
+            : 'automatic';
           const recoveryEvent: RecoveryEvent = {
             id: `recovery-${Date.now()}-${Math.random()}`,
-            componentId: recoveryData.componentId,
-            componentType: recoveryData.componentType || 'unknown',
             timestamp: recoveryData.timestamp || Date.now(),
-            recoveryTime: recoveryData.recoveryTime || 0,
-            strategy: recoveryData.strategy || 'automatic'
+            collapseEventId,
+            recoveredComponents: [recoveryData.componentId],
+            actualRecoveryTime: Number(recoveryData.recoveryTime ?? 0),
+            recoveryMethod,
+            remainingIssues: []
           };
           setRecoveryEvents(prev => [...prev.slice(-49), recoveryEvent]); // Keep last 50 events
+          timelineRecoveryLinkRef.current.delete(recoveryData.componentId);
         }
       }
     });
@@ -503,7 +773,7 @@ export const Workspace: React.FC = () => {
       unsubscribeFailure();
       unsubscribeEvent();
     };
-  }, [subscribe]);
+  }, [subscribe, appendTimelineEvent]);
 
   const handleComponentAdd = (component: Component) => {
     console.log('Component added:', component);
@@ -609,7 +879,7 @@ export const Workspace: React.FC = () => {
         id: loadedWorkspace.id,
         componentCount: loadedWorkspace.components?.length,
         connectionCount: loadedWorkspace.connections?.length,
-        components: loadedWorkspace.components?.map(c => ({ id: c.id, type: c.type, componentKey: c.componentKey }))
+        components: loadedWorkspace.components?.map((c: any) => ({ id: c.id, type: c.type, componentKey: c.componentKey }))
       });
       
       // Build components from component keys if scenario provides them
@@ -1428,39 +1698,43 @@ export const Workspace: React.FC = () => {
       )}
 
       {!workspaceLoadError && (
-        <div className="flex h-screen bg-gray-50">
+        <div className="flex h-[100dvh] overflow-hidden bg-gray-50">
           {/* Left Sidebar - Component Palette */}
-          <aside
-          className="bg-white border-r border-gray-200 flex flex-col"
-          style={{ width: leftSidebarWidth }}
-        >
-          <div className="p-4 border-b border-gray-200 flex-shrink-0">
-            <h2 className="text-lg font-semibold text-gray-800">Components</h2>
-            <p className="text-xs text-gray-500 mt-1">Drag to canvas</p>
-          </div>
-          <div className="flex-1 overflow-hidden p-3" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <ComponentPalette 
-              width={leftSidebarWidth - 24} 
-              height={undefined}
-              onWidthChange={setLeftSidebarWidth}
+          {showLeftSidebar && (
+            <aside
+              className="bg-white border-r border-gray-200 flex flex-col min-h-0 shrink-0"
+              style={{ width: leftSidebarWidth }}
+            >
+              <div className="p-4 border-b border-gray-200 flex-shrink-0">
+                <h2 className="text-lg font-semibold text-gray-800">Components</h2>
+                <p className="text-xs text-gray-500 mt-1">Drag to canvas</p>
+              </div>
+              <div className="flex-1 overflow-hidden p-3" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <ComponentPalette
+                  width={leftSidebarWidth - 24}
+                  height={undefined}
+                  onWidthChange={setLeftSidebarWidth}
+                />
+              </div>
+            </aside>
+          )}
+
+          {/* Left resize handle */}
+          {showLeftSidebar && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize component palette"
+              className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300 shrink-0"
+              onMouseDown={(event) => handleHorizontalDrag(event, 'left')}
             />
-          </div>
-        </aside>
+          )}
 
-        {/* Left resize handle */}
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize component palette"
-          className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300"
-          onMouseDown={(event) => handleHorizontalDrag(event, 'left')}
-        />
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0">
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Top Toolbar */}
-          <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
-            <div className="flex flex-col gap-1">
+          <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-wrap items-start justify-between gap-3 flex-shrink-0">
+            <div className="flex flex-col gap-1 min-w-0">
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <button
                   type="button"
@@ -1533,7 +1807,26 @@ export const Workspace: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLeftSidebar((prev) => !prev)}
+                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md transition-colors"
+                  title={showLeftSidebar ? 'Hide component palette' : 'Show component palette'}
+                >
+                  {showLeftSidebar ? 'Hide Left' : 'Show Left'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRightSidebar((prev) => !prev)}
+                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md transition-colors"
+                  title={showRightSidebar ? 'Hide details panel' : 'Show details panel'}
+                >
+                  {showRightSidebar ? 'Hide Right' : 'Show Right'}
+                </button>
+              </div>
+
               {/* Workspace actions */}
               <div className="flex items-center gap-2">
                 <button
@@ -1590,7 +1883,7 @@ export const Workspace: React.FC = () => {
                 )}
               </div>
 
-              <div className="h-6 w-px bg-gray-200" />
+              <div className="h-6 w-px bg-gray-200 hidden md:block" />
 
               {/* Panels Menu */}
               <div className="relative group">
@@ -1640,6 +1933,20 @@ export const Workspace: React.FC = () => {
                     >
                       {showVersionDiffReviewerPanel ? '✓' : '○'} AI Version Diff Review
                     </button>
+                    <button
+                      onClick={() => setShowTimelinePanel(!showTimelinePanel)}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showTimelinePanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
+                    >
+                      {showTimelinePanel ? '✓' : '○'} Simulation Timeline
+                    </button>
+                    <button
+                      onClick={() => setShowRunComparisonPanel(!showRunComparisonPanel)}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showRunComparisonPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
+                    >
+                      {showRunComparisonPanel ? '✓' : '○'} Before vs After
+                    </button>
                     <div className="border-t border-gray-200 my-1" />
                     <p className="px-3 py-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
                       Learning tools
@@ -1676,7 +1983,7 @@ export const Workspace: React.FC = () => {
                 </div>
               </div>
 
-              <div className="h-6 w-px bg-gray-200" />
+              <div className="h-6 w-px bg-gray-200 hidden md:block" />
 
               {/* Simulation controls */}
               <div className="flex items-center gap-2">
@@ -1723,12 +2030,12 @@ export const Workspace: React.FC = () => {
           </header>
 
           {/* Main Workspace Area */}
-          <div className="flex-1 flex gap-0 p-4 min-h-0">
+          <div className="flex-1 flex gap-0 p-3 min-h-0 min-w-0">
             {/* Canvas Section */}
-            <div className="flex-1 flex flex-col gap-4 min-w-0 pr-4">
+            <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0 pr-3">
               {/* Canvas Container */}
               <div className="flex-1 bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-center overflow-auto min-h-0">
-                <div className="w-full h-full min-w-[800px] min-h-[500px]">
+                <div className="w-full h-full min-w-[560px] lg:min-w-[800px] min-h-[420px] lg:min-h-[500px]">
                   <Canvas
                     width={1000}
                     height={600}
@@ -1851,19 +2158,22 @@ export const Workspace: React.FC = () => {
             </div>
 
             {/* Right resize handle */}
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize details panel"
-              className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300"
-              onMouseDown={(event) => handleHorizontalDrag(event, 'right')}
-            />
+            {showRightSidebar && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize details panel"
+                className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300 shrink-0"
+                onMouseDown={(event) => handleHorizontalDrag(event, 'right')}
+              />
+            )}
 
             {/* Right Sidebar - Properties & Controls */}
-            <aside
-              className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden"
-              style={{ width: rightSidebarWidth, maxHeight: 'calc(100vh - 80px)' }}
-            >
+            {showRightSidebar && (
+              <aside
+                className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden min-h-0 h-full shrink-0"
+                style={{ width: rightSidebarWidth }}
+              >
               {/* Component Properties / Configuration Panel */}
               <ResizableCard
                 minHeight={150}
@@ -2112,6 +2422,43 @@ export const Workspace: React.FC = () => {
                 </ResizableCard>
               )}
 
+              {/* Simulation Timeline Panel (docked) */}
+              {showTimelinePanel && (
+                <ResizableCard
+                  minHeight={180}
+                  maxHeight={520}
+                  defaultHeight={timelinePanelHeight}
+                  onResize={setTimelinePanelHeight}
+                  title="Simulation Timeline"
+                  onClose={() => setShowTimelinePanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <SimulationTimelinePanel
+                    events={timelineEvents}
+                    isSimulationRunning={isSimulationRunning}
+                    onClear={() => setTimelineEvents([])}
+                  />
+                </ResizableCard>
+              )}
+
+              {/* Before vs After Comparison (docked) */}
+              {showRunComparisonPanel && (
+                <ResizableCard
+                  minHeight={160}
+                  maxHeight={420}
+                  defaultHeight={runComparisonPanelHeight}
+                  onResize={setRunComparisonPanelHeight}
+                  title="Before vs After"
+                  onClose={() => setShowRunComparisonPanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <SimulationRunComparisonCard
+                    baseline={simulationRunHistory[1] ?? null}
+                    latest={simulationRunHistory[0] ?? null}
+                  />
+                </ResizableCard>
+              )}
+
               {/* Learning Panels (docked) */}
               {showSocraticTutorPanel && (
                 <ResizableCard
@@ -2231,7 +2578,8 @@ export const Workspace: React.FC = () => {
                   />
                 </ResizableCard>
               )}
-            </aside>
+              </aside>
+            )}
           </div>
         </div>
       </div>

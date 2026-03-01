@@ -22,7 +22,7 @@ const generateComponentType = (): ComponentType => {
 };
 
 const generateComponentKey = (type: ComponentType): string => {
-  const keyMap: Record<ComponentType, string[]> = {
+  const keyMap: Partial<Record<ComponentType, string[]>> = {
     'client': ['client-web', 'client-mobile', 'client-api'],
     'database': ['database-mysql', 'database-postgresql', 'database-mongodb', 'database-redis'],
     'load-balancer': ['load-balancer-nginx', 'load-balancer-haproxy', 'load-balancer-awsAlb'],
@@ -33,7 +33,7 @@ const generateComponentKey = (type: ComponentType): string => {
     'proxy': ['proxy-squid', 'proxy-envoy', 'proxy-traefik']
   };
   
-  const keys = keyMap[type] || [];
+  const keys = keyMap[type] || ['client-web'];
   return keys[Math.floor(Math.random() * keys.length)];
 };
 
@@ -171,7 +171,7 @@ describe('Canvas Operations Property Tests', () => {
 
     it('should maintain component type consistency', () => {
       // Property: Component type should match the requested type and have appropriate configuration
-      const typeConfigRequirements: Record<ComponentType, string[]> = {
+      const typeConfigRequirements: Partial<Record<ComponentType, string[]>> = {
         'client': ['capacity', 'latency', 'failureRate', 'connectionPool', 'requestRate'],
         'database': ['capacity', 'latency', 'failureRate'],
         'load-balancer': ['capacity', 'latency', 'failureRate', 'algorithm'],
