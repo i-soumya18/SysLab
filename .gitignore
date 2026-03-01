@@ -14,6 +14,21 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+**/.env
+**/.env.*
+!.env.example
+!.env.prod.template
+!**/.env.example
+
+# Private keys/certificates (never commit)
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
 
 # IDE and editor files
 .vscode/
