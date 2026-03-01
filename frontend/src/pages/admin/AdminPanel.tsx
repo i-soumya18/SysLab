@@ -5,6 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
+import { useSEO } from '../../hooks/useSEO';
+import { adminPanelSEO } from '../../config/seoPages';
 
 interface AdminUser {
   id: string;
@@ -53,6 +55,8 @@ interface SystemSettings {
 type Tab = 'users' | 'subscriptions' | 'health' | 'metrics' | 'settings';
 
 export const AdminPanel: React.FC = () => {
+  useSEO(adminPanelSEO);
+  
   const { user } = useFirebaseAuthContext();
   const [activeTab, setActiveTab] = useState<Tab>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);

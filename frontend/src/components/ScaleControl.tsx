@@ -21,6 +21,8 @@ export interface ScaleControlProps {
   onStartSimulation?: () => void;
   onStopSimulation?: () => void;
   disabled?: boolean;
+  liveUserCount?: number;
+  liveScaleFactor?: number;
 }
 
 // Predefined scale points for logarithmic scale (SRS FR-5.1)
@@ -34,8 +36,7 @@ const SCALE_POINTS: ScalePoint[] = [
   { userCount: 1000000, label: '1M users', position: 60 },
   { userCount: 10000000, label: '10M users', position: 70 },
   { userCount: 100000000, label: '100M users', position: 80 },
-  { userCount: 1000000000, label: '1B users', position: 90 },
-  { userCount: 10000000000, label: '10B users', position: 100 }
+  { userCount: 1000000000, label: '1B users', position: 100 }
 ];
 
 export const ScaleControl: React.FC<ScaleControlProps> = ({
@@ -44,7 +45,9 @@ export const ScaleControl: React.FC<ScaleControlProps> = ({
   isSimulationRunning,
   onStartSimulation,
   onStopSimulation,
-  disabled = false
+  disabled = false,
+  liveUserCount,
+  liveScaleFactor
 }) => {
   const [sliderValue, setSliderValue] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -54,7 +57,7 @@ export const ScaleControl: React.FC<ScaleControlProps> = ({
   // Convert user count to slider position (logarithmic scale)
   const userCountToSliderPosition = useCallback((userCount: number): number => {
     if (userCount <= 1) return 0;
-    if (userCount >= 10000000000) return 100;
+    if (userCount >= 1000000000) return 100;
     
     // Find the two scale points that bracket this user count
     for (let i = 0; i < SCALE_POINTS.length - 1; i++) {
@@ -78,7 +81,7 @@ export const ScaleControl: React.FC<ScaleControlProps> = ({
   // Convert slider position to user count (logarithmic scale)
   const sliderPositionToUserCount = useCallback((position: number): number => {
     if (position <= 0) return 1;
-    if (position >= 100) return 10000000000;
+    if (position >= 100) return 1000000000;
     
     // Find the two scale points that bracket this position
     for (let i = 0; i < SCALE_POINTS.length - 1; i++) {
@@ -96,7 +99,7 @@ export const ScaleControl: React.FC<ScaleControlProps> = ({
       }
     }
     
-    return 10000000000;
+    return 1000000000;
   }, []);
 
   // Format user count for display
@@ -249,6 +252,12 @@ export const ScaleControl: React.FC<ScaleControlProps> = ({
             {isSimulationRunning ? 'Simulation Running' : 'Simulation Stopped'}
           </span>
         </div>
+
+        {isSimulationRunning && typeof liveUserCount === 'number' && typeof liveScaleFactor === 'number' && (
+          <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1 mt-2">
+            Live Ramp: x{liveScaleFactor.toFixed(2)} ({formatUserCount(liveUserCount)} users)
+          </div>
+        )}
 
         <div className="control-buttons">
           {!isSimulationRunning ? (

@@ -1,7 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../hooks/useFirebaseAuth';
+import { useSEO } from '../hooks/useSEO';
+import { gettingStartedSEO } from '../config/seoPages';
 
 export function GettingStartedPage() {
+  useSEO(gettingStartedSEO);
+  
   const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
 

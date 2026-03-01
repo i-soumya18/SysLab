@@ -21,6 +21,7 @@ export function setupRoutes(app: Express): void {
   const hintsRoutes = require('./hints').default;
   const { scalabilityRoutes } = require('./scalabilityRoutes');
   const adminRoutes = require('./admin').default;
+  const aiInsightsRoutes = require('./aiInsights').default;
 
   // Authentication routes
   app.use(`${apiPrefix}/auth`, authRoutes);
@@ -44,6 +45,7 @@ export function setupRoutes(app: Express): void {
   app.use(`${apiPrefix}/hints`, hintsRoutes); // SRS FR-9.3
   app.use(`${apiPrefix}/scalability`, scalabilityRoutes); // SRS NFR-4: Horizontal scaling and load balancing
   app.use(`${apiPrefix}/admin`, adminRoutes); // Admin routes
+  app.use(`${apiPrefix}/ai`, aiInsightsRoutes); // AI-powered architecture and root-cause analysis
 
   // Version routes - mounted last to avoid /:id catching everything
   app.use(`${apiPrefix}/versions`, versionRoutes);
@@ -70,7 +72,8 @@ export function setupRoutes(app: Express): void {
         progressiveConstraints: `${apiPrefix}/progressive-constraints`,
         hints: `${apiPrefix}/hints`,
         scalability: `${apiPrefix}/scalability`,
-        admin: `${apiPrefix}/admin`
+        admin: `${apiPrefix}/admin`,
+        ai: `${apiPrefix}/ai`
       }
     });
   });

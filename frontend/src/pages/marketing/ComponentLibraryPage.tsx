@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSEO } from '../../hooks/useSEO';
+import { componentLibrarySEO } from '../../config/seoPages';
 
 interface ComponentSpec {
   name: string;
@@ -397,6 +399,8 @@ const COMPONENT_LIBRARY: ComponentSpec[] = [
 const CATEGORIES = ['All', 'Traffic Management', 'Data Storage', 'Asynchronous Processing', 'Content Distribution', 'Compute'];
 
 export function ComponentLibraryPage() {
+  useSEO(componentLibrarySEO);
+  
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedComponent, setSelectedComponent] = useState<ComponentSpec | null>(null);
   const navigate = useNavigate();

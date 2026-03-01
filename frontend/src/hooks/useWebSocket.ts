@@ -329,6 +329,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
   }, []);
 
+  const scaleSimulation = useCallback(async (userCount: number) => {
+    if (!webSocketService.current) return;
+
+    try {
+      await webSocketService.current.controlSimulation('scale', { userCount });
+    } catch (error) {
+      console.error('Failed to scale simulation:', error);
+      throw error;
+    }
+  }, []);
+
   // Canvas methods
   const updateCanvas = useCallback(async (type: CanvasUpdate['type'], data: any) => {
     if (!webSocketService.current) return;
@@ -396,6 +407,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     stopSimulation,
     pauseSimulation,
     resumeSimulation,
+    scaleSimulation,
     
     // Canvas methods
     updateCanvas,

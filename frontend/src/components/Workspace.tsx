@@ -3,7 +3,7 @@
  * Combines the component palette and canvas with drag-and-drop functionality
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -18,6 +18,9 @@ import { ProgressiveConstraintsPanel } from './ProgressiveConstraintsPanel';
 import { ScaleControl } from './ScaleControl';
 import { ScenarioLibrary } from './ScenarioLibrary';
 import { StatusBar } from './StatusBar';
+import { AIInsightsPanel } from './AIInsightsPanel';
+import { SocraticTutorPanel } from './SocraticTutorPanel';
+import { VersionDiffReviewerPanel } from './VersionDiffReviewerPanel';
 import { SystemCollapseMonitor, type CollapseEvent, type RecoveryEvent } from './SystemCollapseMonitor';
 import { WorkspaceImportModal } from './WorkspaceImportModal';
 import { BottleneckVisualizer } from './BottleneckVisualizer';
@@ -80,6 +83,7 @@ export const Workspace: React.FC = () => {
   const [collapseEvents, setCollapseEvents] = useState<CollapseEvent[]>([]);
   const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([]);
   const [loadPattern, setLoadPattern] = useState<{ currentLoad: number; pattern: string } | null>(null);
+  const [liveScaleRamp, setLiveScaleRamp] = useState<{ userCount: number; scaleFactor: number } | null>(null);
   const [completedScenarios] = useState<string[]>([]);
   const [activeInsightsTab, setActiveInsightsTab] = useState<'scenarios' | 'progress' | 'health'>('scenarios');
   const [currentScenarioId, setCurrentScenarioId] = useState<string | null>(null);
@@ -95,6 +99,9 @@ export const Workspace: React.FC = () => {
   const [showMetricsPanel, setShowMetricsPanel] = useState<boolean>(false);
   const [showCostPanel, setShowCostPanel] = useState<boolean>(false);
   const [showScalabilityPanel, setShowScalabilityPanel] = useState<boolean>(false);
+  const [showAIInsightsPanel, setShowAIInsightsPanel] = useState<boolean>(false);
+  const [showSocraticTutorPanel, setShowSocraticTutorPanel] = useState<boolean>(false);
+  const [showVersionDiffReviewerPanel, setShowVersionDiffReviewerPanel] = useState<boolean>(false);
 
   // Layout sizing state
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(256);
@@ -118,6 +125,9 @@ export const Workspace: React.FC = () => {
   const [metricsPanelHeight, setMetricsPanelHeight] = useState<number>(250);
   const [costPanelHeight, setCostPanelHeight] = useState<number>(200);
   const [scalabilityPanelHeight, setScalabilityPanelHeight] = useState<number>(250);
+  const [aiInsightsPanelHeight, setAIInsightsPanelHeight] = useState<number>(280);
+  const [socraticTutorPanelHeight, setSocraticTutorPanelHeight] = useState<number>(320);
+  const [versionDiffReviewerPanelHeight, setVersionDiffReviewerPanelHeight] = useState<number>(320);
   const [hintsPanelHeight, setHintsPanelHeight] = useState<number>(200);
   const [constraintsPanelHeight, setConstraintsPanelHeight] = useState<number>(200);
   const [failurePanelHeight, setFailurePanelHeight] = useState<number>(200);
@@ -135,6 +145,7 @@ export const Workspace: React.FC = () => {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
+  const scaleUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { collaborationState } = useCollaboration({
     workspaceId: currentWorkspaceId,
@@ -151,6 +162,7 @@ export const Workspace: React.FC = () => {
     stopSimulation: wsStopSimulation,
     pauseSimulation: wsPauseSimulation,
     resumeSimulation: wsResumeSimulation,
+    scaleSimulation: wsScaleSimulation,
     subscribe
   } = useWebSocket({
     workspaceId: currentWorkspaceId,
@@ -278,6 +290,9 @@ export const Workspace: React.FC = () => {
       if (wsSimulationStatus.isRunning && !showMetricsPanel) {
         setShowMetricsPanel(true);
       }
+      if (!wsSimulationStatus.isRunning) {
+        setLiveScaleRamp(null);
+      }
     }
   }, [wsSimulationStatus, showMetricsPanel]);
 
@@ -286,6 +301,14 @@ export const Workspace: React.FC = () => {
       setElapsedTime(Math.floor(wsSimulationProgress.currentTime / 1000));
     }
   }, [wsSimulationProgress]);
+
+  useEffect(() => {
+    return () => {
+      if (scaleUpdateTimerRef.current) {
+        clearTimeout(scaleUpdateTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!wsSimulationMetrics) {
@@ -342,6 +365,27 @@ export const Workspace: React.FC = () => {
     };
   }, [subscribe, isSimulationRunning, showHintsPanel]);
 
+  // Auto-surface AI insights when bottlenecks appear during active simulation
+  useEffect(() => {
+    if (!isSimulationRunning || showAIInsightsPanel) {
+      return;
+    }
+
+    if (bottlenecksMap.size > 0) {
+      setShowAIInsightsPanel(true);
+    }
+  }, [isSimulationRunning, bottlenecksMap, showAIInsightsPanel]);
+
+  useEffect(() => {
+    if (!isSimulationRunning || showSocraticTutorPanel) {
+      return;
+    }
+
+    if (bottlenecksMap.size > 0) {
+      setShowSocraticTutorPanel(true);
+    }
+  }, [isSimulationRunning, bottlenecksMap, showSocraticTutorPanel]);
+
   // Subscribe to load pattern events
   useEffect(() => {
     if (!subscribe) return;
@@ -355,7 +399,9 @@ export const Workspace: React.FC = () => {
           ? patternData 
           : (patternData?.type || 'unknown');
         const currentLoad = payload.data.currentLoad || payload.data.load || patternData?.baseLoad || 0;
-        
+        const userCount = Number(payload.data.userCount);
+        const scaleFactor = Number(payload.data.scaleFactor);
+
         setLoadPattern(prev => {
           const newPattern = {
             currentLoad: typeof currentLoad === 'number' ? currentLoad : 0,
@@ -367,6 +413,15 @@ export const Workspace: React.FC = () => {
           }
           return newPattern;
         });
+
+        if (Number.isFinite(userCount) && userCount > 0 && Number.isFinite(scaleFactor) && scaleFactor > 0) {
+          setLiveScaleRamp(prev => {
+            if (prev?.userCount === userCount && prev?.scaleFactor === scaleFactor) {
+              return prev;
+            }
+            return { userCount, scaleFactor };
+          });
+        }
       } else if (payload.type === 'load_pattern_scheduled') {
         const patternData = payload.data.pattern || payload.data.type;
         const patternString = typeof patternData === 'string' 
@@ -777,6 +832,21 @@ export const Workspace: React.FC = () => {
   const handleScaleChange = (userCount: number) => {
     setCurrentScale(userCount);
     console.log('Scale changed to:', userCount, 'users');
+
+    if (!isSimulationRunning) {
+      return;
+    }
+
+    if (scaleUpdateTimerRef.current) {
+      clearTimeout(scaleUpdateTimerRef.current);
+    }
+
+    // Throttle slider updates while keeping live simulation response.
+    scaleUpdateTimerRef.current = setTimeout(() => {
+      wsScaleSimulation(userCount).catch(error => {
+        console.error('Failed to apply real-time scale update:', error);
+      });
+    }, 120);
   };
 
   const buildSimulationConfig = useCallback((): SimulationConfig => ({
@@ -803,6 +873,10 @@ export const Workspace: React.FC = () => {
 
       setElapsedTime(0);
 
+      const existingConfig = workspaceMeta?.configuration ?? buildSimulationConfig();
+      const baseLoad = Math.max(1, currentScale * 2);
+      const loadPatternType = existingConfig.loadPattern?.type ?? 'constant';
+
       const workspace = {
         id: currentWorkspaceId,
         name: workspaceMeta?.name ?? 'Demo Workspace',
@@ -810,7 +884,15 @@ export const Workspace: React.FC = () => {
         userId: currentUserId,
         components: workspaceComponents,
         connections: workspaceConnections,
-        configuration: workspaceMeta?.configuration ?? buildSimulationConfig(),
+        configuration: {
+          ...existingConfig,
+          duration: 60,
+          loadPattern: {
+            ...existingConfig.loadPattern,
+            type: loadPatternType,
+            baseLoad
+          }
+        },
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -1544,10 +1626,31 @@ export const Workspace: React.FC = () => {
                     >
                       {showScalabilityPanel ? '✓' : '○'} Scalability
                     </button>
+                    <button
+                      onClick={() => setShowAIInsightsPanel(!showAIInsightsPanel)}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showAIInsightsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
+                    >
+                      {showAIInsightsPanel ? '✓' : '○'} AI Insights
+                    </button>
+                    <button
+                      onClick={() => setShowVersionDiffReviewerPanel(!showVersionDiffReviewerPanel)}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showVersionDiffReviewerPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
+                    >
+                      {showVersionDiffReviewerPanel ? '✓' : '○'} AI Version Diff Review
+                    </button>
                     <div className="border-t border-gray-200 my-1" />
                     <p className="px-3 py-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
                       Learning tools
                     </p>
+                    <button
+                      onClick={() => setShowSocraticTutorPanel(!showSocraticTutorPanel)}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showSocraticTutorPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                      type="button"
+                    >
+                      {showSocraticTutorPanel ? '✓' : '○'} Socratic Tutor
+                    </button>
                     <button
                       onClick={() => setShowHintsPanel(!showHintsPanel)}
                       className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${showHintsPanel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
@@ -1884,6 +1987,8 @@ export const Workspace: React.FC = () => {
                   isSimulationRunning={isSimulationRunning}
                   onStartSimulation={handleStartSimulation}
                   onStopSimulation={handleStopSimulation}
+                  liveUserCount={liveScaleRamp?.userCount}
+                  liveScaleFactor={liveScaleRamp?.scaleFactor}
                 />
               </ResizableCard>
 
@@ -1961,7 +2066,82 @@ export const Workspace: React.FC = () => {
                 </ResizableCard>
               )}
 
+              {/* AI Insights Panel (docked) */}
+              {showAIInsightsPanel && (
+                <ResizableCard
+                  minHeight={220}
+                  maxHeight={700}
+                  defaultHeight={aiInsightsPanelHeight}
+                  onResize={setAIInsightsPanelHeight}
+                  title="AI Insights"
+                  onClose={() => setShowAIInsightsPanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <AIInsightsPanel
+                    workspace={{
+                      id: currentWorkspaceId,
+                      name: workspaceMeta?.name ?? 'Workspace',
+                      description: workspaceMeta?.description,
+                      userId: currentUserId,
+                      components: workspaceComponents,
+                      connections: workspaceConnections,
+                      configuration: workspaceMeta?.configuration ?? buildSimulationConfig(),
+                      createdAt: workspaceMeta?.createdAt ?? new Date(),
+                      updatedAt: new Date()
+                    }}
+                    systemMetrics={systemMetrics}
+                    componentMetrics={componentMetrics}
+                    bottlenecks={Array.from(bottlenecksMap.values())}
+                    isSimulationRunning={isSimulationRunning}
+                  />
+                </ResizableCard>
+              )}
+
+              {/* AI Version Diff Reviewer Panel (docked) */}
+              {showVersionDiffReviewerPanel && (
+                <ResizableCard
+                  minHeight={220}
+                  maxHeight={700}
+                  defaultHeight={versionDiffReviewerPanelHeight}
+                  onResize={setVersionDiffReviewerPanelHeight}
+                  title="AI Version Diff Review"
+                  onClose={() => setShowVersionDiffReviewerPanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <VersionDiffReviewerPanel workspaceId={currentWorkspaceId} />
+                </ResizableCard>
+              )}
+
               {/* Learning Panels (docked) */}
+              {showSocraticTutorPanel && (
+                <ResizableCard
+                  minHeight={220}
+                  maxHeight={700}
+                  defaultHeight={socraticTutorPanelHeight}
+                  onResize={setSocraticTutorPanelHeight}
+                  title="Socratic Tutor"
+                  onClose={() => setShowSocraticTutorPanel(false)}
+                  className="flex-shrink-0"
+                >
+                  <SocraticTutorPanel
+                    workspace={{
+                      id: currentWorkspaceId,
+                      name: workspaceMeta?.name ?? 'Workspace',
+                      description: workspaceMeta?.description,
+                      userId: currentUserId,
+                      components: workspaceComponents,
+                      connections: workspaceConnections,
+                      configuration: workspaceMeta?.configuration ?? buildSimulationConfig(),
+                      createdAt: workspaceMeta?.createdAt ?? new Date(),
+                      updatedAt: new Date()
+                    }}
+                    systemMetrics={systemMetrics}
+                    bottlenecks={Array.from(bottlenecksMap.values())}
+                    isSimulationRunning={isSimulationRunning}
+                  />
+                </ResizableCard>
+              )}
+
               {showHintsPanel && isSimulationRunning && (
                 <ResizableCard
                   minHeight={150}

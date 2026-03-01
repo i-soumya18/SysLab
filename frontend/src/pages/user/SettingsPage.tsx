@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
+import { useSEO } from '../../hooks/useSEO';
+import { settingsPageSEO } from '../../config/seoPages';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 const LOCAL_STORAGE_KEY = 'syslab:user-preferences';
@@ -55,6 +57,8 @@ const DEFAULT_PREFERENCES: FrontendPreferences = {
 };
 
 export function SettingsPage() {
+  useSEO(settingsPageSEO);
+  
   const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
 

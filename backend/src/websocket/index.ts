@@ -33,7 +33,7 @@ interface WorkspaceJoinData {
 
 interface SimulationControlData {
   workspaceId: string;
-  action: 'start' | 'stop' | 'pause' | 'resume';
+  action: 'start' | 'stop' | 'pause' | 'resume' | 'scale';
   parameters?: any;
 }
 
@@ -250,6 +250,9 @@ export function setupWebSocket(io: Server): void {
             // Initialize and start simulation with workspace data
             if (data.parameters?.workspace) {
               simulation.initialize(data.parameters.workspace);
+              if (typeof data.parameters?.userCount === 'number') {
+                simulation.setTrafficScale(data.parameters.userCount);
+              }
               await simulation.start();
             } else {
               callback?.({ error: 'Workspace configuration required to start simulation' });
@@ -280,6 +283,20 @@ export function setupWebSocket(io: Server): void {
             }
             simulation.resume();
             break;
+
+          case 'scale': {
+            if (!simulation) {
+              callback?.({ error: 'No simulation available to scale' });
+              return;
+            }
+            const requestedUserCount = Number(data.parameters?.userCount);
+            if (!Number.isFinite(requestedUserCount) || requestedUserCount < 1) {
+              callback?.({ error: 'A valid userCount (>= 1) is required for scale updates' });
+              return;
+            }
+            simulation.setTrafficScale(requestedUserCount);
+            break;
+          }
         }
 
         // Broadcast simulation control to all clients in workspace

@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
+import { useSEO } from '../../hooks/useSEO';
+import { landingPageSEO } from '../../config/seoPages';
 
 export function LandingPage() {
+  useSEO(landingPageSEO);
+  
   const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
 

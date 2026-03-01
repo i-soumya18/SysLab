@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../hooks/useFirebaseAuth';
+import { useSEO } from '../hooks/useSEO';
+import { workspacesSEO } from '../config/seoPages';
 import { WorkspaceApiService, type WorkspaceSummary } from '../services/workspaceApi';
 
 const ITEMS_PER_PAGE = 12;
 
 export function AllWorkspacesPage() {
+  useSEO(workspacesSEO);
+  
   const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
 

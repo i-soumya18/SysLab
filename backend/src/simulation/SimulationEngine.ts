@@ -15,6 +15,17 @@ import { BottleneckReporter, BottleneckAlert } from './BottleneckReporter';
 import { PerformanceOptimizer } from '../performance/PerformanceOptimizer';
 import { PerformanceMonitoringService } from '../performance/PerformanceMonitoringService';
 
+interface WeightedTimestamp {
+  timestamp: number;
+  weight: number;
+}
+
+interface WeightedLatencyPoint {
+  timestamp: number;
+  latency: number;
+  weight: number;
+}
+
 export class SimulationEngine extends EventEmitter {
   private scheduler: PriorityQueueEventScheduler;
   private state: SimulationState;
@@ -29,15 +40,20 @@ export class SimulationEngine extends EventEmitter {
   
   // Real-time metrics tracking
   private requestTracking: Map<string, {
-    arrivals: number[];
-    completions: number[];
-    failures: number[];
-    latencies: number[];
+    arrivals: WeightedTimestamp[];
+    completions: WeightedTimestamp[];
+    failures: WeightedTimestamp[];
+    latencies: WeightedLatencyPoint[];
     lastUpdateTime: number;
   }> = new Map();
   
   private realtimeMetricsInterval: NodeJS.Timeout | null = null;
   private bottleneckAnalysisInterval: NodeJS.Timeout | null = null;
+  private initialUserCount: number | null = null;
+  private currentUserCount: number | null = null;
+  private initialBaseLoad = 1;
+  private dynamicLoadFactor = 1;
+  private simulationDurationSeconds = 60;
 
   constructor() {
     super();
@@ -91,6 +107,11 @@ export class SimulationEngine extends EventEmitter {
     this.workspace = workspace;
     this.state = this.createInitialState();
     this.scheduler.clear();
+    this.initialBaseLoad = Math.max(1, Number(workspace.configuration?.loadPattern?.baseLoad ?? 1));
+    this.simulationDurationSeconds = Math.max(1, Number(workspace.configuration?.duration ?? 60));
+    this.initialUserCount = null;
+    this.currentUserCount = null;
+    this.dynamicLoadFactor = 1;
     
     // Initialize component states
     workspace.components.forEach(component => {
@@ -119,6 +140,33 @@ export class SimulationEngine extends EventEmitter {
   }
 
   /**
+   * Update traffic scale for a running simulation.
+   * Uses weighted requests so scale changes take effect immediately without full reschedule.
+   */
+  setTrafficScale(userCount: number): void {
+    const normalizedUserCount = Math.max(1, Math.min(1_000_000_000, Math.round(userCount)));
+
+    if (this.initialUserCount === null) {
+      this.initialUserCount = normalizedUserCount;
+    }
+
+    this.currentUserCount = normalizedUserCount;
+    this.dynamicLoadFactor = Math.max(0.000001, normalizedUserCount / this.initialUserCount);
+
+    const currentLoad = Math.max(1, this.initialBaseLoad * this.dynamicLoadFactor);
+    if (this.workspace?.configuration?.loadPattern) {
+      this.workspace.configuration.loadPattern.baseLoad = currentLoad;
+    }
+
+    this.emit('load_changed', {
+      userCount: normalizedUserCount,
+      currentLoad,
+      scaleFactor: this.dynamicLoadFactor,
+      pattern: this.workspace?.configuration?.loadPattern
+    });
+  }
+
+  /**
    * Start the simulation
    */
   async start(): Promise<void> {
@@ -133,7 +181,7 @@ export class SimulationEngine extends EventEmitter {
     this.state.isRunning = true;
     this.state.isPaused = false;
     this.state.startTime = Date.now();
-    this.state.endTime = this.state.startTime + (this.workspace.configuration.duration * 1000);
+    this.state.endTime = this.state.startTime + (this.simulationDurationSeconds * 1000);
 
     // Start metrics collection
     this.metricsCollector.start();
@@ -158,7 +206,7 @@ export class SimulationEngine extends EventEmitter {
 
     this.emit('started', { 
       workspaceId: this.workspace.id,
-      duration: this.workspace.configuration.duration 
+      duration: this.simulationDurationSeconds
     });
   }
 
@@ -450,33 +498,36 @@ export class SimulationEngine extends EventEmitter {
   private scheduleInitialEvents(): void {
     if (!this.workspace) return;
 
-    const config = this.workspace.configuration;
+    const config = this.workspace.configuration || ({} as any);
+    const loadPattern = config.loadPattern || { type: 'constant', baseLoad: 1 };
+    const failureScenarios = Array.isArray(config.failureScenarios) ? config.failureScenarios : [];
+    const metricsInterval = Math.max(100, Number(config.metricsCollection?.collectionInterval ?? 1000));
+    const durationMs = this.simulationDurationSeconds * 1000;
     
     // Schedule load generation events based on load pattern
-    this.scheduleLoadEvents(config.loadPattern);
+    this.scheduleLoadEvents(loadPattern);
     
     // Schedule failure scenarios
-    config.failureScenarios.forEach(scenario => {
+    failureScenarios.forEach(scenario => {
       this.scheduleEvent('failure_injection', scenario.componentId, scenario.startTime, scenario);
     });
 
     // Schedule periodic metrics collection
-    const metricsInterval = config.metricsCollection.collectionInterval;
-    for (let time = metricsInterval; time < config.duration * 1000; time += metricsInterval) {
+    for (let time = metricsInterval; time < durationMs; time += metricsInterval) {
       this.workspace.components.forEach(component => {
         this.scheduleEvent('metrics_collection', component.id, time);
       });
     }
 
     // Schedule periodic random failure checks (every 30 seconds)
-    for (let time = 30000; time < config.duration * 1000; time += 30000) {
+    for (let time = 30000; time < durationMs; time += 30000) {
       this.workspace.components.forEach(component => {
         this.scheduleEvent('random_failure_check', component.id, time);
       });
     }
 
     // Schedule periodic recovery checks (every 5 seconds)
-    for (let time = 5000; time < config.duration * 1000; time += 5000) {
+    for (let time = 5000; time < durationMs; time += 5000) {
       this.workspace.components.forEach(component => {
         this.scheduleEvent('recovery_check', component.id, time);
       });
@@ -489,19 +540,28 @@ export class SimulationEngine extends EventEmitter {
   private scheduleLoadEvents(loadPattern: LoadPattern): void {
     if (!this.workspace) return;
 
-    const duration = this.workspace.configuration.duration * 1000; // Convert to milliseconds
     const loadGenerator = LoadGeneratorFactory.createGenerator('realistic');
+    const maxEventsPerSecond = Math.max(
+      10,
+      Number(process.env.SIM_MAX_EVENTS_PER_SECOND || 500)
+    );
     
     // Generate load points using the advanced load generator
-    const loadPoints = loadGenerator.generateLoadPoints(loadPattern, this.workspace.configuration.duration);
+    const loadPoints = loadGenerator.generateLoadPoints(loadPattern, this.simulationDurationSeconds);
     
     // Schedule request arrivals based on generated load points
     loadPoints.forEach((point, index) => {
-      const requestsInThisSecond = Math.round(point.requestsPerSecond);
+      const requestsInThisSecond = Math.max(0, Math.round(point.requestsPerSecond));
+      if (requestsInThisSecond === 0) {
+        return;
+      }
+
+      const eventsToSchedule = Math.min(requestsInThisSecond, maxEventsPerSecond);
+      const requestWeight = requestsInThisSecond / eventsToSchedule;
       
       // Distribute requests evenly within the second
-      for (let i = 0; i < requestsInThisSecond; i++) {
-        const requestTime = point.timestamp + (i / requestsInThisSecond) * 1000;
+      for (let i = 0; i < eventsToSchedule; i++) {
+        const requestTime = point.timestamp + (i / eventsToSchedule) * 1000;
         
         // Find entry point components (components with no incoming connections)
         const entryComponents = this.findEntryComponents();
@@ -510,7 +570,8 @@ export class SimulationEngine extends EventEmitter {
           const targetComponent = this.selectEntryComponent(entryComponents);
           this.scheduleEvent('request_arrival', targetComponent.id, requestTime, {
             loadPoint: point,
-            requestIndex: i
+            requestIndex: i,
+            requestWeight
           });
         }
       }
@@ -520,7 +581,7 @@ export class SimulationEngine extends EventEmitter {
     this.emit('load_pattern_scheduled', {
       pattern: loadPattern,
       totalRequests: loadPoints.reduce((sum, point) => sum + point.requestsPerSecond, 0),
-      duration: this.workspace.configuration.duration
+      duration: this.simulationDurationSeconds
     });
   }
 
@@ -580,7 +641,7 @@ export class SimulationEngine extends EventEmitter {
         if (!event) break;
 
         // Check if simulation should end
-        if (event.timestamp > this.workspace!.configuration.duration * 1000) {
+        if (event.timestamp > this.simulationDurationSeconds * 1000) {
           this.stop();
           return;
         }
@@ -646,16 +707,16 @@ export class SimulationEngine extends EventEmitter {
   private handleRequestArrival(event: SimulationEvent): void {
     const component = this.state.components.get(event.componentId);
     if (!component) return;
+    const requestWeight = Math.max(0.0001, Number(event.data?.requestWeight ?? 1) * this.dynamicLoadFactor);
 
     // Check if component is at capacity - reject requests if so
-    const isAtCapacity = component.currentLoad >= component.configuration.capacity;
-    const queueFull = component.queueDepth >= (component.configuration.capacity * 2);
+    const queueFull = (component.queueDepth + requestWeight) >= (component.configuration.capacity * 2);
     
     if (queueFull) {
       // Request dropped due to queue overflow
       const tracking = this.requestTracking.get(event.componentId);
       if (tracking) {
-        tracking.failures.push(event.timestamp);
+        tracking.failures.push({ timestamp: event.timestamp, weight: requestWeight });
       }
       this.emit('request_dropped', { 
         componentId: event.componentId, 
@@ -665,13 +726,13 @@ export class SimulationEngine extends EventEmitter {
       return;
     }
 
-    component.currentLoad++;
-    component.queueDepth++;
+    component.currentLoad += requestWeight;
+    component.queueDepth += requestWeight;
 
     // Track arrival
     const tracking = this.requestTracking.get(event.componentId);
     if (tracking) {
-      tracking.arrivals.push(event.timestamp);
+      tracking.arrivals.push({ timestamp: event.timestamp, weight: requestWeight });
     }
 
     // Calculate processing time based on current load and capacity
@@ -687,19 +748,17 @@ export class SimulationEngine extends EventEmitter {
         event.timestamp + processingTime * 0.1, { 
           requestId: event.id,
           failed: true,
-          errorReason: !component.isHealthy ? 'component_unhealthy' : 'capacity_exceeded'
+          errorReason: !component.isHealthy ? 'component_unhealthy' : 'capacity_exceeded',
+          requestWeight
         });
-      
-      if (tracking) {
-        tracking.failures.push(event.timestamp);
-      }
     } else {
       // Schedule successful completion
       this.scheduleEvent('request_completion', event.componentId, 
         event.timestamp + processingTime, { 
           requestId: event.id,
           failed: false,
-          arrivalTime: event.timestamp
+          arrivalTime: event.timestamp,
+          requestWeight
         });
     }
 
@@ -716,24 +775,29 @@ export class SimulationEngine extends EventEmitter {
     const wasFailure = event.data?.failed === true;
     const arrivalTime = event.data?.arrivalTime || event.timestamp;
     const processingLatency = event.timestamp - arrivalTime;
+    const requestWeight = Math.max(0.0001, Number(event.data?.requestWeight ?? 1));
 
-    component.currentLoad = Math.max(0, component.currentLoad - 1);
-    component.queueDepth = Math.max(0, component.queueDepth - 1);
+    component.currentLoad = Math.max(0, component.currentLoad - requestWeight);
+    component.queueDepth = Math.max(0, component.queueDepth - requestWeight);
 
     // Track completion and latency
     const tracking = this.requestTracking.get(event.componentId);
     if (tracking) {
       if (wasFailure) {
-        tracking.failures.push(event.timestamp);
+        tracking.failures.push({ timestamp: event.timestamp, weight: requestWeight });
       } else {
-        tracking.completions.push(event.timestamp);
-        tracking.latencies.push(processingLatency);
+        tracking.completions.push({ timestamp: event.timestamp, weight: requestWeight });
+        tracking.latencies.push({
+          timestamp: event.timestamp,
+          latency: processingLatency,
+          weight: requestWeight
+        });
       }
     }
 
     // Only route to next components if request succeeded
     if (!wasFailure) {
-      this.routeRequestToNextComponents(event.componentId, event.timestamp);
+      this.routeRequestToNextComponents(event.componentId, event.timestamp, requestWeight);
     }
 
     this.emit('request_completed', { 
@@ -848,35 +912,32 @@ export class SimulationEngine extends EventEmitter {
     const windowStart = now - windowMs;
 
     // Calculate actual throughput based on completed requests
-    const recentCompletions = tracking.completions.filter(t => t >= windowStart);
-    const recentFailures = tracking.failures.filter(t => t >= windowStart);
-    const recentArrivals = tracking.arrivals.filter(t => t >= windowStart);
+    const recentCompletions = tracking.completions.filter(p => p.timestamp >= windowStart);
+    const recentFailures = tracking.failures.filter(p => p.timestamp >= windowStart);
     
-    const totalRequests = recentCompletions.length + recentFailures.length;
+    const completionWeight = this.sumWeights(recentCompletions);
+    const failureWeight = this.sumWeights(recentFailures);
+    const totalRequests = completionWeight + failureWeight;
     const requestsPerSecond = totalRequests; // Already filtered to 1-second window
     
     // Calculate actual error rate
-    const errorRate = totalRequests > 0 ? recentFailures.length / totalRequests : 0;
+    const errorRate = totalRequests > 0 ? failureWeight / totalRequests : 0;
     
     // Calculate actual latency from tracked latencies
-    const recentLatencies = tracking.latencies.filter((_, idx) => {
-      const completionTime = tracking.completions[idx];
-      return completionTime >= windowStart;
-    });
+    const recentLatencies = tracking.latencies.filter(p => p.timestamp >= windowStart);
     const averageLatency = recentLatencies.length > 0
-      ? recentLatencies.reduce((sum, lat) => sum + lat, 0) / recentLatencies.length
+      ? this.weightedAverageLatency(recentLatencies)
       : component.configuration.latency;
     
     // Calculate percentiles for latency
-    const sortedLatencies = [...recentLatencies].sort((a, b) => a - b);
-    const p50Latency = sortedLatencies.length > 0 
-      ? sortedLatencies[Math.floor(sortedLatencies.length * 0.5)] 
+    const p50Latency = recentLatencies.length > 0
+      ? this.weightedPercentileLatency(recentLatencies, 0.5)
       : averageLatency;
-    const p95Latency = sortedLatencies.length > 0 
-      ? sortedLatencies[Math.floor(sortedLatencies.length * 0.95)] 
+    const p95Latency = recentLatencies.length > 0
+      ? this.weightedPercentileLatency(recentLatencies, 0.95)
       : averageLatency;
-    const p99Latency = sortedLatencies.length > 0 
-      ? sortedLatencies[Math.floor(sortedLatencies.length * 0.99)] 
+    const p99Latency = recentLatencies.length > 0
+      ? this.weightedPercentileLatency(recentLatencies, 0.99)
       : averageLatency;
 
     // Get failure impact on performance
@@ -925,10 +986,10 @@ export class SimulationEngine extends EventEmitter {
     
     // Cleanup old tracking data (keep last 10 seconds)
     const cleanupThreshold = now - 10000;
-    tracking.arrivals = tracking.arrivals.filter(t => t >= cleanupThreshold);
-    tracking.completions = tracking.completions.filter(t => t >= cleanupThreshold);
-    tracking.failures = tracking.failures.filter(t => t >= cleanupThreshold);
-    tracking.latencies = tracking.latencies.slice(-1000); // Keep last 1000 latencies
+    tracking.arrivals = tracking.arrivals.filter(p => p.timestamp >= cleanupThreshold);
+    tracking.completions = tracking.completions.filter(p => p.timestamp >= cleanupThreshold);
+    tracking.failures = tracking.failures.filter(p => p.timestamp >= cleanupThreshold);
+    tracking.latencies = tracking.latencies.filter(p => p.timestamp >= cleanupThreshold);
   }
 
   /**
@@ -1019,7 +1080,7 @@ export class SimulationEngine extends EventEmitter {
   /**
    * Route completed request to connected components
    */
-  private routeRequestToNextComponents(componentId: string, timestamp: number): void {
+  private routeRequestToNextComponents(componentId: string, timestamp: number, requestWeight: number): void {
     if (!this.workspace) return;
 
     const outgoingConnections = this.workspace.connections.filter(
@@ -1029,7 +1090,7 @@ export class SimulationEngine extends EventEmitter {
     outgoingConnections.forEach(connection => {
       // Add connection latency
       const arrivalTime = timestamp + connection.configuration.latency;
-      this.scheduleEvent('request_arrival', connection.targetComponentId, arrivalTime);
+      this.scheduleEvent('request_arrival', connection.targetComponentId, arrivalTime, { requestWeight });
     });
   }
   
@@ -1042,29 +1103,26 @@ export class SimulationEngine extends EventEmitter {
     // Stream metrics every 100ms for real-time updates
     this.realtimeMetricsInterval = setInterval(() => {
       if (!this.workspace || !this.state.isRunning) return;
+      const simulationNow = this.state.currentTime;
       
       // Compute and emit metrics for all components
       this.workspace.components.forEach(component => {
         const tracking = this.requestTracking.get(component.id);
         if (!tracking) return;
         
-        const now = Date.now();
         const windowMs = 1000;
-        const windowStart = now - windowMs;
+        const windowStart = simulationNow - windowMs;
         
         // Calculate real-time metrics
-        const recentCompletions = tracking.completions.filter(t => t >= windowStart);
-        const recentFailures = tracking.failures.filter(t => t >= windowStart);
-        const recentLatencies = tracking.latencies.filter((_, idx) => {
-          const completionTime = tracking.completions[idx];
-          return completionTime >= windowStart;
-        });
+        const recentCompletions = tracking.completions.filter(p => p.timestamp >= windowStart);
+        const recentFailures = tracking.failures.filter(p => p.timestamp >= windowStart);
+        const recentLatencies = tracking.latencies.filter(p => p.timestamp >= windowStart);
         
-        const totalRequests = recentCompletions.length + recentFailures.length;
+        const totalRequests = this.sumWeights(recentCompletions) + this.sumWeights(recentFailures);
         const requestsPerSecond = totalRequests;
-        const errorRate = totalRequests > 0 ? recentFailures.length / totalRequests : 0;
+        const errorRate = totalRequests > 0 ? this.sumWeights(recentFailures) / totalRequests : 0;
         const avgLatency = recentLatencies.length > 0
-          ? recentLatencies.reduce((sum, lat) => sum + lat, 0) / recentLatencies.length
+          ? this.weightedAverageLatency(recentLatencies)
           : component.configuration.latency;
         
         const compState = this.state.components.get(component.id);
@@ -1076,7 +1134,7 @@ export class SimulationEngine extends EventEmitter {
         
         const metrics: ComponentMetrics = {
           componentId: component.id,
-          timestamp: now,
+          timestamp: simulationNow,
           requestsPerSecond,
           averageLatency: avgLatency,
           errorRate,
@@ -1093,7 +1151,7 @@ export class SimulationEngine extends EventEmitter {
       const systemMetrics = this.computeSystemMetrics();
       if (systemMetrics) {
         this.metricsCollector.emit('metrics_aggregated', {
-          timestamp: Date.now(),
+          timestamp: simulationNow,
           componentCount: this.workspace.components.length,
           systemMetrics
         });
@@ -1143,6 +1201,7 @@ export class SimulationEngine extends EventEmitter {
    */
   private computeSystemMetrics(): SystemMetrics | null {
     if (!this.workspace) return null;
+    const simulationNow = this.state.currentTime;
     
     const componentMetricsMap = new Map<string, ComponentMetrics>();
     let totalThroughput = 0;
@@ -1159,26 +1218,24 @@ export class SimulationEngine extends EventEmitter {
       const tracking = this.requestTracking.get(component.id);
       if (!tracking) return;
       
-      const now = Date.now();
       const windowMs = 1000;
-      const windowStart = now - windowMs;
+      const windowStart = simulationNow - windowMs;
       
-      const recentCompletions = tracking.completions.filter(t => t >= windowStart);
-      const recentFailures = tracking.failures.filter(t => t >= windowStart);
-      const recentLatencies = tracking.latencies.filter((_, idx) => {
-        const completionTime = tracking.completions[idx];
-        return completionTime >= windowStart;
-      });
+      const recentCompletions = tracking.completions.filter(p => p.timestamp >= windowStart);
+      const recentFailures = tracking.failures.filter(p => p.timestamp >= windowStart);
+      const recentLatencies = tracking.latencies.filter(p => p.timestamp >= windowStart);
       
-      const componentRequests = recentCompletions.length + recentFailures.length;
+      const completionWeight = this.sumWeights(recentCompletions);
+      const failureWeight = this.sumWeights(recentFailures);
+      const componentRequests = completionWeight + failureWeight;
       const componentThroughput = componentRequests;
       const componentLatency = recentLatencies.length > 0
-        ? recentLatencies.reduce((sum, lat) => sum + lat, 0) / recentLatencies.length
+        ? this.weightedAverageLatency(recentLatencies)
         : component.configuration.latency;
       
       totalThroughput += componentThroughput;
       totalLatency += componentLatency;
-      totalErrors += recentFailures.length;
+      totalErrors += failureWeight;
       totalRequests += componentRequests;
       totalQueueDepth += compState.queueDepth;
       
@@ -1188,10 +1245,10 @@ export class SimulationEngine extends EventEmitter {
       
       const metrics: ComponentMetrics = {
         componentId: component.id,
-        timestamp: now,
+        timestamp: simulationNow,
         requestsPerSecond: componentThroughput,
         averageLatency: componentLatency,
-        errorRate: componentRequests > 0 ? recentFailures.length / componentRequests : 0,
+        errorRate: componentRequests > 0 ? failureWeight / componentRequests : 0,
         cpuUtilization: Math.min(1.0, compState.currentLoad / component.configuration.capacity),
         memoryUtilization: Math.min(1.0, compState.queueDepth / (component.configuration.capacity * 2)),
         queueDepth: compState.queueDepth
@@ -1210,8 +1267,8 @@ export class SimulationEngine extends EventEmitter {
       const aggregated: AggregatedMetrics = {
         componentId,
         timeWindow: 1000,
-        startTime: Date.now() - 1000,
-        endTime: Date.now(),
+        startTime: Math.max(0, simulationNow - 1000),
+        endTime: simulationNow,
         requestsPerSecond: {
           min: metrics.requestsPerSecond,
           max: metrics.requestsPerSecond,
@@ -1257,7 +1314,7 @@ export class SimulationEngine extends EventEmitter {
     });
     
     return {
-      timestamp: Date.now(),
+      timestamp: simulationNow,
       totalThroughput,
       averageLatency,
       systemErrorRate,
@@ -1314,5 +1371,38 @@ export class SimulationEngine extends EventEmitter {
         systemMetrics
       });
     }
+  }
+
+  private sumWeights(points: WeightedTimestamp[]): number {
+    return points.reduce((sum, p) => sum + p.weight, 0);
+  }
+
+  private weightedAverageLatency(points: WeightedLatencyPoint[]): number {
+    const totalWeight = points.reduce((sum, p) => sum + p.weight, 0);
+    if (totalWeight <= 0) {
+      return 0;
+    }
+    const weightedSum = points.reduce((sum, p) => sum + (p.latency * p.weight), 0);
+    return weightedSum / totalWeight;
+  }
+
+  private weightedPercentileLatency(points: WeightedLatencyPoint[], percentile: number): number {
+    if (points.length === 0) {
+      return 0;
+    }
+
+    const sorted = [...points].sort((a, b) => a.latency - b.latency);
+    const totalWeight = sorted.reduce((sum, p) => sum + p.weight, 0);
+    const target = totalWeight * percentile;
+
+    let cumulative = 0;
+    for (const point of sorted) {
+      cumulative += point.weight;
+      if (cumulative >= target) {
+        return point.latency;
+      }
+    }
+
+    return sorted[sorted.length - 1].latency;
   }
 }

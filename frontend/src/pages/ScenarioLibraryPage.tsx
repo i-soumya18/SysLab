@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../hooks/useFirebaseAuth';
+import { useSEO } from '../hooks/useSEO';
+import { scenariosSEO } from '../config/seoPages';
 import { scenarioApi } from '../services/scenarioApi';
 import { progressApi } from '../services/progressApi';
 import type { Scenario } from '../types';
 
 export function ScenarioLibraryPage() {
+  useSEO(scenariosSEO);
+  
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useFirebaseAuthContext();

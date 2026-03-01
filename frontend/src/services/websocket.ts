@@ -225,7 +225,7 @@ export class WebSocketService {
   /**
    * Send simulation control command
    */
-  async controlSimulation(action: 'start' | 'stop' | 'pause' | 'resume', parameters?: any): Promise<void> {
+  async controlSimulation(action: 'start' | 'stop' | 'pause' | 'resume' | 'scale', parameters?: any): Promise<void> {
     if (!this.socket?.connected || !this.currentWorkspaceId) {
       throw new Error('WebSocket not connected or no workspace joined');
     }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
+import { useSEO } from '../../hooks/useSEO';
+import { profilePageSEO } from '../../config/seoPages';
 import { updateUserProfile } from '../../services/firebaseAuth';
 import { progressApi } from '../../services/progressApi';
 import type { ProgressStats } from '../../services/progressApi';
@@ -18,6 +20,8 @@ interface UserProfile {
 }
 
 export function ProfilePage() {
+  useSEO(profilePageSEO);
+  
   const navigate = useNavigate();
   const { user, logoutUser } = useFirebaseAuthContext();
 

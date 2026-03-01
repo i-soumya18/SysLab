@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../hooks/useFirebaseAuth';
+import { useSEO } from '../hooks/useSEO';
+import { dashboardSEO } from '../config/seoPages';
 import { progressApi } from '../services/progressApi';
 import type { ProgressStats } from '../services/progressApi';
 import { WorkspaceApiService } from '../services/workspaceApi';
@@ -27,12 +29,12 @@ interface WorkspaceListResponse {
   };
 }
 
-// Use a relative default so the frontend can talk to the backend
 // through the same origin (e.g. the Nginx gateway on :8080 in Docker).
 // Use environment variable for API URL, fallback to relative path
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export function Dashboard() {
+  useSEO(dashboardSEO);
   const navigate = useNavigate();
   const { user, logoutUser } = useFirebaseAuthContext();
 

@@ -142,6 +142,46 @@ describe('Simulation Engine', () => {
     expect(webServerMetrics).toBeDefined();
     expect(databaseMetrics).toBeDefined();
   });
+
+  it('should emit realtime metrics using simulation-time timestamps', async () => {
+    engine.initialize(mockWorkspace);
+
+    let realtimeMetric: any = null;
+    engine.on('metrics_collected', (metric) => {
+      if (!realtimeMetric && metric.componentId === 'web-server-1') {
+        realtimeMetric = metric;
+      }
+    });
+
+    await engine.start();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    engine.stop();
+
+    expect(realtimeMetric).toBeTruthy();
+    expect(realtimeMetric.timestamp).toBeGreaterThanOrEqual(0);
+    expect(realtimeMetric.timestamp).toBeLessThanOrEqual(mockWorkspace.configuration.duration * 1000);
+  });
+
+  it('should apply live scale updates and emit load change events', async () => {
+    engine.initialize(mockWorkspace);
+
+    const loadChanges: Array<{ userCount: number; scaleFactor: number; currentLoad: number }> = [];
+    engine.on('load_changed', (payload) => {
+      loadChanges.push(payload);
+    });
+
+    // Baseline scale
+    engine.setTrafficScale(100);
+    // 10x scale-up should immediately update load factor.
+    engine.setTrafficScale(1000);
+
+    expect(loadChanges.length).toBeGreaterThanOrEqual(2);
+    expect(loadChanges[0].userCount).toBe(100);
+    expect(loadChanges[0].scaleFactor).toBe(1);
+    expect(loadChanges[1].userCount).toBe(1000);
+    expect(loadChanges[1].scaleFactor).toBe(10);
+    expect(loadChanges[1].currentLoad).toBeGreaterThan(loadChanges[0].currentLoad);
+  });
 });
 
 describe('Component Model Factory', () => {

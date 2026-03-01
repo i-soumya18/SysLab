@@ -1,6 +1,10 @@
 import { useNavigate } from 'react-router-dom';
+import { useSEO } from '../../hooks/useSEO';
+import { aboutPageSEO } from '../../config/seoPages';
 
 export function AboutPage() {
+  useSEO(aboutPageSEO);
+  
   const navigate = useNavigate();
 
   return (

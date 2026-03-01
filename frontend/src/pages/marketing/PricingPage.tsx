@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuthContext } from '../../hooks/useFirebaseAuth';
+import { useSEO } from '../../hooks/useSEO';
+import { pricingSEO } from '../../config/seoPages';
 
 interface PricingTier {
   name: string;
@@ -65,6 +67,7 @@ const PRICING_TIERS: PricingTier[] = [
 ];
 
 export function PricingPage() {
+  useSEO(pricingSEO);
   const navigate = useNavigate();
   const { user } = useFirebaseAuthContext();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
