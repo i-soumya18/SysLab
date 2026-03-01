@@ -13,6 +13,7 @@ import { ConnectionWire } from './ConnectionWire';
 import { useConnectionManager } from './ConnectionManager';
 import { ConnectionConfigPanel } from './ConnectionConfigPanel';
 import { ConnectionContextMenu } from './ConnectionContextMenu';
+import { generateUUID } from '../utils/uuid';
 
 // Drag item type for React DnD
 export interface DragItem {
@@ -371,7 +372,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const maxY = Math.max(...groupComponents.map(comp => comp.position.y + 80));
     
     const newGroup: ComponentGroup = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       name,
       componentIds,
       color: `hsl(${Math.random() * 360}, 70%, 85%)`,
@@ -563,7 +564,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleComponentDuplicate = useCallback((component: Component) => {
     const duplicatedComponent = {
       ...component,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       position: {
         x: component.position.x + 20,
         y: component.position.y + 20

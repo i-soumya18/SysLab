@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import type { Connection, Component, ConnectionConfig } from '../types';
+import { generateUUID } from '../utils/uuid';
 
 interface ConnectionManagerProps {
   components: Component[];
@@ -156,7 +157,7 @@ export const useConnectionManager = ({
 
     // Create new connection
     const newConnection: Connection = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       sourceComponentId: wireInProgress.sourceComponentId,
       targetComponentId: targetComponentId,
       sourcePort: wireInProgress.sourcePort,

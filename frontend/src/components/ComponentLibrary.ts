@@ -4,6 +4,7 @@
  */
 
 import type { Component, ComponentType, ComponentConfig, ComponentMetadata } from '../types';
+import { generateUUID } from '../utils/uuid';
 
 // Client component configurations
 export const ClientConfigs = {
@@ -1108,7 +1109,7 @@ export class ComponentLibrary {
     const finalConfig = { ...baseConfig, ...customConfig };
 
     return {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       type,
       position,
       configuration: finalConfig,

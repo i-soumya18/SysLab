@@ -8,6 +8,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { Component, Position, Connection } from '../types';
 import { Canvas } from '../components/Canvas';
+import { generateUUID } from '../utils/uuid';
 
 // Performance optimization configuration
 interface OptimizationConfig {
@@ -109,7 +110,7 @@ export const OptimizedCanvas: React.FC<OptimizedCanvasProps> = ({
     data: any,
     rollback?: () => void
   ): string => {
-    const id = crypto.randomUUID();
+    const id = generateUUID();
     const update: OptimisticUpdate = {
       id,
       type,

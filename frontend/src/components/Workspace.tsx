@@ -26,6 +26,7 @@ import { useCollaboration } from '../hooks/useCollaboration';
 import useWebSocket from '../hooks/useWebSocket';
 import { WorkspaceApiService } from '../services/workspaceApi';
 import { scenarioApi } from '../services/scenarioApi';
+import { generateUUID } from '../utils/uuid';
 import { CostDashboard } from './CostDashboard';
 import { ScalabilityDashboard } from './ScalabilityDashboard';
 import { ComponentConfigPanel } from './ComponentConfigPanel';
@@ -636,7 +637,7 @@ export const Workspace: React.FC = () => {
         const oldId = comp.id;
         if (oldId && !isValidUUID(oldId)) {
           // Generate a new UUID for non-UUID IDs
-          const newId = crypto.randomUUID();
+          const newId = generateUUID();
           componentIdMap.set(oldId, newId);
           console.log(`  ID mapping: ${oldId} → ${newId}`);
         }
@@ -658,7 +659,7 @@ export const Workspace: React.FC = () => {
           newId = componentIdMap.get(oldId)!;
         } else {
           // Generate a new UUID if somehow missing
-          newId = crypto.randomUUID();
+          newId = generateUUID();
           if (oldId) {
             componentIdMap.set(oldId, newId);
           }
@@ -710,7 +711,7 @@ export const Workspace: React.FC = () => {
           console.log(`    ✅ Connection valid: ${sourceId} → ${targetId}`);
           return {
             ...conn,
-            id: (conn.id && isValidUUID(conn.id)) ? conn.id : crypto.randomUUID(),
+            id: (conn.id && isValidUUID(conn.id)) ? conn.id : generateUUID(),
             sourceComponentId: sourceId,
             targetComponentId: targetId
           };
@@ -1015,7 +1016,7 @@ export const Workspace: React.FC = () => {
       // Clean components - remove any extra fields like componentKey that aren't in the schema
       // Ensure all IDs are valid UUIDs
       const cleanedComponents = workspaceComponents.map(comp => {
-        const compId = isValidUUID(comp.id) ? comp.id : crypto.randomUUID();
+        const compId = isValidUUID(comp.id) ? comp.id : generateUUID();
         return {
           id: compId,
           type: comp.type,
@@ -1035,7 +1036,7 @@ export const Workspace: React.FC = () => {
 
       // Clean connections - ensure all required fields are present and IDs are UUIDs
       const cleanedConnections = workspaceConnections.map(conn => {
-        const connId = isValidUUID(conn.id) ? conn.id : crypto.randomUUID();
+        const connId = isValidUUID(conn.id) ? conn.id : generateUUID();
         let sourceId = conn.sourceComponentId;
         let targetId = conn.targetComponentId;
         
@@ -1049,10 +1050,10 @@ export const Workspace: React.FC = () => {
         
         // Ensure source and target IDs are valid UUIDs
         if (!isValidUUID(sourceId)) {
-          sourceId = crypto.randomUUID();
+          sourceId = generateUUID();
         }
         if (!isValidUUID(targetId)) {
-          targetId = crypto.randomUUID();
+          targetId = generateUUID();
         }
         
         return {
