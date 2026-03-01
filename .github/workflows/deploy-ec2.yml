@@ -29,7 +29,7 @@ env:
 jobs:
   quality-checks:
     name: Quality Checks
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_checks == false }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_checks != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
