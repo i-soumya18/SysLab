@@ -1,0 +1,84 @@
+# Development Docker Compose Configuration
+# Run with: docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d
+
+services:
+  postgres:
+    # Internal Docker network communication only
+
+  redis:
+    # Internal Docker network communication only
+
+  frontend:
+    # Use development Dockerfile
+    build:
+      context: ../../apps/frontend
+      dockerfile: Dockerfile.dev
+    command: npm run dev -- --host 0.0.0.0
+    volumes:
+      # Source code hot reload
+      - ../../apps/frontend/src:/app/src:delegated
+      - ../../apps/frontend/public:/app/public:delegated
+      - ../../apps/frontend/index.html:/app/index.html
+      - ../../apps/frontend/vite.config.ts:/app/vite.config.ts
+      - ../../apps/frontend/postcss.config.js:/app/postcss.config.js
+      - ../../apps/frontend/tailwind.config.js:/app/tailwind.config.js
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:8080/api/v1
+      VITE_WS_URL: ws://localhost:8080
+      VITE_HMR_HOST: localhost
+      VITE_HMR_CLIENT_PORT: 8080
+      VITE_HMR_PATH: /vite-hmr
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5173"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    stdin_open: true
+    tty: true
+
+  backend:
+    # Use development Dockerfile
+    build:
+      context: ../../apps/backend
+      dockerfile: Dockerfile.dev
+    command: npm run dev
+    volumes:
+      # Source code hot reload
+      - ../../apps/backend/src:/app/src:delegated
+      - ../../apps/backend/tsconfig.json:/app/tsconfig.json
+    environment:
+      NODE_ENV: development
+      DEBUG: "express:*"
+    stdin_open: true
+    tty: true
+
+  backend-replica:
+    # Use development Dockerfile
+    build:
+      context: ../../apps/backend
+      dockerfile: Dockerfile.dev
+    command: npm run dev
+    volumes:
+      # Source code hot reload
+      - ../../apps/backend/src:/app/src:delegated
+      - ../../apps/backend/tsconfig.json:/app/tsconfig.json
+    environment:
+      NODE_ENV: development
+      DEBUG: "express:*"
+    stdin_open: true
+    tty: true
+
+  # Override gateway to proxy to Vite dev server with proper HMR
+  gateway:
+    volumes:
+      - ../nginx/gateway.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

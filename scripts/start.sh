@@ -25,6 +25,7 @@ DOCKER_COMPOSE="docker compose"
 if ! docker compose version &> /dev/null 2>&1; then
     DOCKER_COMPOSE="docker-compose"
 fi
+COMPOSE_FILES="-f infra/compose/docker-compose.yml"
 
 # Check if .env file exists, if not copy from .env.example
 if [ ! -f .env ]; then
@@ -36,15 +37,15 @@ fi
 
 # Pull latest images
 echo "📥 Pulling latest images..."
-$DOCKER_COMPOSE pull
+$DOCKER_COMPOSE $COMPOSE_FILES pull
 
 # Build services
 echo "🔨 Building services..."
-$DOCKER_COMPOSE build --parallel
+$DOCKER_COMPOSE $COMPOSE_FILES build --parallel
 
 # Start services
 echo "🎬 Starting services..."
-$DOCKER_COMPOSE up -d
+$DOCKER_COMPOSE $COMPOSE_FILES up -d
 
 # Wait for services to be healthy
 echo ""
@@ -61,8 +62,8 @@ echo "🌐 Access the application at: http://localhost"
 echo "📊 Grafana dashboard at: http://localhost:3001 (admin/admin)"
 echo ""
 echo "📝 Useful commands:"
-echo "  - View logs: docker-compose logs -f"
-echo "  - Stop: docker-compose down"
-echo "  - Restart: docker-compose restart"
-echo "  - View status: docker-compose ps"
+echo "  - View logs: docker compose $COMPOSE_FILES logs -f"
+echo "  - Stop: docker compose $COMPOSE_FILES down"
+echo "  - Restart: docker compose $COMPOSE_FILES restart"
+echo "  - View status: docker compose $COMPOSE_FILES ps"
 echo ""

@@ -31,15 +31,15 @@
 - If unavailable/fails: deterministic fallback with explicit limitations and validation checklist (`analysisMode = heuristic-fallback`).
 
 ## Files added
-- `frontend/src/components/SocraticTutorPanel.tsx`
-- `frontend/src/components/VersionDiffReviewerPanel.tsx`
+- `apps/frontend/src/components/SocraticTutorPanel.tsx`
+- `apps/frontend/src/components/VersionDiffReviewerPanel.tsx`
 - `docs/architecture/AI_PHASE2_IMPLEMENTATION.md`
 
 ## Files updated
-- `backend/src/services/aiInsightService.ts`
-- `backend/src/routes/aiInsights.ts`
-- `frontend/src/services/aiInsightsApi.ts`
-- `frontend/src/components/Workspace.tsx`
+- `apps/backend/src/services/aiInsightService.ts`
+- `apps/backend/src/routes/aiInsights.ts`
+- `apps/frontend/src/services/aiInsightsApi.ts`
+- `apps/frontend/src/components/Workspace.tsx`
 
 ## Responsible design choices
 - AI prompts emphasize guidance and verification over authoritative answers.

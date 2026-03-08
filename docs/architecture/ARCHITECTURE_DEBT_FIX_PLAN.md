@@ -17,9 +17,9 @@
 - Impact:
   - Auth drift, authorization bypass opportunities, inconsistent user identity model.
 - Evidence:
-  - `frontend/src/hooks/useFirebaseAuth.tsx`
-  - `backend/src/routes/workspaces.ts` (comment notes temporary hybrid model; body/query userId accepted)
-  - `backend/src/middleware/auth.ts`, `backend/src/routes/auth.ts`
+  - `apps/frontend/src/hooks/useFirebaseAuth.tsx`
+  - `apps/backend/src/routes/workspaces.ts` (comment notes temporary hybrid model; body/query userId accepted)
+  - `apps/backend/src/middleware/auth.ts`, `apps/backend/src/routes/auth.ts`
 - Fix plan:
   1. Make backend trust Firebase ID tokens as primary identity source (middleware verifies Firebase token).
   2. Remove `userId` from client-controlled query/body for protected resources.
@@ -37,7 +37,7 @@
 - Impact:
   - User impersonation and cross-user action risk in collaboration/simulation control.
 - Evidence:
-  - `backend/src/websocket/index.ts` (`join-workspace` path)
+  - `apps/backend/src/websocket/index.ts` (`join-workspace` path)
 - Fix plan:
   1. Require valid token for any mutating WS events (simulation control, canvas updates, collaboration ops).
   2. Never assign identity from event payload; use authenticated socket principal only.
@@ -55,8 +55,8 @@
 - Impact:
   - Broken profile/account flows in production.
 - Evidence:
-  - `frontend/src/pages/user/ProfilePage.tsx`
-  - `backend/src/routes/users.ts`
+  - `apps/frontend/src/pages/user/ProfilePage.tsx`
+  - `apps/backend/src/routes/users.ts`
 - Fix plan:
   1. Align frontend to backend contract (`/users/me`) or add compatibility routes.
   2. Add shared typed API client and contract tests.
@@ -74,7 +74,7 @@
 - Impact:
   - High defect probability, difficult onboarding, testing friction.
 - Evidence:
-  - `frontend/src/components/Workspace.tsx`
+  - `apps/frontend/src/components/Workspace.tsx`
 - Fix plan:
   1. Split into feature modules: `workspace-state`, `simulation-controls`, `panel-manager`, `scenario-loader`, `autosave`.
   2. Move side-effects into dedicated hooks with unit tests.
@@ -89,7 +89,7 @@
 - Impact:
   - Fragile access control and environment-specific behavior.
 - Evidence:
-  - `frontend/src/hooks/useAdmin.ts`
+  - `apps/frontend/src/hooks/useAdmin.ts`
 - Fix plan:
   1. Fetch admin claim/role from backend or Firebase custom claims.
   2. Use backend authz response as single source of truth.
@@ -102,8 +102,8 @@
 - Impact:
   - Duplicate logic, inconsistent behavior, difficult observability.
 - Evidence:
-  - `backend/src/routes/simulation.ts`
-  - `backend/src/websocket/index.ts`
+  - `apps/backend/src/routes/simulation.ts`
+  - `apps/backend/src/websocket/index.ts`
 - Fix plan:
   1. Define canonical control path (likely WS for interactive runs).
   2. Keep REST for async/batch use cases only; route both through shared service layer.
@@ -118,7 +118,7 @@
 - Impact:
   - Environment-specific CORS/network bugs.
 - Evidence:
-  - Multiple files under `frontend/src/services/*` and pages.
+  - Multiple files under `apps/frontend/src/services/*` and pages.
 - Fix plan:
   1. Centralize API/WS base URL resolver in one config module.
   2. Enforce via lint rule or code review checklist.
@@ -135,7 +135,7 @@
 - Impact:
   - Referential integrity and migration complexity.
 - Evidence:
-  - `backend/src/config/database.ts`
+  - `apps/backend/src/config/database.ts`
 - Fix plan:
   1. Decide canonical user identity format.
   2. Add migration path + FK constraints where feasible.
@@ -149,7 +149,7 @@
 - Impact:
   - Learning path quality and data fidelity limits.
 - Evidence:
-  - `backend/src/routes/scenarios.ts`, `frontend/src/pages/ScenarioLibraryPage.tsx`
+  - `apps/backend/src/routes/scenarios.ts`, `apps/frontend/src/pages/ScenarioLibraryPage.tsx`
 - Fix plan:
   1. Persist prerequisite completion IDs and recommendation inputs.
   2. Add dedicated endpoint returning completed scenario IDs.
@@ -162,7 +162,7 @@
 - Impact:
   - Product capability gap.
 - Evidence:
-  - `frontend/src/pages/user/SubscriptionPage.tsx`
+  - `apps/frontend/src/pages/user/SubscriptionPage.tsx`
 - Fix plan:
   1. Integrate Stripe (or chosen provider) through backend webhook-driven billing state.
   2. Replace mock usage with backend-backed usage metrics.

@@ -10,15 +10,15 @@
   - If not configured or model call fails: transparent `heuristic-fallback` response with limitations.
 
 ## Files added
-- `backend/src/services/aiInsightService.ts`
-- `backend/src/routes/aiInsights.ts`
-- `frontend/src/services/aiInsightsApi.ts`
-- `frontend/src/components/AIInsightsPanel.tsx`
+- `apps/backend/src/services/aiInsightService.ts`
+- `apps/backend/src/routes/aiInsights.ts`
+- `apps/frontend/src/services/aiInsightsApi.ts`
+- `apps/frontend/src/components/AIInsightsPanel.tsx`
 - `docs/architecture/AI_PHASE1_IMPLEMENTATION.md`
 
 ## Files updated
-- `backend/src/routes/index.ts` (mount AI routes)
-- `frontend/src/components/Workspace.tsx` (panel toggle + docked panel + context wiring)
+- `apps/backend/src/routes/index.ts` (mount AI routes)
+- `apps/frontend/src/components/Workspace.tsx` (panel toggle + docked panel + context wiring)
 - `.env.example` (AI env vars)
 
 ## Responsible design choices

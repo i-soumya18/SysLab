@@ -24,7 +24,7 @@ The System Design Simulator is an educational platform for learning system desig
 
 ```bash
 cd /home/aspire/Projects/SysLab
-docker compose up -d
+docker compose -f infra/compose/docker-compose.yml up -d
 ```
 
 This starts:
@@ -34,7 +34,7 @@ This starts:
 ### 2. Start Backend
 
 ```bash
-cd backend
+cd apps/backend
 npm install
 npm run seed  # Populate demo user and scenarios
 npm run dev   # Start backend on port 3000
@@ -47,7 +47,7 @@ Health check: http://localhost:3000/health
 ### 3. Start Frontend
 
 ```bash
-cd frontend
+cd apps/frontend
 npm install
 npm run dev   # Start frontend on port 5173
 ```
@@ -313,18 +313,18 @@ Components are flagged as bottlenecks when they exceed thresholds:
 
 ### Backend won't start
 - Check PostgreSQL is running: `docker ps`
-- Check environment variables in `backend/.env`
-- Check logs: `cd backend && npm run dev`
+- Check environment variables in `apps/backend/.env`
+- Check logs: `cd apps/backend && npm run dev`
 
 ### Database connection errors
 - Verify port 5433 is free: `lsof -i :5433`
-- Check Docker container health: `docker compose ps`
-- Reset database: `docker compose down -v && docker compose up -d`
+- Check Docker container health: `docker compose -f infra/compose/docker-compose.yml ps`
+- Reset database: `docker compose -f infra/compose/docker-compose.yml down -v && docker compose -f infra/compose/docker-compose.yml up -d`
 
 ### Frontend can't reach backend
 - Verify backend is on port 3000: `curl http://localhost:3000/health`
 - Check browser console for CORS errors
-- Verify `frontend/src/services/*Api.ts` use port 3000
+- Verify `apps/frontend/src/services/*Api.ts` use port 3000
 
 ### Simulation not starting
 - Check simulation logs in backend console
@@ -334,7 +334,7 @@ Components are flagged as bottlenecks when they exceed thresholds:
 ### Seed script fails
 - Ensure database is initialized first
 - Check demo user doesn't already exist
-- Run: `cd backend && npm run seed`
+- Run: `cd apps/backend && npm run seed`
 
 ## Development
 
@@ -342,11 +342,11 @@ Components are flagged as bottlenecks when they exceed thresholds:
 
 ```bash
 # Backend tests
-cd backend
+cd apps/backend
 npm test
 
 # Frontend tests
-cd frontend
+cd apps/frontend
 npm test
 ```
 
@@ -363,7 +363,7 @@ docker exec -i postgres psql -U postgres -d system_design_simulator < migration.
 ### Re-seed Database
 
 ```bash
-cd backend
+cd apps/backend
 npm run seed
 ```
 
@@ -405,7 +405,7 @@ Demo environment doesn't need email verification complexity. Production would re
 For issues or questions:
 1. Check logs: Backend console and browser DevTools
 2. Review this guide
-3. Check specifications in `.kiro/specs/`
+3. Check specifications in `docs/specs/`
 4. File issues with detailed reproduction steps
 
 ## License

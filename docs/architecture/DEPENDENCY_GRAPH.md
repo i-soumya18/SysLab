@@ -1,7 +1,7 @@
 # Module Dependency Graph (Frontend + Backend)
 
 ## Scope
-This graph is module-level (not file-level) and reflects the current import/runtime structure in `frontend/src` and `backend/src`.
+This graph is module-level (not file-level) and reflects the current import/runtime structure in `apps/frontend/src` and `apps/backend/src`.
 
 ## Frontend Module Graph
 ```mermaid

@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 PROJECT_NAME="sds"
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml"
+COMPOSE_FILES="-f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  System Design Simulator - Development Mode (Hot Reload)     ║${NC}"
@@ -84,8 +84,8 @@ echo ""
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}🔥 HOT RELOAD ENABLED${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
-echo -e "   Frontend:  Edit ${GREEN}frontend/src/**${NC} → Changes auto-refresh"
-echo -e "   Backend:   Edit ${GREEN}backend/src/**${NC} → Server auto-restarts"
+echo -e "   Frontend:  Edit ${GREEN}apps/frontend/src/**${NC} → Changes auto-refresh"
+echo -e "   Backend:   Edit ${GREEN}apps/backend/src/**${NC} → Server auto-restarts"
 echo ""
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}📝 USEFUL COMMANDS${NC}"

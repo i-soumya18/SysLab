@@ -13,6 +13,13 @@ An interactive professional self-learning platform that enables users to learn, 
 - 🎯 **Learning Scenarios**: Guided exercises with specific objectives and challenges
 - 💾 **Workspace Management**: Save, load, and share system designs
 
+## Reviewer Quick Path
+
+- Technical review map: `docs/REVIEW_GUIDE.md`
+- AWS deployment package: `infra/aws-deployment/`
+- AI implementation notes: `docs/architecture/AI_PHASE1_IMPLEMENTATION.md`, `docs/architecture/AI_PHASE2_IMPLEMENTATION.md`
+- Hackathon PPT content: `docs/hackathon/AI_FOR_BHARAT_PPT_CONTENT.md`
+
 ## Architecture
 
 - **Frontend**: React + TypeScript + Vite
@@ -57,14 +64,14 @@ If you prefer to set up manually:
 
 1. **Start database services:**
    ```bash
-   docker-compose up -d postgres redis
+   docker compose -f infra/compose/docker-compose.yml up -d postgres redis
    ```
 
 2. **Install dependencies:**
    ```bash
    npm install
-   cd frontend && npm install && cd ..
-   cd backend && npm install && cd ..
+   cd apps/frontend && npm install && cd ../..
+   cd apps/backend && npm install && cd ../..
    ```
 
 3. **Start development servers:**
@@ -82,7 +89,7 @@ If you prefer to set up manually:
 Copy the example environment file and adjust as needed:
 
 ```bash
-cp backend/.env.example backend/.env
+cp apps/backend/.env.example apps/backend/.env
 ```
 
 Key environment variables:
@@ -97,20 +104,20 @@ The project uses Docker Compose to manage PostgreSQL and Redis:
 
 ```bash
 # Start services
-docker-compose up -d
+docker compose -f infra/compose/docker-compose.yml up -d
 
 # Stop services
-docker-compose down
+docker compose -f infra/compose/docker-compose.yml down
 
 # View logs
-docker-compose logs postgres
-docker-compose logs redis
+docker compose -f infra/compose/docker-compose.yml logs postgres
+docker compose -f infra/compose/docker-compose.yml logs redis
 
 # Connect to PostgreSQL
-docker-compose exec postgres psql -U postgres -d system_design_simulator
+docker compose -f infra/compose/docker-compose.yml exec postgres psql -U postgres -d system_design_simulator
 
 # Connect to Redis
-docker-compose exec redis redis-cli
+docker compose -f infra/compose/docker-compose.yml exec redis redis-cli
 ```
 
 ## Development Scripts
@@ -136,21 +143,32 @@ npm run test:backend     # Run backend tests
 
 ```
 system-design-simulator/
-├── frontend/                 # React frontend application
-│   ├── src/
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/                  # Node.js backend API
-│   ├── src/
-│   │   ├── config/          # Database and Redis configuration
-│   │   ├── routes/          # API route handlers
-│   │   ├── websocket/       # WebSocket event handlers
-│   │   └── index.ts         # Main server file
-│   ├── package.json
-│   └── tsconfig.json
-├── database/                 # Database initialization scripts
+├── docs/                     # Reviewer docs, architecture notes, specs, hackathon assets
+│   ├── REVIEW_GUIDE.md
+│   ├── architecture/
+│   ├── specs/
+│   └── hackathon/
+├── apps/
+│   ├── frontend/             # React frontend application
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── vite.config.ts
+│   └── backend/              # Node.js backend API
+│       ├── src/
+│       │   ├── config/      # Database and Redis configuration
+│       │   ├── routes/      # API route handlers
+│       │   ├── websocket/   # WebSocket event handlers
+│       │   └── index.ts     # Main server file
+│       ├── package.json
+│       └── tsconfig.json
+├── infra/
+│   ├── aws-deployment/       # AWS deployment scripts, task defs, CI/CD notes
+│   ├── compose/              # Docker Compose files
+│   ├── database/             # Database initialization scripts
+│   ├── nginx/                # Gateway configuration
+│   └── monitoring/           # Prometheus/Grafana config
+├── tests/                    # Root test entrypoints (symlinked to app test suites)
 ├── scripts/                  # Development and deployment scripts
-├── docker-compose.yml        # Docker services configuration
 └── package.json             # Root workspace configuration
 ```
 

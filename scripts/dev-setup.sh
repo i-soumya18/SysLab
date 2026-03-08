@@ -25,34 +25,34 @@ echo ""
 
 # Install backend dependencies
 echo "📦 Installing backend dependencies..."
-cd backend
+cd apps/backend
 npm install
 echo "✅ Backend dependencies installed"
-cd ..
+cd ../..
 
 # Install frontend dependencies
 echo "📦 Installing frontend dependencies..."
-cd frontend
+cd apps/frontend
 npm install
 echo "✅ Frontend dependencies installed"
-cd ..
+cd ../..
 
 # Create .env files if they don't exist
 echo ""
 echo "📝 Setting up environment files..."
 
-if [ ! -f backend/.env ]; then
-    cp backend/.env.example backend/.env
-    echo "✅ Created backend/.env from backend/.env.example"
+if [ ! -f apps/backend/.env ]; then
+    cp apps/backend/.env.example apps/backend/.env
+    echo "✅ Created apps/backend/.env from apps/backend/.env.example"
 else
-    echo "⏭️  backend/.env already exists"
+    echo "⏭️  apps/backend/.env already exists"
 fi
 
-if [ ! -f frontend/.env ]; then
-    cp frontend/.env.example frontend/.env
-    echo "✅ Created frontend/.env from frontend/.env.example"
+if [ ! -f apps/frontend/.env ]; then
+    cp apps/frontend/.env.example apps/frontend/.env
+    echo "✅ Created apps/frontend/.env from apps/frontend/.env.example"
 else
-    echo "⏭️  frontend/.env already exists"
+    echo "⏭️  apps/frontend/.env already exists"
 fi
 
 if [ ! -f .env ]; then
@@ -69,6 +69,6 @@ echo "📝 Next steps:"
 echo "  1. Update .env files with your configuration"
 echo "  2. Start Docker services: ./scripts/start.sh"
 echo "  3. Or run locally:"
-echo "     - Backend: cd backend && npm run dev"
-echo "     - Frontend: cd frontend && npm run dev"
+echo "     - Backend: cd apps/backend && npm run dev"
+echo "     - Frontend: cd apps/frontend && npm run dev"
 echo ""

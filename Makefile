@@ -13,41 +13,41 @@ dev-down:
 	@./scripts/stop-dev.sh
 
 dev-logs:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
+	docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml logs -f
 
 dev-logs-frontend:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f frontend
+	docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml logs -f frontend
 
 dev-logs-backend:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f backend
+	docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml logs -f backend
 
 dev-clean:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+	docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml down -v
 
 # Building
 build: build-backend build-frontend
 
 build-backend:
-	docker compose build backend
+	docker compose -f infra/compose/docker-compose.yml build backend
 
 build-frontend:
-	docker compose build frontend
+	docker compose -f infra/compose/docker-compose.yml build frontend
 
 # Testing
 test: test-frontend test-backend
 
 test-frontend:
-	cd frontend && npm test
+	cd apps/frontend && npm test
 
 test-backend:
-	cd backend && npm test
+	cd apps/backend && npm test
 
 # Shell access
 shell-frontend:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml exec frontend sh
+	docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml exec frontend sh
 
 shell-backend:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend sh
+	docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml exec backend sh
 
 # Shortcuts
 logs: dev-logs

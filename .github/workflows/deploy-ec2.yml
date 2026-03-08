@@ -6,12 +6,12 @@ on:
       - main
     paths:
       - '.github/workflows/deploy-ec2.yml'
-      - 'aws-deployment/**'
-      - 'frontend/**'
-      - 'backend/**'
-      - 'database/**'
-      - 'docker-compose.yml'
-      - 'docker-compose.dev.yml'
+      - 'infra/aws-deployment/**'
+      - 'apps/frontend/**'
+      - 'apps/backend/**'
+      - 'infra/database/**'
+      - 'infra/compose/docker-compose.yml'
+      - 'infra/compose/docker-compose.dev.yml'
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
@@ -25,7 +25,7 @@ concurrency:
 
 env:
   DEPLOY_DIR: /home/ubuntu/SysLab
-  COMPOSE_FILE: aws-deployment/docker-compose.ec2.yml
+  COMPOSE_FILE: infra/aws-deployment/docker-compose.ec2.yml
 
 jobs:
   deploy:
@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate compose config
-        run: docker compose -f aws-deployment/docker-compose.ec2.yml config >/dev/null
+        run: docker compose -f infra/aws-deployment/docker-compose.ec2.yml config >/dev/null
 
       - name: Validate required secrets
         env:
@@ -95,8 +95,8 @@ jobs:
           rsync -az --delete \
             --exclude '.git' \
             --exclude 'node_modules' \
-            --exclude 'frontend/node_modules' \
-            --exclude 'backend/node_modules' \
+            --exclude 'apps/frontend/node_modules' \
+            --exclude 'apps/backend/node_modules' \
             --exclude 'coverage' \
             --exclude '.env' \
             -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts" \
@@ -117,7 +117,7 @@ jobs:
               -o UserKnownHostsFile=~/.ssh/known_hosts \
               -o ConnectTimeout=20 \
               "$EC2_USER@$EC2_HOST" \
-              "cd '$DEPLOY_DIR' && PUBLIC_HOST='$PUBLIC_HOST' JWT_SECRET='$JWT_SECRET' JWT_REFRESH_SECRET='$JWT_REFRESH_SECRET' bash ./aws-deployment/deploy-ec2-remote.sh"; then
+              "cd '$DEPLOY_DIR' && PUBLIC_HOST='$PUBLIC_HOST' JWT_SECRET='$JWT_SECRET' JWT_REFRESH_SECRET='$JWT_REFRESH_SECRET' bash ./infra/aws-deployment/deploy-ec2-remote.sh"; then
               echo "Deploy succeeded on attempt $attempt"
               break
             fi
@@ -160,4 +160,4 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile=~/.ssh/known_hosts \
             "$EC2_USER@$EC2_HOST" \
-            "cd '$DEPLOY_DIR/aws-deployment' && docker compose -f docker-compose.ec2.yml ps && docker compose -f docker-compose.ec2.yml logs --tail=120 backend frontend gateway"
+            "cd '$DEPLOY_DIR/infra/aws-deployment' && docker compose -f docker-compose.ec2.yml ps && docker compose -f docker-compose.ec2.yml logs --tail=120 backend frontend gateway"

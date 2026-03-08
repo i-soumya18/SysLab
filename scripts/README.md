@@ -25,7 +25,7 @@ Helper scripts for operating the System Design Simulator with Docker.
 
 **To remove volumes as well:**
 ```bash
-docker-compose down -v
+docker compose -f infra/compose/docker-compose.yml down -v
 ```
 
 ### `health-check.sh`
@@ -151,7 +151,7 @@ SysLab/
 │   ├── dev-setup.sh
 │   ├── backup.sh
 │   └── restore.sh
-├── docker-compose.yml
+├── infra/compose/docker-compose.yml
 ├── .env.example
 └── ...
 ```

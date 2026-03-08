@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml"
+COMPOSE_FILES="-f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml"
 
 echo -e "${BLUE}Stopping development environment...${NC}"
 docker compose $COMPOSE_FILES down
